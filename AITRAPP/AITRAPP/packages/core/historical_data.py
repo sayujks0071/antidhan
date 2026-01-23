@@ -40,6 +40,53 @@ class HistoricalDataLoader:
         if not re.match(r"^[a-zA-Z0-9_-]+$", text):
             raise ValueError(f"Invalid input: {text}. Only alphanumeric, underscore, and hyphen allowed.")
 
+    def validate_data(self, df: pd.DataFrame, filename: str) -> pd.DataFrame:
+        """
+        Validate data quality and filter invalid records.
+
+        Checks:
+        1. Positive prices (Open, High, Low, Close)
+        2. OHLC consistency (High >= Low, High >= Open, High >= Close, Low <= Open, Low <= Close)
+        3. Non-negative volume and OI
+        """
+        if df.empty:
+            return df
+
+        initial_len = len(df)
+
+        # 1. Positive Prices
+        price_cols = ['Open', 'High', 'Low', 'Close']
+        for col in price_cols:
+            if col in df.columns:
+                df = df[df[col] > 0]
+
+        # 2. OHLC Consistency
+        if all(col in df.columns for col in price_cols):
+            mask = (
+                (df['High'] >= df['Low']) &
+                (df['High'] >= df['Open']) &
+                (df['High'] >= df['Close']) &
+                (df['Low'] <= df['Open']) &
+                (df['Low'] <= df['Close'])
+            )
+            df = df[mask]
+
+        # 3. Non-negative Volume/OI
+        if 'No. of contracts' in df.columns:
+            # Handle NaNs in Volume
+            df = df[ (df['No. of contracts'].isna()) | (df['No. of contracts'] >= 0) ]
+
+        if 'Open Int' in df.columns:
+             # Handle NaNs in OI before checking
+             df = df[ (df['Open Int'].isna()) | (df['Open Int'] >= 0) ]
+
+        if len(df) < initial_len:
+            logger.warning(
+                f"Dropped {initial_len - len(df)} invalid records from {filename} (remaining: {len(df)})"
+            )
+
+        return df
+
     def load_file(
         self,
         symbol: str,
@@ -144,6 +191,9 @@ class HistoricalDataLoader:
             # Drop rows with invalid dates
             df = df.dropna(subset=['Date'])
             
+            # Validate Data
+            df = self.validate_data(df, filepath.name)
+
             # Cache
             self._cache[cache_key] = df
         
