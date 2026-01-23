@@ -1,0 +1,23 @@
+foundry:
+  max_candidates: 80
+  fast_mode_candidates: 15
+  timeframes: ["5m", "15m", "1d"]
+  data_days_intraday: 59
+  data_days_daily: 3650
+  folds: 4
+  fast_mode_folds: 2
+
+execution:
+  slippage_bps_per_side: 5.0
+  brokerage_per_order: 20.0
+  spread_guard_bps: 2.0
+  tax_bps: 3.0 # Approx STT + GST etc.
+
+selection:
+  min_trades_5m: 60
+  min_trades_15m: 30
+  max_drawdown: 0.30
+  min_profit_factor: 1.1
+  min_win_rate: 0.35
+  sanity_daily_min_sharpe: -0.5 # Lenient check for daily sanity
+  sanity_daily_max_dd: 0.45

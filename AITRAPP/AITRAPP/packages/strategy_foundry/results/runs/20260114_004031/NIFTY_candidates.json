@@ -1,0 +1,232 @@
+[
+  {
+    "strategy_id": "f81e7a55",
+    "entry_rules": [
+      {
+        "indicator": "adx",
+        "operator": "<",
+        "value": 25,
+        "params": {
+          "period": 21
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 10
+  },
+  {
+    "strategy_id": "626df857",
+    "entry_rules": [
+      {
+        "indicator": "adx",
+        "operator": "<",
+        "value": 25,
+        "params": {
+          "period": 14
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 10
+  },
+  {
+    "strategy_id": "10d114fc",
+    "entry_rules": [
+      {
+        "indicator": "donchian",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20
+        }
+      },
+      {
+        "indicator": "donchian",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 20
+  },
+  {
+    "strategy_id": "d6618556",
+    "entry_rules": [
+      {
+        "indicator": "supertrend",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 14,
+          "multiplier": 3.0
+        }
+      },
+      {
+        "indicator": "supertrend",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 7,
+          "multiplier": 3.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 10
+  },
+  {
+    "strategy_id": "c026c32d",
+    "entry_rules": [
+      {
+        "indicator": "rsi",
+        "operator": ">",
+        "value": 50,
+        "params": {
+          "period": 7
+        }
+      },
+      {
+        "indicator": "rsi",
+        "operator": ">",
+        "value": 50,
+        "params": {
+          "period": 14
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 50
+  },
+  {
+    "strategy_id": "aeb3c1d5",
+    "entry_rules": [
+      {
+        "indicator": "donchian",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 20
+        }
+      },
+      {
+        "indicator": "adx",
+        "operator": ">",
+        "value": 20,
+        "params": {
+          "period": 14
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 5
+  },
+  {
+    "strategy_id": "b94b057d",
+    "entry_rules": [
+      {
+        "indicator": "donchian",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 20
+        }
+      },
+      {
+        "indicator": "bollinger",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 20,
+          "std": 2.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 1.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 20
+  },
+  {
+    "strategy_id": "c619041c",
+    "entry_rules": [
+      {
+        "indicator": "donchian",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20
+        }
+      },
+      {
+        "indicator": "ema",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 50
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 6.0,
+    "max_bars_hold": 20
+  },
+  {
+    "strategy_id": "6a7fc721",
+    "entry_rules": [
+      {
+        "indicator": "supertrend",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 10,
+          "multiplier": 2.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 5
+  },
+  {
+    "strategy_id": "669e4a95",
+    "entry_rules": [
+      {
+        "indicator": "ema",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 20
+        }
+      },
+      {
+        "indicator": "ema",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 200
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 1.0,
+    "take_profit_atr": 6.0,
+    "max_bars_hold": 10
+  }
+]

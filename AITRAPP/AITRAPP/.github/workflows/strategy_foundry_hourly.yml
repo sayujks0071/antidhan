@@ -1,0 +1,57 @@
+name: Strategy Foundry Hourly
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packages/strategy_foundry/**'
+
+jobs:
+  run-foundry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Strategy Foundry (PR Mode)
+        if: github.event_name == 'pull_request'
+        env:
+          FAST_MODE: '1'
+          PYTHONPATH: .
+        run: python -m packages.strategy_foundry.run_hourly
+
+      - name: Run Strategy Foundry (Full Mode)
+        if: github.event_name != 'pull_request'
+        env:
+          FAST_MODE: '0'
+          PYTHONPATH: .
+        run: python -m packages.strategy_foundry.run_hourly
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundry-results
+          path: packages/strategy_foundry/results/
+          retention-days: 7
+
+      - name: Commit Leaderboard
+        if: github.event_name != 'pull_request' && env.COMMIT_RESULTS == 'true'
+        env:
+          COMMIT_RESULTS: ${{ secrets.COMMIT_RESULTS }}
+        run: |
+          git config --global user.name 'StrategyFoundry Bot'
+          git config --global user.email 'bot@strategyfoundry.internal'
+          git add packages/strategy_foundry/results/leaderboard.md
+          git commit -m "Update Strategy Foundry Leaderboard [skip ci]" || echo "No changes to commit"
+          git push

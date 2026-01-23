@@ -1,0 +1,194 @@
+mode: PAPER  # PAPER | LIVE
+timezone: Asia/Kolkata
+
+# Risk Management Configuration
+risk:
+  per_trade_risk_pct: 0.5        # Max 0.5% per trade
+  max_portfolio_heat_pct: 2.0    # Max 2.0% aggregate risk
+  daily_loss_stop_pct: 2.5       # Hard stop at -2.5% daily loss
+  slippage_bps: 5                # Assumed slippage in basis points
+  fees_per_order: 20             # Per order in INR
+  fees_per_option_leg: 2         # Additional per option contract
+  max_position_size_multiplier: 3  # Max lots per position
+
+# Universe Configuration
+universe:
+  indices:
+    - NIFTY
+    - BANKNIFTY
+    - FINNIFTY
+  
+  # Top liquid F&O stocks
+  fo_stocks_liquidity_rank_top_n: 50
+  
+  # Exclusions
+  exclude_fo_ban: true
+  exclude_illiquid_threshold_turnover: 10000000  # Min 1 Cr turnover
+  
+  # Refresh schedule
+  sync_time: "08:30"  # IST daily sync
+
+# Options Filtering
+options_filters:
+  max_spread_mid_pct: 0.5      # Reject if bid-ask > 0.5% of mid
+  min_oi: 20000                # Minimum open interest
+  min_last_traded_volume: 100  # Minimum volume
+  strikes_from_atm: 5          # Include strikes 0..5 from ATM
+  prefer_weekly: true          # Prefer weekly over monthly expiry
+  max_dte: 7                   # Max days to expiry for weeklies
+  iv_percentile_min: 20        # Min IVP for premium selling
+  iv_percentile_max: 80        # Max IVP for premium buying
+
+# Strategy Configuration
+strategies:
+  - name: ORB
+    enabled: true
+    priority: 1
+    params:
+      window_min: 15
+      breakout_confirmation_ticks: 3
+      rr_min: 1.8
+      max_positions: 2
+      instruments: [NIFTY, BANKNIFTY]
+      
+  - name: VWAPReversion
+    enabled: false
+    priority: 2
+    params:
+      vwap_band_mult: 1.5
+      rr_min: 1.5
+      max_positions: 3
+      
+  - name: TrendPullback
+    enabled: true
+    priority: 1
+    params:
+      ema_fast: 34
+      ema_slow: 89
+      atr_period: 14
+      pullback_atr_mult: 0.5
+      rr_min: 2.0
+      max_positions: 2
+      
+  - name: OptionsRanker
+    enabled: true
+    priority: 2
+    params:
+      strategy_type: DEBIT_SPREAD  # DEBIT_SPREAD | CREDIT_SPREAD | DIRECTIONAL
+      ivp_min: 30
+      ivp_max: 70
+      liquidity_score_min: 0.7
+      max_spread_legs: 2
+      rr_min: 1.5
+
+# Ranking Engine Configuration
+ranking:
+  weights:
+    momentum: 0.25
+    trend: 0.25
+    liquidity: 0.20
+    regime: 0.15
+    rr: 0.15
+  
+  penalties:
+    illiquid_mult: 0.5
+    news_event_mult: 0.7
+    far_from_vwap_mult: 0.8
+  
+  top_n: 5  # Max candidates per cycle
+
+# Exit Management
+exits:
+  # Stop Loss
+  hard_stop_atr_mult: 2.0
+  
+  # Trailing Stop
+  trail_enabled: true
+  trail_atr_mult: 1.2
+  trail_step_pct: 0.5
+  
+  # Take Profit
+  tp1_rr: 1.2
+  tp1_partial_pct: 50  # Close 50% at TP1
+  tp2_rr: 2.0
+  tp2_partial_pct: 100  # Close remaining at TP2
+  move_to_be_after_tp1: true  # Move stop to breakeven after TP1
+  
+  # Time Stop
+  time_stop_enabled: true
+  time_stop_min: 20
+  
+  # Volatility Stop
+  vol_stop_enabled: true
+  vol_spike_mult: 2.0  # Exit if ATR spikes 2x
+  
+  # MAE Stop
+  mae_stop_enabled: true
+  mae_stop_pct: 1.5  # Exit if MAE exceeds 1.5% account
+
+# Market Hours & EOD
+market:
+  open_time: "09:15"
+  close_time: "15:30"
+  eod_squareoff_time: "15:25"
+  eod_squareoff_enabled: true
+  
+  # Pre-market actions
+  premarket_sync_time: "08:30"
+  
+  # Event calendar (pause or widen stops)
+  event_aware: true
+  event_stop_mult: 1.5
+
+# Order Execution
+execution:
+  default_order_type: LIMIT
+  limit_chase_ticks: 2
+  limit_timeout_sec: 5
+  ioc_for_exits: true
+  max_order_retries: 3
+  retry_backoff_ms: 500
+  dry_run: false  # Set to true to generate signals but skip order placement (useful for testing ranking/signals)
+
+# Alerts Configuration
+alerts:
+  telegram:
+    enabled: false
+    events:
+      - POSITION_OPENED
+      - POSITION_CLOSED
+      - STOP_HIT
+      - DAILY_LOSS_STOP
+      - KILL_SWITCH
+  
+  slack:
+    enabled: false
+    events:
+      - DAILY_LOSS_STOP
+      - KILL_SWITCH
+
+# WebSocket Configuration
+websocket:
+  tick_interval_ms: 1000
+  aggregation_windows: [1, 5]  # 1s and 5s bars
+  reconnect_delay_sec: 5
+  max_reconnect_attempts: 10
+  subscribe_mode: FULL  # FULL | LTP | QUOTE
+
+# Logging & Audit
+logging:
+  level: INFO
+  format: json
+  log_file: logs/aitrapp.log
+  max_bytes: 104857600  # 100 MB
+  backup_count: 10
+  
+  # Audit trail
+  audit_all_decisions: true
+  audit_retention_days: 90
+
+# Monitoring
+monitoring:
+  prometheus_enabled: true
+  prometheus_port: 9090
+  health_check_interval_sec: 30

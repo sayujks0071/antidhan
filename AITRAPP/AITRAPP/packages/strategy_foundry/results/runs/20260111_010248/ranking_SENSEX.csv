@@ -1,0 +1,4 @@
+id,score,sharpe,calmar,cagr,max_dd,trades,stability,rule_summary
+f198c2531e28,0.33757974572974525,0.15572712397517238,0.08553104577350157,0.012181660373948633,0.14242384462604854,83,2.3680714598661656,"Signal(RsiFilter({'period': 14, 'threshold': 70, 'mode': 'long_if_below'}) AND EmaCross({'fast': 10, 'slow': 50})) | Risk(SL=1.0ATR, TP=2.0ATR)"
+6c2d61f5bc16,0.15320025228179765,0.10754230146499516,0.017267989597818178,0.003809294004027075,0.22059858111730518,59,1.830411123261915,"Signal(EmaCross({'fast': 9, 'slow': 100}) AND Donchian({'period': 50}) AND EmaCross({'fast': 9, 'slow': 100})) | Risk(SL=2.0ATR, TP=3.0ATR)"
+9de128961c31,-0.641115854841116,-0.11803285408938066,-0.12134246296101603,-0.018865812834351736,0.1554757697675281,80,0.7960412751553633,"Signal(RsiFilter({'period': 14, 'threshold': 40, 'mode': 'long_if_below'}) AND Donchian({'period': 20})) | Risk(SL=1.0ATR, TP=1.5ATR)"

@@ -1,0 +1,62 @@
+# Core web framework (pinned)
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.30,<0.32
+pydantic>=2.9,<2.11
+pydantic-settings>=2.1,<2.2
+
+# Database (pinned)
+SQLAlchemy>=2.0,<2.1
+alembic>=1.13,<1.14
+psycopg2-binary>=2.9,<3.0
+
+# Redis (pinned)
+redis>=5.0,<6.0
+hiredis>=2.3,<3.0
+
+# Monitoring & metrics (pinned)
+prometheus-client>=0.20,<0.22
+
+# Kite Connect (pinned)
+kiteconnect>=5.0,<6.0
+
+# WebSocket (pinned)
+websockets>=12,<13
+python-socketio>=5.11,<6.0
+
+# Data processing (pinned)
+pandas>=2.2,<2.3
+numpy>=1.26,<2.0
+
+# Technical Indicators
+ta-lib>=0.4.28  # May need system install: brew install ta-lib
+ta>=0.11,<0.12
+
+# HTTP Client
+httpx>=0.26,<0.28
+aiohttp>=3.9,<4.0
+requests>=2.32,<3.0
+
+# Utilities (pinned)
+python-dotenv>=1.0,<2.0
+structlog>=24.0,<25.0
+python-dateutil>=2.8,<3.0
+pytz>=2024.1
+pyyaml>=6.0,<7.0
+
+# Task Queue
+celery>=5.3,<6.0
+
+# Alerting (Optional)
+python-telegram-bot>=21.0
+slack-sdk>=3.26,<4.0
+
+# Authentication
+python-jose[cryptography]>=3.3,<4.0
+passlib[bcrypt]>=1.7,<2.0
+
+# Rate Limiting
+aiolimiter>=1.1,<2.0
+
+# FastAPI form data support
+python-multipart>=0.0.6
+tabulate

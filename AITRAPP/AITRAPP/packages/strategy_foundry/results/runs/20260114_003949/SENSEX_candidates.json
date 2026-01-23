@@ -1,0 +1,209 @@
+[
+  {
+    "strategy_id": "de847a16",
+    "entry_rules": [
+      {
+        "indicator": "ema",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 100
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 10
+  },
+  {
+    "strategy_id": "24121be6",
+    "entry_rules": [
+      {
+        "indicator": "ema",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 200
+        }
+      },
+      {
+        "indicator": "donchian",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 1.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 50
+  },
+  {
+    "strategy_id": "edd743d3",
+    "entry_rules": [
+      {
+        "indicator": "ema",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 50
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 50
+  },
+  {
+    "strategy_id": "c7669fb4",
+    "entry_rules": [
+      {
+        "indicator": "donchian",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 1.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 5
+  },
+  {
+    "strategy_id": "9ad60a1d",
+    "entry_rules": [
+      {
+        "indicator": "bollinger",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 20,
+          "std": 2.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 5
+  },
+  {
+    "strategy_id": "870eb8c3",
+    "entry_rules": [
+      {
+        "indicator": "ema",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 200
+        }
+      },
+      {
+        "indicator": "supertrend",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 7,
+          "multiplier": 2.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 10
+  },
+  {
+    "strategy_id": "3288ee76",
+    "entry_rules": [
+      {
+        "indicator": "bollinger",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20,
+          "std": 2.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 5
+  },
+  {
+    "strategy_id": "5a4523c5",
+    "entry_rules": [
+      {
+        "indicator": "bollinger",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20,
+          "std": 2.0
+        }
+      },
+      {
+        "indicator": "ema",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 200
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 6.0,
+    "max_bars_hold": 5
+  },
+  {
+    "strategy_id": "d535203c",
+    "entry_rules": [
+      {
+        "indicator": "rsi",
+        "operator": "<",
+        "value": 60,
+        "params": {
+          "period": 21
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 5
+  },
+  {
+    "strategy_id": "2156f809",
+    "entry_rules": [
+      {
+        "indicator": "bollinger",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20,
+          "std": 2.0
+        }
+      },
+      {
+        "indicator": "ema",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 100
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 1.0,
+    "take_profit_atr": 6.0,
+    "max_bars_hold": 10
+  }
+]

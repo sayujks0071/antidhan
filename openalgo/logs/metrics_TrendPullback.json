@@ -1,0 +1,20 @@
+{
+  "strategy_name": "TrendPullback",
+  "total_trades": 24,
+  "winning_trades": 13,
+  "losing_trades": 11,
+  "win_rate": 54.166666666666664,
+  "avg_pnl": 530.3425,
+  "total_pnl": 12728.22,
+  "max_win": 1997.24,
+  "max_loss": -700.47,
+  "avg_win": 1237.4646153846154,
+  "avg_loss": 305.3472727272727,
+  "profit_factor": 4.789491547626846,
+  "avg_pnl_pct": 1.1654166666666665,
+  "max_consecutive_wins": 4,
+  "max_consecutive_losses": 3,
+  "tp_exits": 13,
+  "sl_exits": 11,
+  "eod_exits": 0
+}

@@ -1,0 +1,29 @@
+# Canary LIVE profile for Day-1 (09:10-10:10 IST)
+# Use this override for the first LIVE hour
+
+mode: LIVE
+
+risk:
+  per_trade_risk_pct: 0.25
+  max_portfolio_heat_pct: 1.0
+  daily_loss_stop_pct: 1.0
+
+order:
+  max_child_retries: 3
+  max_entry_chase_ticks: 2
+  cancel_timeout_ms: 800
+
+universe:
+  indices: [NIFTY, BANKNIFTY]
+  fo_stocks_liquidity_rank_top_n: 0   # indices only for day-1
+
+exits:
+  trail_atr_mult: 1.0
+  time_stop_min: 15
+  tp1_rr: 1.0
+  tp2_rr: 1.8
+
+guards:
+  block_around_events_min: 10   # CPI/RBI/expiry
+  max_spread_mid_pct: 0.35
+

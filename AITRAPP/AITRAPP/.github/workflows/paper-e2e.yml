@@ -1,0 +1,87 @@
+name: paper-e2e
+
+on:
+  schedule:
+    - cron: "20 03 * * 1-5"   # 08:50 IST (03:20 UTC), weekdays
+  workflow_dispatch:
+
+concurrency:
+  group: paper-e2e
+  cancel-in-progress: true
+
+jobs:
+  run-paper-e2e:
+    timeout-minutes: 20
+    runs-on: self-hosted
+    labels: [paper-runner]
+    
+    env:
+      DATABASE_URL: postgresql+psycopg2://trader:trader@localhost:5432/aitrapp
+      REDIS_URL: redis://localhost:6379/0
+      APP_MODE: PAPER
+      APP_TIMEZONE: Asia/Kolkata
+      # Store these as GitHub Actions secrets
+      KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+      KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+      KITE_ACCESS_TOKEN: ${{ secrets.KITE_ACCESS_TOKEN }}
+      KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start services (Postgres + Redis)
+        run: |
+          docker compose up -d postgres redis
+          # Wait for services to be healthy
+          for i in {1..30}; do
+            docker compose exec -T postgres pg_isready -U trader -d aitrapp && \
+            docker compose exec -T redis redis-cli ping && break || sleep 2
+          done
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: DB migrate
+        run: alembic upgrade head
+
+      - name: Boot API (PAPER) in background
+        run: nohup uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 & echo $! > api.pid
+
+      - name: Wait for /health
+        run: |
+          for i in {1..30}; do curl -fsS http://localhost:8000/health && break || sleep 2; done
+
+      - name: Run PAPER E2E
+        run: |
+          make paper-e2e || (echo "::error ::paper-e2e failed" && exit 1)
+
+      - name: Collect artifacts
+        if: always()
+        run: |
+          mkdir -p artifacts
+          curl -s http://localhost:8000/metrics > artifacts/metrics.txt || true
+          cp -R logs artifacts/ || true
+        shell: bash
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paper-e2e-${{ github.run_id }}
+          path: artifacts
+
+      - name: Stop API
+        if: always()
+        run: kill -9 $(cat api.pid) || true
+
+      - name: Notify (Telegram) on failure
+        if: failure()
+        run: |
+          MSG="❌ PAPER E2E failed on $GITHUB_REPOSITORY (#$GITHUB_RUN_NUMBER)"
+          curl -s "https://api.telegram.org/bot${{secrets.TG_BOT_TOKEN}}/sendMessage" \
+            -d chat_id="${{secrets.TG_CHAT_ID}}" -d text="$MSG" || echo "Telegram notification skipped (secrets not set)"
+

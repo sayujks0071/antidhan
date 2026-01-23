@@ -1,0 +1,51 @@
+# Opening Range Breakout Strategy
+# Trades breakouts from the first 15 minutes of market open
+
+name: ORB
+version: 1.0.0
+enabled: true
+
+instruments:
+  - NIFTY
+  - BANKNIFTY
+  - FINNIFTY
+
+params:
+  # Opening range window in minutes
+  window_min: 15
+  
+  # Breakout threshold as % above/below range
+  breakout_threshold_pct: 0.5
+  
+  # Minimum risk:reward ratio
+  rr_min: 1.8
+  
+  # Maximum concurrent positions for this strategy
+  max_positions: 2
+  
+  # Entry type: futures or options
+  entry_type: futures  # futures, call_debit, put_debit
+  
+  # Stop loss as % of opening range
+  stop_loss_pct: 50
+  
+  # Take profit levels
+  take_profit_1_rr: 1.2
+  take_profit_2_rr: 2.0
+  
+  # Time validity (minutes after breakout)
+  signal_validity_min: 10
+  
+  # Minimum volume spike for valid breakout
+  volume_spike_mult: 1.5
+
+filters:
+  # Only trade on low volatility days (IVR threshold)
+  max_ivr: 60
+  
+  # Avoid first 5 minutes (noise)
+  skip_first_min: 5
+  
+  # Don't trade if gap too large
+  max_gap_pct: 2.0
+

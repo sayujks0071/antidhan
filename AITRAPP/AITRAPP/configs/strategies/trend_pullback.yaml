@@ -1,0 +1,47 @@
+# Trend Pullback Strategy
+# Enters on pullbacks in established trends using EMAs and ATR bands
+
+name: TrendPullback
+version: 1.0.0
+enabled: true
+
+instruments:
+  - all_fo_stocks  # Will use top liquid F&O stocks
+
+params:
+  # EMA periods
+  ema_fast: 34
+  ema_slow: 89
+  
+  # ATR settings
+  atr_period: 14
+  pullback_atr_mult: 0.5
+  stop_atr_mult: 1.5
+  
+  # Minimum risk:reward
+  rr_min: 2.0
+  
+  # Maximum concurrent positions
+  max_positions: 2
+  
+  # Entry type
+  entry_type: futures
+  
+  # Trend strength filter (ADX)
+  min_adx: 25
+  
+  # Take profit levels
+  take_profit_1_rr: 1.5
+  take_profit_2_rr: 2.5
+
+filters:
+  # Minimum price
+  min_price: 100
+  
+  # Minimum daily volume
+  min_daily_volume: 1000000
+  
+  # Pullback depth (% of range)
+  min_pullback_pct: 30
+  max_pullback_pct: 70
+

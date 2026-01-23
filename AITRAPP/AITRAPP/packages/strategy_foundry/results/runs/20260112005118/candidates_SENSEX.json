@@ -1,0 +1,41 @@
+[
+  {
+    "id":"adc5534fac2cfd972f83fd791236a226",
+    "name":"Auto_mean_rev_2blocks",
+    "blocks":[
+      {
+        "type":"mean_rev",
+        "subtype":"bollinger",
+        "param_keys":[
+          "bb_period",
+          "bb_std"
+        ]
+      },
+      {
+        "type":"exit",
+        "subtype":"time_stop",
+        "param_keys":[
+          "max_bars"
+        ]
+      }
+    ],
+    "params":{
+      "bb_period":25,
+      "bb_std":1.5,
+      "max_bars":5
+    },
+    "rule_summary":"mean_rev(bollinger) + exit(time_stop)",
+    "stats":{
+      "avg_sharpe":0.7047480824,
+      "avg_calmar":0.9954145179,
+      "avg_cagr":0.0996338573,
+      "positive_fold_ratio":1.0
+    },
+    "symbol":"SENSEX",
+    "avg_sharpe":0.7047480824,
+    "avg_calmar":0.9954145179,
+    "avg_cagr":0.0996338573,
+    "positive_fold_ratio":1.0,
+    "score":0.4802048257
+  }
+]

@@ -1,0 +1,157 @@
+# Prometheus alerting rules for AITRAPP
+# Load this into your Prometheus configuration
+
+groups:
+- name: trader-heartbeats
+  rules:
+  - alert: MarketDataStale
+    expr: trader_marketdata_heartbeat_seconds > 5
+    for: 1m
+    labels: { severity: page }
+    annotations: { summary: "Market data stream stale > 5s" }
+  
+  - alert: OrderStreamStale
+    expr: trader_order_stream_heartbeat_seconds > 5
+    for: 1m
+    labels: { severity: page }
+    annotations: { summary: "Order stream stale > 5s" }
+  
+  - alert: ScanLoopStale
+    expr: trader_scan_heartbeat_seconds > 5
+    for: 1m
+    labels: { severity: page }
+    annotations: { summary: "Orchestrator scan not ticking > 5s" }
+  
+  - alert: LeaderLostDuringMarket
+    expr: trader_is_leader == 0
+    for: 1m
+    labels: { severity: page }
+    annotations: { summary: "Leader lock lost during market hours" }
+  
+  - alert: LeaderFlaps
+    expr: increase(trader_leader_changes_total[15m]) > 2
+    for: 0m
+    labels: { severity: warn }
+    annotations:
+      summary: "Leader lock flapping in the last 15m"
+      description: "{{ $value }} leader changes detected. Check Redis connectivity and network stability."
+
+  - alert: PreLiveDay2Fail
+    expr: trader_prelive_day2_pass == 0
+    for: 5m
+    labels: { severity: warn }
+    annotations:
+      summary: "Day-2 scorer JSON is not PASS"
+      description: "Day-2 JSON is missing, stale (>36h), or failed validation. Run 'make score-day2' to refresh. Age: {{ $value }}s"
+    
+  - alert: PreLiveDay2Stale
+    expr: trader_prelive_day2_age_seconds > 129600
+    for: 0m
+    labels: { severity: warn }
+    annotations:
+      summary: "Day-2 scorer JSON is stale (>36h)"
+      description: "Latest Day-2 JSON is {{ $value | humanizeDuration }} old. Run 'make score-day2' to refresh."
+
+groups:
+  - name: trader
+    interval: 30s
+    rules:
+      # No signals generated in 5 minutes
+      - alert: NoSignals5Min
+        expr: rate(trader_signals_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: signals
+        annotations:
+          summary: "No signals generated in 5 minutes"
+          description: "Signal generation has stopped. Check orchestrator and strategies."
+
+      # High portfolio heat
+      - alert: HighPortfolioHeat
+        expr: trader_portfolio_heat_rupees > (0.02 * 1000000)  # 2% of 10L default
+        for: 1m
+        labels:
+          severity: critical
+          component: risk
+        annotations:
+          summary: "Portfolio heat exceeds 2% of net liquid"
+          description: "Portfolio heat is {{ $value }} rupees. Risk limit may be breached."
+
+      # Stuck orders / high retries
+      - alert: StuckOrders
+        expr: increase(trader_retries_total[10m]) > 50
+        for: 2m
+        labels:
+          severity: warning
+          component: execution
+        annotations:
+          summary: "High number of broker/API retries"
+          description: "{{ $value }} retries in last 10 minutes. Check broker connectivity."
+
+      # Daily loss limit approaching
+      - alert: DailyLossApproaching
+        expr: trader_daily_pnl_rupees < -20000  # -2% of 10L
+        for: 5m
+        labels:
+          severity: warning
+          component: risk
+        annotations:
+          summary: "Daily loss approaching limit"
+          description: "Daily P&L is {{ $value }} rupees. Daily loss stop may trigger soon."
+
+      # No orders filled in 30 minutes (during market hours)
+      - alert: NoOrdersFilled
+        expr: rate(trader_orders_filled_total[30m]) == 0
+        for: 30m
+        labels:
+          severity: warning
+          component: execution
+        annotations:
+          summary: "No orders filled in 30 minutes"
+          description: "Check order execution and broker connectivity."
+
+      # WebSocket reconnects
+      - alert: HighWSReconnects
+        expr: increase(trader_retries_total{type="ws"}[10m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: market_data
+        annotations:
+          summary: "High WebSocket reconnects"
+          description: "{{ $value }} WebSocket reconnects in last 10 minutes."
+
+      # API latency high
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(trader_order_latency_ms_bucket[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: execution
+        annotations:
+          summary: "High order placement latency"
+          description: "95th percentile latency is {{ $value }}ms. Check broker API."
+
+      # Order ack latency high (P95)
+      - alert: OrderAckLatencyP95High
+        expr: histogram_quantile(0.95, rate(trader_order_latency_ms_bucket[5m])) > 500
+        for: 5m
+        labels:
+          severity: warning
+          component: execution
+        annotations:
+          summary: "Order acknowledgment latency high (P95)"
+          description: "95th percentile order ack latency is {{ $value }}ms. May indicate broker issues."
+
+      # Kill switch used
+      - alert: KillSwitchUsed
+        expr: increase(trader_risk_events_total{event_type="KILL_SWITCH"}[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: control
+        annotations:
+          summary: "Kill switch activated"
+          description: "Kill switch was pressed. All positions should be flattened."
+

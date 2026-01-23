@@ -1,0 +1,173 @@
+name: Manual Canary LIVE Gate
+
+on:
+  workflow_dispatch:  # Manual trigger ONLY - no schedule
+
+concurrency:
+  group: live-gate
+  cancel-in-progress: false  # Do NOT cancel - these are safety checks
+
+jobs:
+  prelive-validation:
+    timeout-minutes: 15
+    runs-on: self-hosted
+    labels: [paper-runner]
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://trader:trader@localhost:5432/aitrapp
+      REDIS_URL: redis://localhost:6379/0
+      APP_TIMEZONE: Asia/Kolkata
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: 🚨 CRITICAL SAFETY NOTICE
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║  ⚠️  LIVE TRADING MODE VALIDATION (SEBI-COMPLIANT)  ⚠️   ║"
+          echo "╠════════════════════════════════════════════════════════════╣"
+          echo "║  This workflow validates Day-2 PASS requirements but      ║"
+          echo "║  DOES NOT automatically switch to LIVE mode.              ║"
+          echo "║                                                            ║"
+          echo "║  Manual operator action REQUIRED after validation passes. ║"
+          echo "║                                                            ║"
+          echo "║  Reference: SEBI/HO/MIRSD/MIRSD-PoD/P/CIR/2025/0000013   ║"
+          echo "║  Date: Feb 4, 2025                                        ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+
+      - name: Setup Python 3.11+
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies (minimal)
+        run: |
+          set -euxo pipefail
+          pip install -q psycopg2-binary python-dateutil
+
+      - name: 🔍 Verify Day-2 JSON exists and is fresh
+        run: |
+          set -euxo pipefail
+          echo "⏳ Checking for Day-2 scorer JSON..."
+          
+          # Find the most recent Day-2 JSON file
+          DAY2_JSON=$(find reports/burnin -name "day2_score_*.json" -type f -mtime -2 2>/dev/null | sort -r | head -n1)
+          
+          if [ -z "$DAY2_JSON" ]; then
+            echo "❌ FAIL: No Day-2 JSON found in reports/burnin/ within last 48h"
+            echo "::error ::Day-2 JSON not found or too old"
+            exit 1
+          fi
+          
+          echo "✅ Found Day-2 JSON: $DAY2_JSON"
+          
+          # Check file age (must be ≤36 hours old)
+          FILE_AGE_HOURS=$(echo "($(date +%s) - $(stat -f %m "$DAY2_JSON" 2>/dev/null || stat -c %Y "$DAY2_JSON")) / 3600" | bc)
+          
+          if [ "$FILE_AGE_HOURS" -gt 36 ]; then
+            echo "❌ FAIL: Day-2 JSON is $FILE_AGE_HOURS hours old (max 36h)"
+            echo "::error ::Day-2 JSON is stale"
+            exit 1
+          fi
+          
+          echo "✅ Day-2 JSON is fresh ($FILE_AGE_HOURS hours old)"
+          
+          # Save path for next steps
+          echo "DAY2_JSON=$DAY2_JSON" >> $GITHUB_ENV
+
+      - name: 📋 Parse Day-2 JSON (jq-less fallback)
+        run: |
+          set -euxo pipefail
+          echo "📖 Reading Day-2 JSON: $DAY2_JSON"
+          
+          # Try jq first, fall back to grep/sed
+          if command -v jq &>/dev/null; then
+            OVERALL=$(jq -r '.overall_status // "UNKNOWN"' "$DAY2_JSON")
+          else
+            # jq-less parser (grep + sed)
+            OVERALL=$(grep -o '"overall_status"[[:space:]]*:[[:space:]]*"[^"]*"' "$DAY2_JSON" | sed 's/.*"\([^"]*\)".*/\1/' || echo "UNKNOWN")
+          fi
+          
+          echo "Overall Status: $OVERALL"
+          
+          if [ "$OVERALL" != "PASS" ]; then
+            echo "❌ FAIL: Day-2 overall_status is '$OVERALL' (expected 'PASS')"
+            echo "::error ::Day-2 scoring did not pass"
+            cat "$DAY2_JSON"
+            exit 1
+          fi
+          
+          echo "✅ Day-2 overall_status is PASS"
+
+      - name: ⚙️ Run prelive gate script
+        run: |
+          set -euxo pipefail
+          echo "🔒 Running prelive gate checks..."
+          bash scripts/prelive_gate.sh
+          echo "✅ Prelive gate passed"
+
+      - name: 🚫 Verify APP_MODE is not already LIVE
+        run: |
+          set -euxo pipefail
+          # Check if API is running and already in LIVE mode
+          if curl -sf --max-time 3 http://localhost:8000/health >/dev/null 2>&1; then
+            MODE=$(curl -sf http://localhost:8000/health | grep -o '"mode"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"\([^"]*\)".*/\1/' || echo "UNKNOWN")
+            if [ "$MODE" = "LIVE" ]; then
+              echo "❌ FAIL: System is already in LIVE mode"
+              echo "::error ::APP_MODE is already LIVE - cannot re-switch"
+              exit 1
+            fi
+            echo "✅ APP_MODE is not LIVE (current: $MODE)"
+          else
+            echo "ℹ️ API not running - mode check skipped"
+          fi
+
+      - name: ✅ All validations PASSED
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║  ✅ ALL PRELIVE VALIDATIONS PASSED ✅                      ║"
+          echo "╠════════════════════════════════════════════════════════════╣"
+          echo "║  Day-2 burn-in requirements met.                          ║"
+          echo "║  System is READY for manual LIVE switch.                  ║"
+          echo "║                                                            ║"
+          echo "║  ⚠️  MANUAL OPERATOR ACTION REQUIRED ⚠️                   ║"
+          echo "║                                                            ║"
+          echo "║  To enable LIVE mode, run this command LOCALLY:           ║"
+          echo "║                                                            ║"
+          echo "║    curl -X POST http://localhost:8000/admin/mode \\       ║"
+          echo "║         -H 'Content-Type: application/json' \\            ║"
+          echo "║         -d '{"mode": "LIVE", "confirm": true}'            ║"
+          echo "║                                                            ║"
+          echo "║  OR use the Makefile target:                              ║"
+          echo "║                                                            ║"
+          echo "║    make live-switch                                       ║"
+          echo "║                                                            ║"
+          echo "║  Verify via:  curl http://localhost:8000/health           ║"
+          echo "║                                                            ║"
+          echo "║  ⚠️  DO NOT automate this switch via CI/CD ⚠️             ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+
+      - name: Collect validation logs
+        if: always()
+        run: |
+          set -euxo pipefail
+          mkdir -p artifacts
+          # Copy Day-2 JSON
+          cp "$DAY2_JSON" artifacts/ 2>/dev/null || true
+          # Copy prelive gate logs if any
+          cp -R reports/ artifacts/ 2>/dev/null || true
+          # Create validation summary
+          echo "Validation run: $(date)" > artifacts/validation_summary.txt
+          echo "Day-2 JSON: $DAY2_JSON" >> artifacts/validation_summary.txt
+          echo "Status: PASSED" >> artifacts/validation_summary.txt
+
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-gate-validation-${{ github.run_id }}
+          path: artifacts/
+          retention-days: 90

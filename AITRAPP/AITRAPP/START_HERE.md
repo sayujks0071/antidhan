@@ -1,0 +1,159 @@
+# 🚀 START HERE - Login & Test Your App
+
+## ✅ What's Already Done
+
+- ✅ `.env` file created with your API credentials
+- ✅ Python 3.11 virtual environment set up
+- ✅ PostgreSQL database created
+- ✅ Redis is running
+- ✅ Core dependencies installed
+- ✅ Token generator script ready
+
+## 🎯 Next Steps (5 minutes)
+
+### Step 1: Get Your Kite Access Token
+
+You need to authenticate with Kite Connect to get an access token.
+
+**Option A: Use the helper script (Recommended)**
+```bash
+cd /Users/mac/AITRAPP
+source venv/bin/activate
+python get_kite_token.py
+```
+
+The script will:
+1. Show you the login URL
+2. Guide you through the process
+3. Optionally update your `.env` file automatically
+
+**Option B: Manual process**
+1. Visit: https://kite.trade/connect/login?api_key=nhe2vo0afks02ojs&v=3
+2. Login with your Zerodha credentials
+3. Copy the `request_token` from the redirect URL
+4. Run: `python get_kite_token.py` and paste the token
+
+### Step 2: Update .env File
+
+If you didn't use the auto-update option, edit `.env`:
+```bash
+nano .env
+```
+
+Update these lines:
+```
+KITE_ACCESS_TOKEN=your_actual_access_token_here
+KITE_USER_ID=your_actual_user_id_here
+```
+
+### Step 3: Install Remaining Dependencies
+
+```bash
+cd /Users/mac/AITRAPP
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+(Some packages might have warnings, but core functionality should work)
+
+### Step 4: Run Database Migrations
+
+```bash
+# Make sure PostgreSQL bin is in PATH
+eval "$(/opt/homebrew/bin/brew shellenv)"
+export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+
+# Run migrations
+alembic upgrade head
+```
+
+### Step 5: Start the App
+
+```bash
+cd /Users/mac/AITRAPP
+source venv/bin/activate
+
+# Start in PAPER mode (safe testing)
+make paper
+
+# Or start directly:
+export APP_MODE=PAPER
+python -m uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Step 6: Test the App
+
+Open a **new terminal** and run:
+
+```bash
+# Check health
+curl http://localhost:8000/health | jq
+
+# Check system state
+curl http://localhost:8000/state | jq
+
+# View positions (should be empty initially)
+curl http://localhost:8000/positions | jq
+
+# View metrics
+curl http://localhost:8000/metrics | head -20
+```
+
+---
+
+## 🆘 Troubleshooting
+
+### "Access token expired" or "Invalid token"
+- Access tokens expire daily
+- Re-run `python get_kite_token.py` to get a new token
+
+### "Database connection error"
+```bash
+# Check PostgreSQL is running
+eval "$(/opt/homebrew/bin/brew shellenv)"
+brew services list | grep postgresql
+
+# Start if needed
+brew services start postgresql@16
+```
+
+### "Redis connection error"
+```bash
+# Check Redis is running
+redis-cli ping  # Should return PONG
+
+# Start if needed
+brew services start redis
+```
+
+### "Module not found" errors
+```bash
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+---
+
+## 📚 Quick Reference
+
+- **Get token**: `python get_kite_token.py`
+- **Start app**: `make paper`
+- **Check health**: `curl http://localhost:8000/health | jq`
+- **View logs**: `tail -f logs/aitrapp.log | jq`
+- **Stop app**: `Ctrl+C` in the terminal running the app
+
+---
+
+## 🎉 You're Ready!
+
+Once the app is running:
+1. Monitor the logs for any errors
+2. Check the `/state` endpoint to see system status
+3. Test in PAPER mode before going LIVE
+4. Review `LAUNCH_CARD.md` before switching to LIVE mode
+
+**Need help?** Check:
+- `QUICK_LOGIN_SETUP.md` - Detailed setup guide
+- `FAST_FAQ.md` - Quick diagnostics
+- `README.md` - Full documentation
+

@@ -1,0 +1,116 @@
+name: Postclose Reports
+
+on:
+  schedule:
+    - cron: "05 10 * * 1-5"  # 15:35 IST (10:05 UTC), weekdays
+  workflow_dispatch:
+
+concurrency:
+  group: paper-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postclose-hygiene:
+    timeout-minutes: 20
+    runs-on: self-hosted
+    labels: [paper-runner]
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://trader:trader@localhost:5432/aitrapp
+      REDIS_URL: redis://localhost:6379/0
+      APP_MODE: PAPER
+      APP_TIMEZONE: Asia/Kolkata
+      # Store these as GitHub Actions secrets
+      KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+      KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+      KITE_ACCESS_TOKEN: ${{ secrets.KITE_ACCESS_TOKEN }}
+      KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Start infrastructure (Postgres + Redis)
+        run: |
+          set -euxo pipefail
+          docker compose up -d postgres redis
+          echo "⏳ Waiting for services to be healthy..."
+          for i in {1..30}; do
+            docker compose exec -T postgres pg_isready -U trader -d aitrapp && \
+            docker compose exec -T redis redis-cli ping | grep -q PONG && break || sleep 2
+          done
+          echo "✅ Infrastructure ready"
+
+      - name: Setup Python 3.11+
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+          cache-dependency-path: 'requirements.txt'
+
+      - name: Install dependencies
+        run: |
+          set -euxo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run database migrations
+        run: |
+          set -euxo pipefail
+          alembic upgrade head
+
+      - name: Generate burn-in report
+        run: |
+          set -euxo pipefail
+          make burnin-report || echo "⚠️ Burn-in report failed (may be expected EOD)"
+
+      - name: Run database reconciliation
+        run: |
+          set -euxo pipefail
+          make reconcile-db || echo "⚠️ DB reconciliation encountered issues"
+
+      - name: Run post-close hygiene
+        run: |
+          set -euxo pipefail
+          make post-close
+
+      - name: Score Day-2 (generate JSON)
+        run: |
+          set -euxo pipefail
+          make score-day2
+          echo "📊 Day-2 scoring complete"
+
+      - name: Read Day-2 results
+        run: |
+          set -euxo pipefail
+          make read-day2 || echo "No Day-2 JSON found yet"
+
+      - name: Collect artifacts
+        if: always()
+        run: |
+          set -euxo pipefail
+          mkdir -p artifacts
+          # Copy all reports
+          cp -R reports/burnin/ artifacts/ 2>/dev/null || true
+          cp -R reports/ artifacts/ 2>/dev/null || true
+          # Copy logs
+          cp -R logs/ artifacts/ 2>/dev/null || true
+          # Copy ops snapshots
+          cp -R ops/*.yml artifacts/ 2>/dev/null || true
+          # Try to get latency summaries
+          bash scripts/print_latency_histogram.sh > artifacts/latency_summary.txt 2>/dev/null || echo "No latency data" > artifacts/latency_summary.txt
+          # Try to get Prometheus flare
+          bash scripts/print_prometheus_flare.sh > artifacts/prometheus_flare.txt 2>/dev/null || echo "No metrics" > artifacts/prometheus_flare.txt
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postclose-report-${{ github.run_id }}
+          path: artifacts/
+          retention-days: 30
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down || true

@@ -1,0 +1,20 @@
+{
+  "strategy_name": "SuperTrendVWAP",
+  "total_trades": 20,
+  "winning_trades": 15,
+  "losing_trades": 5,
+  "win_rate": 75.0,
+  "avg_pnl": 10476.926,
+  "total_pnl": 209538.52,
+  "max_win": 28644.64,
+  "max_loss": -7792.29,
+  "avg_win": 15226.067999999997,
+  "avg_loss": 3770.5,
+  "profit_factor": 12.114627768200501,
+  "avg_pnl_pct": 1.7485,
+  "max_consecutive_wins": 5,
+  "max_consecutive_losses": 3,
+  "tp_exits": 15,
+  "sl_exits": 5,
+  "eod_exits": 0
+}
