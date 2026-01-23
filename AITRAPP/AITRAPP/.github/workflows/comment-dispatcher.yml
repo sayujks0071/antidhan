@@ -1,0 +1,139 @@
+name: Comment Dispatcher
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  actions: write       # to dispatch workflows
+  issues: write        # to reply to the comment
+  pull-requests: write
+
+jobs:
+  dispatch:
+    # Only act on PR comments from trusted roles
+    if: >
+      github.event.issue.pull_request != null &&
+      contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'),
+        github.event.comment.author_association)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Parse slash command
+        id: parse
+        run: |
+          BODY="${{ github.event.comment.body }}"
+          # first token starting with '/'
+          CMD=$(printf "%s\n" "$BODY" | sed -n 's|^[[:space:]]*/\([A-Za-z0-9._-]\+\).*|\1|p' | head -n1)
+          ARGS=$(printf "%s\n" "$BODY" | sed -n 's|^[[:space:]]*/[A-Za-z0-9._-]\+[[:space:]]*||p' | head -n1)
+          echo "cmd=$CMD" >> "$GITHUB_OUTPUT"
+          echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+
+      - name: Route command
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const cmd = '${{ steps.parse.outputs.cmd }}';
+            const args = '${{ steps.parse.outputs.args }}';
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const issue = context.issue.number;
+            const ref   = 'main'; // change if needed
+
+            // Map slash commands to your existing workflow files
+            const map = {
+              'paper-preopen':      'paper-preopen.yml',
+              'postclose-report':   'postclose-report.yml',
+              'prelive-gate':       'prelive-gate.yml',
+              'gate':               'prelive-gate.yml',
+              'manual-canary-live': 'manual-canary-live.yml',
+              'canary-live':        'manual-canary-live.yml',
+              'burnin-check':       'paper-preopen.yml',  // bundled in preopen
+              'paper-e2e':          'paper-e2e.yml'       // existing dedicated workflow
+            };
+
+            async function reply(body) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: issue, body });
+            }
+
+            if (!cmd) {
+              await reply('No command detected. Try `/help`.');
+              return;
+            }
+
+            if (cmd === 'help') {
+              await reply([
+                '**Slash commands for AITRAPP CI**',
+                '',
+                '🟢 **PAPER Mode (Safe)**',
+                '• `/paper-preopen` – run preopen checks (burn-in + E2E + prelive gate)',
+                '• `/postclose-report` – postclose reports + Day-2 scorer',
+                '• `/paper-e2e` – run dedicated PAPER E2E workflow',
+                '',
+                '🔒 **Validation**',
+                '• `/prelive-gate` or `/gate` – validate Day-2 PASS requirements',
+                '• `/manual-canary-live` or `/canary-live` – run full prelive validation gate',
+                '',
+                '⚠️ **LIVE Mode (Blocked)**',
+                '• `/live-switch` – **blocked** (manual only per SEBI)',
+                '',
+                '📚 Reference: SEBI/HO/MIRSD/MIRSD-PoD/P/CIR/2025/0000013 (Feb 4, 2025)',
+                '',
+                'Only OWNER/MEMBER/COLLABORATOR can trigger workflows.',
+              ].join('\n'));
+              return;
+            }
+
+            if (cmd === 'live-switch') {
+              await reply([
+                '🚫 **LIVE switch is manual-only per SEBI guardrails**',
+                '',
+                'After prelive gate PASS, run locally:',
+                '```bash',
+                'make prelive-gate  # verify Day-2 PASS',
+                'make live-switch   # manual operator action required',
+                '```',
+                '',
+                'Or use the API:',
+                '```bash',
+                'curl -X POST http://localhost:8000/admin/mode \\',
+                '     -H "Content-Type: application/json" \\',
+                '     -d \'{"mode": "LIVE", "confirm": true}\'',
+                '```',
+                '',
+                '⚠️ **DO NOT automate this via CI/CD**',
+              ].join('\n'));
+              return;
+            }
+
+            const wf = map[cmd];
+            if (!wf) {
+              await reply(`Unknown command \`/${cmd}\`. Try \`/help\`.`);
+              return;
+            }
+
+            // Dispatch the workflow on the chosen ref (branch)
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner, repo, workflow_id: wf, ref,
+                inputs: {} // workflows must define workflow_dispatch inputs if needed
+              });
+
+              await reply([
+                `✅ **Dispatched \`${wf}\` on \`${ref}\`**`,
+                '',
+                `Watch the [Actions tab](https://github.com/${owner}/${repo}/actions) for results.`,
+                '',
+                'Self-hosted runner with label \`paper-runner\` will execute.',
+              ].join('\n'));
+            } catch (error) {
+              await reply([
+                `❌ **Failed to dispatch \`${wf}\`**`,
+                '',
+                'Error: ' + error.message,
+                '',
+                'Make sure the workflow file has \`workflow_dispatch:\` trigger enabled.',
+              ].join('\n'));
+            }

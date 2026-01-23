@@ -1,0 +1,11 @@
+research:
+  NIFTY: "^NSEI"
+  SENSEX: "^BSESN"
+
+paper_proxy:
+  NIFTY: "NIFTYBEES"
+  SENSEX: "SENSEXBEES"
+
+live_proxy:
+  NIFTY: "NIFTY FUT"
+  SENSEX: "SENSEX FUT"

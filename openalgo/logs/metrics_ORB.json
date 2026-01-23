@@ -1,0 +1,20 @@
+{
+  "strategy_name": "ORB",
+  "total_trades": 30,
+  "winning_trades": 22,
+  "losing_trades": 8,
+  "win_rate": 73.33333333333333,
+  "avg_pnl": 11835.473666666667,
+  "total_pnl": 355064.21,
+  "max_win": 29776.06,
+  "max_loss": -16319.72,
+  "avg_win": 20425.227727272726,
+  "avg_loss": 11786.349999999999,
+  "profit_factor": 4.765629414534611,
+  "avg_pnl_pct": 1.0393333333333334,
+  "max_consecutive_wins": 8,
+  "max_consecutive_losses": 2,
+  "tp_exits": 22,
+  "sl_exits": 8,
+  "eod_exits": 0
+}

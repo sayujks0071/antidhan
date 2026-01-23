@@ -1,0 +1,208 @@
+[
+  {
+    "strategy_id": "115ef3c7",
+    "entry_rules": [
+      {
+        "indicator": "rsi",
+        "operator": "<",
+        "value": 40,
+        "params": {
+          "period": 14
+        }
+      },
+      {
+        "indicator": "supertrend",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 7,
+          "multiplier": 2.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 5
+  },
+  {
+    "strategy_id": "c0ae3f1c",
+    "entry_rules": [
+      {
+        "indicator": "rsi",
+        "operator": ">",
+        "value": 60,
+        "params": {
+          "period": 7
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 5
+  },
+  {
+    "strategy_id": "785d2799",
+    "entry_rules": [
+      {
+        "indicator": "adx",
+        "operator": ">",
+        "value": 25,
+        "params": {
+          "period": 21
+        }
+      },
+      {
+        "indicator": "adx",
+        "operator": ">",
+        "value": 20,
+        "params": {
+          "period": 21
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 20
+  },
+  {
+    "strategy_id": "89d64abc",
+    "entry_rules": [
+      {
+        "indicator": "ema",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 200
+        }
+      },
+      {
+        "indicator": "bollinger",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20,
+          "std": 2.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 50
+  },
+  {
+    "strategy_id": "c1969fdd",
+    "entry_rules": [
+      {
+        "indicator": "supertrend",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 7,
+          "multiplier": 2.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 6.0,
+    "max_bars_hold": 10
+  },
+  {
+    "strategy_id": "c9861695",
+    "entry_rules": [
+      {
+        "indicator": "donchian",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 20
+  },
+  {
+    "strategy_id": "2378c2e4",
+    "entry_rules": [
+      {
+        "indicator": "bollinger",
+        "operator": ">",
+        "value": "close",
+        "params": {
+          "period": 20,
+          "std": 2.0
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 3.0,
+    "take_profit_atr": 6.0,
+    "max_bars_hold": 20
+  },
+  {
+    "strategy_id": "31cb672f",
+    "entry_rules": [
+      {
+        "indicator": "ema",
+        "operator": "<",
+        "value": "close",
+        "params": {
+          "period": 200
+        }
+      },
+      {
+        "indicator": "rsi",
+        "operator": ">",
+        "value": 60,
+        "params": {
+          "period": 21
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 1.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 10
+  },
+  {
+    "strategy_id": "15fdafae",
+    "entry_rules": [
+      {
+        "indicator": "adx",
+        "operator": ">",
+        "value": 25,
+        "params": {
+          "period": 14
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 1.0,
+    "take_profit_atr": 4.0,
+    "max_bars_hold": 50
+  },
+  {
+    "strategy_id": "f70b267d",
+    "entry_rules": [
+      {
+        "indicator": "rsi",
+        "operator": ">",
+        "value": 60,
+        "params": {
+          "period": 21
+        }
+      }
+    ],
+    "exit_rules": [],
+    "stop_loss_atr": 2.0,
+    "take_profit_atr": 2.0,
+    "max_bars_hold": 20
+  }
+]

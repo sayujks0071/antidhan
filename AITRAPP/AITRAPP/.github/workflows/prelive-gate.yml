@@ -1,0 +1,31 @@
+name: prelive-gate
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "10 03 * * 1-5"   # 08:40 IST (03:10 UTC), weekdays (10 min before E2E)
+
+jobs:
+  run-prelive-gate:
+    timeout-minutes: 5
+    runs-on: self-hosted
+    labels: [paper-runner]
+    
+    env:
+      API: http://localhost:8000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prelive gate check
+        run: |
+          bash scripts/prelive_gate.sh || exit 1
+
+      - name: Prelive gate (summary)
+        if: always()
+        run: |
+          echo "### Prelive Gate Result" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          bash scripts/prelive_gate.sh 2>&1 | tee -a $GITHUB_STEP_SUMMARY || true
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+

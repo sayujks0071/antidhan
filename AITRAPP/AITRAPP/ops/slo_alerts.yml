@@ -1,0 +1,94 @@
+# Operational SLOs - Prometheus Alert Rules
+
+groups:
+  - name: trader_slos
+    interval: 30s
+    rules:
+      # Kill-flatten time p95 ≤ 2s
+      - alert: KillFlattenSLOBreach
+        expr: histogram_quantile(0.95, rate(trader_kill_flatten_duration_seconds_bucket[5m])) > 2
+        for: 1m
+        labels:
+          severity: critical
+          component: control
+        annotations:
+          summary: "Kill-flatten SLO breach"
+          description: "95th percentile kill-flatten time is {{ $value }}s (SLO: ≤2s)"
+
+      # Order ack latency p95 ≤ 500ms
+      - alert: OrderAckLatencySLOBreach
+        expr: histogram_quantile(0.95, rate(trader_order_latency_ms_bucket[5m])) > 500
+        for: 1m
+        labels:
+          severity: warning
+          component: execution
+        annotations:
+          summary: "Order ack latency SLO breach"
+          description: "95th percentile order ack latency is {{ $value }}ms (SLO: ≤500ms)"
+
+      # No duplicate client IDs
+      - alert: DuplicateClientIDs
+        expr: count by (client_order_id) (trader_orders_placed_total) > 1
+        for: 0m
+        labels:
+          severity: critical
+          component: execution
+        annotations:
+          summary: "Duplicate client_order_id detected"
+          description: "Found duplicate client_order_id: {{ $labels.client_order_id }}"
+
+      # Zero orphan OCO siblings (checked via SQL, but alert if metric exists)
+      - alert: OrphanOCOSiblings
+        expr: trader_oco_orphans_total > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: oco
+        annotations:
+          summary: "Orphan OCO siblings detected"
+          description: "Found {{ $value }} orphan OCO siblings"
+
+      # Heat guard: portfolio_heat_rupees ≤ 0.02 * NL (or configured cap)
+      - alert: HeatGuardBreach
+        expr: trader_portfolio_heat_rupees > (trader_net_liquid_rupees * 0.02)
+        for: 0m
+        labels:
+          severity: critical
+          component: risk
+        annotations:
+          summary: "Portfolio heat guard breach"
+          description: "Portfolio heat {{ $value }} exceeds 2% of net liquid"
+
+      # Leader lock dropped
+      - alert: LeaderLockLost
+        expr: trader_is_leader == 0
+        for: 10s
+        labels:
+          severity: critical
+          component: orchestrator
+        annotations:
+          summary: "Leader lock lost"
+          description: "Instance {{ $labels.instance_id }} lost leader lock for >10s"
+
+      # Market data heartbeat > 5s during market hours
+      - alert: MarketDataHeartbeatStale
+        expr: trader_marketdata_heartbeat_seconds > 5
+        for: 30s
+        labels:
+          severity: warning
+          component: market_data
+        annotations:
+          summary: "Market data heartbeat stale"
+          description: "No ticks received for {{ $value }}s in bucket {{ $labels.bucket }}"
+
+      # Order stream heartbeat > 5s during market hours
+      - alert: OrderStreamHeartbeatStale
+        expr: trader_order_stream_heartbeat_seconds > 5
+        for: 30s
+        labels:
+          severity: warning
+          component: order_watcher
+        annotations:
+          summary: "Order stream heartbeat stale"
+          description: "No order events for {{ $value }}s"
+

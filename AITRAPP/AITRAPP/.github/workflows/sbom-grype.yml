@@ -1,0 +1,77 @@
+name: Security • SBOM & Grype Scan
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: "10 3 * * *"  # Daily at 08:40 IST (03:10 UTC)
+
+permissions:
+  contents: read
+  security-events: write  # needed to publish SARIF to Security tab
+  actions: read
+
+jobs:
+  sbom-scan:
+    runs-on: ubuntu-latest  # GitHub-hosted; no repo secrets needed
+    timeout-minutes: 15
+    
+    env:
+      GRYPE_DB_CACHE_DIR: .grype/db
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      
+      # Cache the Grype vulnerability DB to speed up runs
+      - name: Cache Grype DB
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57  # v4.2.0
+        with:
+          path: ${{ env.GRYPE_DB_CACHE_DIR }}
+          key: grype-db-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            grype-db-${{ runner.os }}-
+      
+      # Generate CycloneDX JSON SBOM with Syft
+      - name: Generate SBOM (CycloneDX JSON)
+        uses: anchore/sbom-action@v0.21.0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+      
+      # Scan the SBOM with Grype (report only; don't fail the build)
+      - name: Scan SBOM with Grype
+        uses: anchore/scan-action@ec2e86d32bb9bc2eb44d1fa4f9c85d9ddc8c5b60  # v4.2.0
+        with:
+          sbom: sbom.cdx.json
+          fail-build: false  # keep CI green; we just report
+          severity-cutoff: high  # show high+critical in SARIF
+          output-format: sarif
+          output-file: grype-results.sarif
+      
+      # Publish SARIF to the Code Scanning UI (Security tab)
+      - name: Upload SARIF to Security tab
+        uses: github/codeql-action/upload-sarif@ea9e4e37992a54ee68a9622e985e60c8e8f12d9f  # v3.27.4
+        with:
+          sarif_file: grype-results.sarif
+          category: grype-vulnerabilities
+      
+      # Keep the SBOM as a build artifact for 30 days
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.0
+        with:
+          name: sbom-cyclonedx-${{ github.run_id }}
+          path: sbom.cdx.json
+          retention-days: 30
+      
+      # Upload Grype results as artifact too
+      - name: Upload Grype SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.0
+        with:
+          name: grype-sarif-${{ github.run_id }}
+          path: grype-results.sarif
+          retention-days: 30

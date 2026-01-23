@@ -1,0 +1,1 @@
+"""AITRAPP Applications"""

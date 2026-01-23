@@ -1,0 +1,156 @@
+# MCX Commodity Instruments Configuration
+# Multi Commodity Exchange India - Futures Contracts
+
+mcx_commodities:
+  GOLDM:
+    name: "Gold Mini"
+    full_name: "Gold Mini February 2026"
+    current_symbol: "GOLDM05FEB26FUT"
+    lot_size: 100  # 100 grams
+    tick_size: 1.0  # ₹1 per 100 grams
+    margin_required: 45000  # Approximate intraday margin (₹)
+    multiplier: 100  # Contract value = price × multiplier
+    trading_hours:
+      morning_start: "09:00"
+      morning_end: "17:00"
+      evening_start: "17:00"
+      evening_end: "23:30"
+    settlement_type: "physical"  # Can be cash-settled or physically delivered
+    avg_daily_volume: 25000  # contracts
+    volatility_category: "low"  # low, medium, high
+
+  SILVERM:
+    name: "Silver Mini"
+    full_name: "Silver Mini February 2026"
+    current_symbol: "SILVERM27FEB26FUT"
+    lot_size: 30  # 30 kg
+    tick_size: 1.0  # ₹1 per kg
+    margin_required: 35000
+    multiplier: 30
+    trading_hours:
+      morning_start: "09:00"
+      morning_end: "17:00"
+      evening_start: "17:00"
+      evening_end: "23:30"
+    settlement_type: "physical"
+    avg_daily_volume: 8000
+    volatility_category: "medium"
+
+  CRUDEOIL:
+    name: "Crude Oil"
+    full_name: "Crude Oil March 2026"
+    current_symbol: "CRUDEOIL19MAR26FUT"
+    lot_size: 100  # 100 barrels
+    tick_size: 1.0  # ₹1 per barrel
+    margin_required: 55000
+    multiplier: 100
+    trading_hours:
+      morning_start: "09:00"
+      morning_end: "23:30"  # Extended hours for energy
+    settlement_type: "cash"
+    avg_daily_volume: 12000
+    volatility_category: "high"
+
+  NATURALGAS:
+    name: "Natural Gas"
+    full_name: "Natural Gas February 2026"
+    current_symbol: "NATURALGAS24FEB26FUT"
+    lot_size: 1250  # 1250 mmBtu
+    tick_size: 0.1  # ₹0.10 per mmBtu
+    margin_required: 30000
+    multiplier: 1250
+    trading_hours:
+      morning_start: "09:00"
+      morning_end: "23:30"
+    settlement_type: "cash"
+    avg_daily_volume: 5000
+    volatility_category: "high"
+
+  COPPER:
+    name: "Copper"
+    full_name: "Copper February 2026"
+    current_symbol: "COPPER27FEB26FUT"
+    lot_size: 1000  # 1000 kg (1 MT)
+    tick_size: 0.05  # ₹0.05 per kg
+    margin_required: 40000
+    multiplier: 1000
+    trading_hours:
+      morning_start: "09:00"
+      morning_end: "17:00"
+    settlement_type: "physical"
+    avg_daily_volume: 3000
+    volatility_category: "medium"
+
+# Strategy parameter recommendations by volatility category
+strategy_params:
+  low_volatility:  # Gold, Silver
+    stop_loss_atr: [1.5, 2.0, 2.5]
+    take_profit_atr: [2.5, 3.5, 4.5, 5.5]
+    max_bars_hold: [20, 40, 60, 80]
+    favor_strategy: "mean_reversion"
+    entry_confidence: 0.65  # Lower threshold for stable instruments
+
+  medium_volatility:  # Copper, Industrial metals
+    stop_loss_atr: [2.0, 2.5, 3.0]
+    take_profit_atr: [3.0, 4.0, 5.0, 6.0]
+    max_bars_hold: [15, 30, 50, 70]
+    favor_strategy: "hybrid"
+    entry_confidence: 0.70
+
+  high_volatility:  # Crude Oil, Natural Gas, Energy
+    stop_loss_atr: [2.5, 3.0, 3.5]
+    take_profit_atr: [4.0, 5.0, 6.0, 7.0]
+    max_bars_hold: [10, 20, 40, 60]
+    favor_strategy: "breakout"
+    entry_confidence: 0.75  # Higher threshold for volatile instruments
+
+# Contract rollover schedule (approximate - verify before expiry)
+rollover_calendar:
+  GOLDM:
+    current_month: "FEB2026"
+    expiry_date: "2026-02-05"
+    next_month: "MAR2026"
+    next_symbol: "GOLDM05MAR26FUT"
+    rollover_days_before: 3  # Start rolling 3 days before expiry
+
+  SILVERM:
+    current_month: "FEB2026"
+    expiry_date: "2026-02-27"
+    next_month: "MAR2026"
+    next_symbol: "SILVERM05MAR26FUT"
+    rollover_days_before: 3
+
+  CRUDEOIL:
+    current_month: "MAR2026"
+    expiry_date: "2026-03-19"
+    next_month: "APR2026"
+    next_symbol: "CRUDEOIL19APR26FUT"
+    rollover_days_before: 2
+
+  NATURALGAS:
+    current_month: "FEB2026"
+    expiry_date: "2026-02-24"
+    next_month: "MAR2026"
+    next_symbol: "NATURALGAS24MAR26FUT"
+    rollover_days_before: 2
+
+  COPPER:
+    current_month: "FEB2026"
+    expiry_date: "2026-02-27"
+    next_month: "MAR2026"
+    next_symbol: "COPPER28MAR26FUT"
+    rollover_days_before: 3
+
+# Correlation matrix (approximate, for position management)
+# Values range from -1 (perfect negative) to 1 (perfect positive correlation)
+correlations:
+  GOLDM-SILVERM: 0.85  # Highly correlated precious metals
+  GOLDM-CRUDEOIL: 0.35  # Low correlation
+  GOLDM-NATURALGAS: 0.25
+  GOLDM-COPPER: 0.40
+  SILVERM-CRUDEOIL: 0.30
+  SILVERM-NATURALGAS: 0.22
+  SILVERM-COPPER: 0.45
+  CRUDEOIL-NATURALGAS: 0.72  # Correlated energy commodities
+  CRUDEOIL-COPPER: 0.50  # Industrial demand correlation
+  NATURALGAS-COPPER: 0.35

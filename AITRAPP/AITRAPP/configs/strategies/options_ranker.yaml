@@ -1,0 +1,64 @@
+# Options Ranking Strategy
+# Ranks and trades options spreads based on IV, skew, and liquidity
+
+name: OptionsRanker
+version: 1.0.0
+enabled: true
+
+instruments:
+  - NIFTY
+  - BANKNIFTY
+  - FINNIFTY
+
+params:
+  # Strategy type
+  strategy_type: debit_spread  # debit_spread, credit_spread, naked
+  
+  # IV Rank filters
+  min_iv_rank: 30
+  max_iv_rank: 70
+  
+  # Skew tolerance
+  max_skew_pct: 10
+  
+  # Minimum risk:reward
+  rr_min: 2.5
+  
+  # Maximum concurrent positions
+  max_positions: 3
+  
+  # Spread width (in strikes)
+  spread_width: 1
+  
+  # Days to expiry range
+  min_dte: 3
+  max_dte: 10
+  
+  # Delta range for entry
+  min_delta: 0.30
+  max_delta: 0.50
+
+debit_spread:
+  # For bullish/bearish directional bets
+  max_cost_pct: 30  # % of spread width
+  min_pop: 40  # Probability of profit %
+
+credit_spread:
+  # For premium collection
+  min_credit_pct: 25  # % of spread width
+  min_pop: 65  # Probability of profit %
+
+filters:
+  # Liquidity gates
+  min_oi: 50000
+  min_volume: 10000
+  max_spread_pct: 0.5  # Bid-ask as % of mid
+  
+  # Greeks constraints
+  max_gamma: 0.05
+  max_vega: 50
+  
+  # Price constraints
+  min_premium: 10
+  max_premium: 500
+

@@ -1,0 +1,200 @@
+═══════════════════════════════════════════════════════════════════════════
+🚀 LIVE TRADING QUICK START GUIDE
+═══════════════════════════════════════════════════════════════════════════
+
+You are here: http://127.0.0.1:5001/dashboard
+
+═══════════════════════════════════════════════════════════════════════════
+STEP 1: CONNECT YOUR BROKER (MOST IMPORTANT!)
+═══════════════════════════════════════════════════════════════════════════
+
+Look at the LEFT SIDEBAR or TOP MENU for one of these options:
+  • "Broker"
+  • "Authentication" 
+  • "Broker Login"
+  • "Connect Broker"
+
+Click on it, then:
+
+FOR ZERODHA:
+  1. Select "Zerodha" or "Kite Connect"
+  2. You'll need:
+     - API Key (from https://developers.kite.trade/)
+     - API Secret
+  3. Enter credentials
+  4. Click "Connect" → You'll be redirected to Zerodha login
+  5. Login and authorize
+  6. You'll be redirected back
+
+FOR FINVASIA:
+  1. Select "Finvasia" or "Shoonya"
+  2. Enter:
+     - Client ID (your user ID)
+     - Password
+     - TOTP/PIN
+  3. Click "Connect"
+
+FOR ANGEL ONE:
+  1. Select "Angel One"
+  2. Enter API credentials
+  3. Click "Connect"
+
+═══════════════════════════════════════════════════════════════════════════
+STEP 2: GO TO PYTHON STRATEGIES
+═══════════════════════════════════════════════════════════════════════════
+
+Look for in menu:
+  • "Python" 
+  • "Python Strategies"
+  • "Strategies" → "Python"
+
+Click on it to open the Python strategies page.
+
+═══════════════════════════════════════════════════════════════════════════
+STEP 3: UPLOAD YOUR 3 STRATEGIES
+═══════════════════════════════════════════════════════════════════════════
+
+Strategy files are located at:
+  /Users/mac/dyad-apps/openalgo/strategies/scripts/
+
+STRATEGY #1: AI Hybrid Reversion + Breakout
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+File: ai_hybrid_reversion_breakout.py
+Click "Add Strategy" or "New Strategy"
+Upload file or browse to:
+  /Users/mac/dyad-apps/openalgo/strategies/scripts/ai_hybrid_reversion_breakout.py
+
+Configure:
+  Name: AI Hybrid
+  Symbols: NIFTY,BANKNIFTY
+  Interval: 5m
+  Schedule: 09:30-15:15
+  Product: MIS
+  Mode: PAPER (for testing) or LIVE (real money)
+
+Click Save → Click Enable
+
+STRATEGY #2: ML Momentum
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+File: advanced_ml_momentum_strategy.py
+Click "Add Strategy"
+Upload file or browse to:
+  /Users/mac/dyad-apps/openalgo/strategies/scripts/advanced_ml_momentum_strategy.py
+
+Configure:
+  Name: ML Momentum
+  Symbols: RELIANCE,TCS,INFY
+  Interval: 5m
+  Schedule: 09:30-15:15
+  Product: MIS
+  Mode: PAPER or LIVE
+
+Click Save → Click Enable
+
+STRATEGY #3: SuperTrend VWAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+File: supertrend_vwap_strategy.py
+Click "Add Strategy"
+Upload file or browse to:
+  /Users/mac/dyad-apps/openalgo/strategies/scripts/supertrend_vwap_strategy.py
+
+Configure:
+  Name: SuperTrend VWAP
+  Symbols: HDFCBANK,ICICIBANK,SBIN
+  Interval: 5m
+  Schedule: 09:30-15:15
+  Product: MIS
+  Mode: PAPER or LIVE
+
+Click Save → Click Enable
+
+═══════════════════════════════════════════════════════════════════════════
+STEP 4: MONITOR YOUR TRADING
+═══════════════════════════════════════════════════════════════════════════
+
+Navigate to these sections:
+
+POSITIONS:
+  • See all open trades
+  • Real-time P&L
+  • Close positions if needed
+
+ORDERS:
+  • Order history
+  • Filled, pending, rejected orders
+
+LOGS:
+  • Strategy signals
+  • Entry/exit reasons
+  • Scores and regime detection
+
+═══════════════════════════════════════════════════════════════════════════
+⚠️ CRITICAL SAFETY SETTINGS
+═══════════════════════════════════════════════════════════════════════════
+
+BEFORE ENABLING LIVE MODE:
+
+1. SET POSITION SIZES:
+   Start with 10-25% of target size
+   Example: If target is 50 qty, start with 10-15 qty
+
+2. SET LOSS LIMITS:
+   Daily loss limit: -₹5,000 (or 5% of account)
+   Per trade loss: -₹1,000
+
+3. START SMALL:
+   First week: PAPER mode or 1-2 symbols only
+   If profitable: Gradually add more symbols
+
+4. MONITOR ACTIVELY:
+   First few days: Watch every trade
+   Check hourly during market hours
+
+═══════════════════════════════════════════════════════════════════════════
+🎯 WHAT TO EXPECT
+═══════════════════════════════════════════════════════════════════════════
+
+MARKET HOURS: 09:15 AM - 03:30 PM
+TRADING WINDOW: 09:30 AM - 03:15 PM
+
+When strategies are enabled:
+  ✓ They scan for signals every 30 seconds
+  ✓ AI Hybrid detects market regime (TRENDING/RANGING)
+  ✓ ML Momentum calculates signal scores (0-100)
+  ✓ SuperTrend VWAP follows trends
+  
+You'll see:
+  • Entry notifications with scores
+  • Partial exits at multiple levels
+  • Trailing stop activations
+  • Real-time P&L updates
+
+Combined Performance Target:
+  Win Rate: 76-80%
+  Daily Trades: 15-25 total
+  Daily Return: 1.5-3% (good days)
+
+═══════════════════════════════════════════════════════════════════════════
+🆘 EMERGENCY STOP
+═══════════════════════════════════════════════════════════════════════════
+
+If something goes wrong:
+  1. Go to "Python Strategies"
+  2. Toggle OFF all strategies
+  3. Go to "Positions" → Close all manually
+  4. Review logs to see what happened
+
+═══════════════════════════════════════════════════════════════════════════
+📞 SUPPORT
+═══════════════════════════════════════════════════════════════════════════
+
+Strategy Files Location:
+  /Users/mac/dyad-apps/openalgo/strategies/scripts/
+
+Documentation:
+  /Users/mac/dyad-apps/ULTIMATE_HYBRID_STRATEGY.md
+  /Users/mac/dyad-apps/ALL_STRATEGIES_COMPARISON.md
+
+Server URL: http://127.0.0.1:5001
+
+═══════════════════════════════════════════════════════════════════════════

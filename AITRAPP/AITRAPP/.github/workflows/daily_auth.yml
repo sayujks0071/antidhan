@@ -1,0 +1,70 @@
+name: Daily Kite Auth Check
+on:
+  schedule:
+    # 8:00 AM IST is 2:30 AM UTC
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  auth-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Check Auth Session
+        env:
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_ACCESS_TOKEN: ${{ secrets.KITE_ACCESS_TOKEN }}
+        run: |
+          # Create dummy .env for dotenv to find
+          touch .env
+          export PYTHONPATH=$PYTHONPATH:.
+          # Run check-only. If it fails (exit 1), we create an issue.
+          python scripts/kite_auth_bootstrap.py --check-only || echo "AUTH_NEEDED=true" >> $GITHUB_ENV
+
+      - name: Notify / Create Issue if Auth Needed
+        # Triggered if auth check failed (exit code 1)
+        if: env.AUTH_NEEDED == 'true'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const title = "⚠️ Action Required: Daily Kite Login";
+            const body = "The daily auth check failed. The Kite Connect session is invalid or expired.\n\n" +
+              "**Please perform the manual login on the server.**\n\n" +
+              "1. Log in to the server.\n" +
+              "2. Run `python scripts/kite_auth_bootstrap.py`\n" +
+              "3. Follow the URL to login.\n" +
+              "4. Ensure the API server is running to receive the callback.";
+
+            // Check for existing open issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              creator: 'github-actions[bot]',
+              labels: ['auth-required']
+            });
+
+            const existing = issues.data.find(i => i.title === title);
+
+            if (!existing) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['auth-required']
+              });
+            } else {
+              console.log("Issue already exists.");
+            }

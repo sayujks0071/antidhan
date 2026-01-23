@@ -1,0 +1,83 @@
+name: Archive Day-2 Artifacts
+
+on:
+  schedule:
+    # Run at 15:35 IST (10:05 UTC) on weekdays
+    - cron: '5 10 * * 1-5'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  archive:
+    runs-on: self-hosted
+    labels: [paper-runner]
+    timeout-minutes: 5
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Archive Day-2 Reports
+        run: |
+          mkdir -p artifacts/day2-$(date +%F)
+          
+          # Get git_head and config_sha
+          GIT_HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          CONFIG_SHA=$(python3 -c "import hashlib; f=open('configs/app.yaml','rb'); print(hashlib.sha256(f.read()).hexdigest()[:16])" 2>/dev/null || echo "unknown")
+          HOSTNAME=$(hostname 2>/dev/null || echo "unknown")
+          
+          # Copy JSON scorer outputs
+          if [ -d reports/burnin ]; then
+            cp reports/burnin/day2_*.json artifacts/day2-$(date +%F)/ 2>/dev/null || true
+            cp reports/burnin/day1_*.json artifacts/day2-$(date +%F)/ 2>/dev/null || true
+          fi
+          
+          # Copy latency summaries
+          if [ -d reports/$(date +%Y-%m-%d) ]; then
+            cp reports/$(date +%Y-%m-%d)/latency_summary_*.txt artifacts/day2-$(date +%F)/ 2>/dev/null || true
+          fi
+          
+          # Create metadata file
+          {
+            echo "git_head: $GIT_HEAD"
+            echo "config_sha: $CONFIG_SHA"
+            echo "hostname: $HOSTNAME"
+            echo "timestamp: $(date -Is)"
+          } > artifacts/day2-$(date +%F)/metadata.txt
+          
+          # Create summary
+          {
+            echo "# Day-2 Artifacts - $(date +%Y-%m-%d)"
+            echo ""
+            echo "## Metadata"
+            echo "- Git HEAD: $GIT_HEAD"
+            echo "- Config SHA: $CONFIG_SHA"
+            echo "- Hostname: $HOSTNAME"
+            echo ""
+            echo "## Scorer JSON Files"
+            ls -1 artifacts/day2-$(date +%F)/*.json 2>/dev/null || echo "No JSON files found"
+            echo ""
+            echo "## Latency Summaries"
+            ls -1 artifacts/day2-$(date +%F)/latency_summary_*.txt 2>/dev/null || echo "No latency summaries found"
+          } > artifacts/day2-$(date +%F)/README.md
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: day2-artifacts-$(date +%F)
+          path: artifacts/day2-$(date +%F)/
+          retention-days: 180  # Match audit retention needs
+      
+      - name: Verify latest Day-2 PASS (jq-less gate)
+        run: |
+          bash scripts/prelive_gate.sh || exit 1
+      
+      - name: Summary
+        run: |
+          echo "## Day-2 Artifacts Archived" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ JSON scorer outputs" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Latency summaries" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Pre-live gate verified" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts available for 180 days." >> $GITHUB_STEP_SUMMARY
+
