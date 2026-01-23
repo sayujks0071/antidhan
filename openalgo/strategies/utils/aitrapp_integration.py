@@ -9,10 +9,8 @@ def setup_aitrapp_path():
     # Try to find AITRAPP repository
     # Check common locations
     possible_paths = [
-        Path(__file__).parent.parent.parent.parent / "AITRAPP" / "AITRAPP",
-        Path(__file__).parent.parent.parent.parent.parent / "AITRAPP" / "AITRAPP",
-        Path.home() / "AITRAPP" / "AITRAPP",
-        Path("/Users/mac/dyad-apps/AITRAPP/AITRAPP"),
+        Path(__file__).resolve().parent.parent.parent.parent / "AITRAPP" / "AITRAPP",
+        Path(__file__).resolve().parent.parent.parent.parent.parent / "AITRAPP" / "AITRAPP",
     ]
     
     aitrapp_path = None

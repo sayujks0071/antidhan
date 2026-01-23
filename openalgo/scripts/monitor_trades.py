@@ -29,10 +29,11 @@ except ImportError:
     psutil = None
 
 # Paths
-CONFIG_PATH = Path("/Users/mac/dyad-apps/openalgo/strategies/strategy_configs.json")
-ENV_PATH = Path("/Users/mac/dyad-apps/openalgo/strategies/strategy_env.json")
-LOG_DIR = Path("/Users/mac/dyad-apps/openalgo/strategies/logs")
-ALT_LOG_DIR = Path("/Users/mac/dyad-apps/openalgo/log/strategies")
+BASE_DIR = Path(__file__).resolve().parent.parent
+CONFIG_PATH = BASE_DIR / "strategies/strategy_configs.json"
+ENV_PATH = BASE_DIR / "strategies/strategy_env.json"
+LOG_DIR = BASE_DIR / "strategies/logs"
+ALT_LOG_DIR = BASE_DIR / "log/strategies"
 BASE_URL = "http://127.0.0.1:5001"
 
 # Strategy name mappings (from process command to strategy ID)
