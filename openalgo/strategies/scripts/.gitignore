@@ -20,3 +20,12 @@ __pycache__/
 
 # Keep the directory but ignore contents
 # This ensures the scripts folder exists in git but user strategies are not tracked
+
+# Allow standard strategies
+!advanced_equity_strategy.py
+!ai_hybrid_reversion_breakout.py
+!advanced_ml_momentum_strategy.py
+!supertrend_vwap_strategy.py
+!orb_strategy.py
+!trend_pullback_strategy.py
+!sector_momentum_strategy.py
