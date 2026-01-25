@@ -1,6 +1,7 @@
 import os
 import re
 import glob
+import csv
 from datetime import datetime
 from collections import defaultdict
 import json
@@ -8,6 +9,8 @@ import json
 # Configuration
 LOG_DIR = "openalgo/log/strategies"
 STRATEGIES_DIR = "openalgo/strategies/scripts"
+RANKINGS_DIR = "openalgo/strategies/backtest_results"
+DEPLOY_SCRIPT_PATH = "openalgo/strategies/scripts/deploy_daily_optimized.sh"
 
 def get_today_logs():
     """Finds log files for the current date."""
@@ -200,7 +203,7 @@ def calculate_score(metrics):
         "profit_factor": round(profit_factor, 2)
     }
 
-def generate_report(results, all_adjustments):
+def generate_report(results, all_adjustments, ranked_strategies):
     """Generates Markdown report."""
     date_str = datetime.now().strftime("%Y-%m-%d")
     report = []
@@ -210,20 +213,16 @@ def generate_report(results, all_adjustments):
     report.append("Strategy | Signals | Entries | Wins | WR% | PF | Score | Status")
     report.append("---------|---------|---------|------|-----|----|-------|--------")
 
-    ranked_strategies = []
-
-    for strategy, metrics in results.items():
-        score_data = calculate_score(metrics)
-        score = score_data['score']
-        wr = score_data['win_rate']
-        pf = score_data['profit_factor']
-
+    for item in ranked_strategies:
+        strategy = item['strategy']
+        metrics = results[strategy]
+        score = item['score']
+        wr = item['win_rate']
+        pf = item['profit_factor']
         status = "✓" if score > 0.5 else "✗"
 
         row = f"{strategy:<15} | {metrics['signals']:<7} | {metrics['entries']:<7} | {metrics['wins']:<4} | {wr:<3}% | {pf:<2} | {score:<5} | {status}"
         report.append(row)
-
-        ranked_strategies.append((strategy, score))
 
     report.append("\n🔧 INCREMENTAL IMPROVEMENTS APPLIED:")
     if all_adjustments:
@@ -236,19 +235,79 @@ def generate_report(results, all_adjustments):
         report.append("No improvements applied.")
 
     report.append("\n📊 STRATEGY RANKING (Top 5 for Tomorrow):")
-    ranked_strategies.sort(key=lambda x: x[1], reverse=True)
-    for i, (strat, score) in enumerate(ranked_strategies[:5], 1):
+    for i, item in enumerate(ranked_strategies[:5], 1):
+        strat = item['strategy']
+        score = item['score']
         action = "Start/Restart" if score > 0.5 else "Review"
         report.append(f"{i}. {strat} - Score: {score} - [Action: {action}]")
 
     report.append("\n🚀 DEPLOYMENT PLAN:")
-    to_start = [s[0] for s in ranked_strategies if s[1] > 0.5]
+    to_start = [s['strategy'] for s in ranked_strategies if s['score'] > 0.5]
     report.append(f"- Start/Restart: {', '.join(to_start)}")
 
     return "\n".join(report)
 
+def save_rankings(ranked_strategies):
+    """Saves rankings to CSV."""
+    os.makedirs(RANKINGS_DIR, exist_ok=True)
+    filepath = os.path.join(RANKINGS_DIR, "strategy_rankings.csv")
+
+    with open(filepath, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(["rank", "strategy", "score", "total_trades"])
+        for i, item in enumerate(ranked_strategies, 1):
+            writer.writerow([i, item['strategy'], item['score'], item['total_trades']])
+
+    print(f"Rankings saved to {filepath}")
+
+def generate_deployment_script(ranked_strategies, all_strategies):
+    """Generates a shell script to deploy top strategies."""
+    os.makedirs(os.path.dirname(DEPLOY_SCRIPT_PATH), exist_ok=True)
+
+    # Filter strategies with score > 0.5
+    to_deploy = [s['strategy'] for s in ranked_strategies if s['score'] > 0.5]
+
+    with open(DEPLOY_SCRIPT_PATH, 'w') as f:
+        f.write("#!/bin/bash\n")
+        f.write("# Auto-generated deployment script based on daily optimization\n\n")
+
+        # Load environment if exists
+        f.write("# Load environment variables\n")
+        f.write("if [ -f .env ]; then\n")
+        f.write("    export $(cat .env | xargs)\n")
+        f.write("fi\n\n")
+
+        f.write(f"LOG_DIR={LOG_DIR}\n")
+        f.write("mkdir -p $LOG_DIR\n\n")
+
+        f.write("echo 'Stopping known strategies...'\n")
+        for strategy in all_strategies:
+             f.write(f"pkill -f {strategy}.py || true\n")
+        f.write("\n")
+
+        f.write("echo 'Starting optimized strategies...'\n\n")
+
+        for strategy in to_deploy:
+            # Assume python file exists in STRATEGIES_DIR
+            script_path = os.path.join(STRATEGIES_DIR, f"{strategy}.py")
+            log_path = os.path.join(LOG_DIR, f"{strategy}_live.log")
+
+            f.write(f"echo 'Starting {strategy}...'\n")
+            f.write(f"nohup python3 {script_path} > {log_path} 2>&1 &\n")
+            f.write(f"echo 'Started {strategy} with PID $!'\n\n")
+
+        f.write("echo 'Deployment complete.'\n")
+
+    # Make executable
+    os.chmod(DEPLOY_SCRIPT_PATH, 0o755)
+    print(f"Deployment script generated at {DEPLOY_SCRIPT_PATH}")
+
 def main():
     log_files = get_today_logs()
+
+    if not log_files:
+        print("No logs found for today.")
+        return
 
     strategies = set()
     for log_file in log_files:
@@ -259,6 +318,7 @@ def main():
 
     results = {}
     all_adjustments = {}
+    ranked_strategies = []
 
     for strategy in strategies:
         metrics = analyze_strategy(strategy, log_files)
@@ -268,8 +328,23 @@ def main():
         if adjustments:
             all_adjustments[strategy] = adjustments
 
-    report = generate_report(results, all_adjustments)
+        score_data = calculate_score(metrics)
+        ranked_strategies.append({
+            "strategy": strategy,
+            "score": score_data['score'],
+            "win_rate": score_data['win_rate'],
+            "profit_factor": score_data['profit_factor'],
+            "total_trades": metrics['entries']
+        })
+
+    # Sort by score
+    ranked_strategies.sort(key=lambda x: x['score'], reverse=True)
+
+    report = generate_report(results, all_adjustments, ranked_strategies)
     print(report)
+
+    save_rankings(ranked_strategies)
+    generate_deployment_script(ranked_strategies, strategies)
 
 if __name__ == "__main__":
     main()
