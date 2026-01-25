@@ -3,34 +3,37 @@
 SuperTrend VWAP Strategy
 VWAP mean reversion with volume profile analysis.
 Enhanced with Volume Profile and VWAP deviation.
+Now includes Position Management and Market Hour checks.
 """
 import os
+import sys
 import time
 import logging
+import argparse
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
+# Add repo root to path to allow imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+
+try:
+    from openalgo.strategies.utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
+except ImportError:
+    # Fallback if running from a different context
+    try:
+        from strategies.utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
+    except ImportError:
+        print("Error: Could not import trading_utils. Ensure you are running from the repo root or openalgo directory.")
+        sys.exit(1)
+
+# Try native import, fallback to our APIClient
 try:
     from openalgo import api
 except ImportError:
     api = None
 
-SYMBOL = "REPLACE_ME"
-API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
-HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(f"VWAP_{SYMBOL}")
-
-def calculate_vwap(df):
-    v = df['volume'].values
-    tp = (df['high'] + df['low'] + df['close']) / 3
-    df = df.assign(vwap=(tp * v).cumsum() / v.cumsum())
-
-    # Calculate Deviation
-    df['vwap_dev'] = (df['close'] - df['vwap']) / df['vwap']
-    return df
 
 def analyze_volume_profile(df, n_bins=20):
     """
@@ -64,25 +67,47 @@ def analyze_volume_profile(df, n_bins=20):
 
     return poc_price, poc_volume
 
-def run_strategy():
-    if not api:
-        logger.error("OpenAlgo API not available")
-        return
+def run_strategy(args):
+    symbol = args.symbol
+    api_key = args.api_key or os.getenv('OPENALGO_APIKEY', 'demo_key')
+    host = args.host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
+    quantity = args.quantity
 
-    client = api(api_key=API_KEY, host=HOST)
-    logger.info(f"Starting SuperTrend VWAP for {SYMBOL}")
+    logger = logging.getLogger(f"VWAP_{symbol}")
+
+    # Initialize API Client
+    if api:
+        client = api(api_key=api_key, host=host)
+        logger.info("Using Native OpenAlgo API")
+    else:
+        client = APIClient(api_key=api_key, host=host)
+        logger.info("Using Fallback API Client (httpx)")
+
+    # Initialize Position Manager
+    pm = PositionManager(symbol)
+
+    logger.info(f"Starting SuperTrend VWAP for {symbol} | Qty: {quantity}")
 
     while True:
         try:
-            # Fetch sufficient history for Volume Profile
-            df = client.history(symbol=SYMBOL, exchange="NSE", interval="5m",
+            # Market Hour Check
+            if not args.ignore_time and not is_market_open():
+                logger.info("Market is closed. Waiting...")
+                time.sleep(60)
+                continue
+
+            # Fetch sufficient history for Volume Profile (last 5 days)
+            df = client.history(symbol=symbol, exchange="NSE", interval="5m",
                                 start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
                                 end_date=datetime.now().strftime("%Y-%m-%d"))
-            if df.empty:
+
+            if df.empty or not isinstance(df, pd.DataFrame):
+                logger.warning("No data received. Retrying...")
                 time.sleep(10)
                 continue
 
-            df = calculate_vwap(df)
+            # Calculate Intraday VWAP (resetting daily)
+            df = calculate_intraday_vwap(df)
             last = df.iloc[-1]
 
             # Volume Profile Analysis
@@ -99,18 +124,40 @@ def run_strategy():
             is_above_poc = last['close'] > poc_price
             is_not_overextended = abs(last['vwap_dev']) < 0.02 # Within 2% of VWAP
 
+            logger.debug(f"Price: {last['close']} | VWAP: {last['vwap']:.2f} | POC: {poc_price:.2f}")
+
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended:
-                logger.info(f"VWAP Crossover Buy for {SYMBOL} | POC: {poc_price:.2f} | Dev: {last['vwap_dev']:.4f}")
+                if not pm.has_position():
+                    logger.info(f"VWAP Crossover Buy for {symbol} | POC: {poc_price:.2f} | Dev: {last['vwap_dev']:.4f}")
 
-                qty = 10
-                client.placesmartorder(strategy="SuperTrend VWAP", symbol=SYMBOL, action="BUY",
-                                       exchange="NSE", price_type="MARKET", product="MIS",
-                                       quantity=qty, position_size=qty)
+                    # Place Order
+                    resp = client.placesmartorder(strategy="SuperTrend VWAP", symbol=symbol, action="BUY",
+                                           exchange="NSE", price_type="MARKET", product="MIS",
+                                           quantity=quantity, position_size=quantity)
 
+                    if resp: # Assuming resp is not None/Empty on success
+                        pm.update_position(quantity, last['close'], 'BUY')
+                else:
+                    logger.debug("Signal detected but position already open.")
+
+            # Exit Logic (Simple stop/target or reverse) - For now just log
+            # In a real strategy, checking PnL or technical exit conditions goes here.
+
+        except KeyboardInterrupt:
+            logger.info("Stopping strategy...")
+            break
         except Exception as e:
             logger.error(f"Error: {e}")
 
         time.sleep(30)
 
 if __name__ == "__main__":
-    run_strategy()
+    parser = argparse.ArgumentParser(description="SuperTrend VWAP Strategy")
+    parser.add_argument("--symbol", type=str, required=True, help="Trading Symbol (e.g., RELIANCE)")
+    parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
+    parser.add_argument("--api_key", type=str, help="OpenAlgo API Key")
+    parser.add_argument("--host", type=str, help="OpenAlgo Server Host")
+    parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours check")
+
+    args = parser.parse_args()
+    run_strategy(args)
