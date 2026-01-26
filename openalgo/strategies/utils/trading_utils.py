@@ -1,6 +1,8 @@
 import os
 import logging
 import pytz
+import json
+from pathlib import Path
 from datetime import datetime, time
 import httpx
 import pandas as pd
@@ -57,31 +59,95 @@ def calculate_intraday_vwap(df):
 
 class PositionManager:
     """
-    Simple in-memory position manager to prevent duplicate orders.
+    Persistent position manager to track trades and prevent duplicate orders.
+    Saves state to openalgo/strategies/state/{symbol}_state.json
     """
     def __init__(self, symbol):
         self.symbol = symbol
-        self.position = 0 # Net quantity
+        # Determine state directory relative to this file
+        # this file: openalgo/strategies/utils/trading_utils.py
+        # target: openalgo/strategies/state/
+        self.state_dir = Path(__file__).resolve().parent.parent / "state"
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.state_file = self.state_dir / f"{self.symbol}_state.json"
+
+        self.position = 0
         self.entry_price = 0.0
+        self.pnl = 0.0
+
+        self.load_state()
+
+    def load_state(self):
+        if self.state_file.exists():
+            try:
+                with open(self.state_file, 'r') as f:
+                    data = json.load(f)
+                    self.position = data.get('position', 0)
+                    self.entry_price = data.get('entry_price', 0.0)
+                    self.pnl = data.get('pnl', 0.0)
+                    logger.info(f"Loaded state for {self.symbol}: Pos={self.position} @ {self.entry_price}")
+            except Exception as e:
+                logger.error(f"Failed to load state for {self.symbol}: {e}")
+
+    def save_state(self):
+        try:
+            data = {
+                'position': self.position,
+                'entry_price': self.entry_price,
+                'pnl': self.pnl,
+                'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            with open(self.state_file, 'w') as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            logger.error(f"Failed to save state for {self.symbol}: {e}")
 
     def update_position(self, qty, price, side):
         """
         Update position state.
         side: 'BUY' or 'SELL'
         """
-        if side.upper() == 'BUY':
+        side = side.upper()
+
+        if side == 'BUY':
             if self.position == 0:
-                self.entry_price = price
+                self.entry_price = price # Long Entry
+            elif self.position < 0:
+                # Closing Short
+                realized_pnl = (self.entry_price - price) * qty
+                self.pnl += realized_pnl
+                logger.info(f"Closed Short. PnL: {realized_pnl}")
+
             self.position += qty
-        elif side.upper() == 'SELL':
+
+        elif side == 'SELL':
             if self.position == 0:
-                self.entry_price = price # Short entry
+                self.entry_price = price # Short Entry
+            elif self.position > 0:
+                # Closing Long
+                realized_pnl = (price - self.entry_price) * qty
+                self.pnl += realized_pnl
+                logger.info(f"Closed Long. PnL: {realized_pnl}")
+
             self.position -= qty
 
+        if self.position == 0:
+            self.entry_price = 0.0
+
         logger.info(f"Position Updated for {self.symbol}: {self.position} @ {self.entry_price}")
+        self.save_state()
 
     def has_position(self):
         return self.position != 0
+
+    def get_pnl(self, current_price):
+        if self.position == 0:
+            return 0.0
+
+        if self.position > 0:
+            return (current_price - self.entry_price) * abs(self.position)
+        else:
+            return (self.entry_price - current_price) * abs(self.position)
 
 class APIClient:
     """
