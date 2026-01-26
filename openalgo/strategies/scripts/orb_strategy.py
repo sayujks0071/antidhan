@@ -2,6 +2,7 @@
 """
 ORB Strategy
 Opening Range Breakout with pre-market gap analysis and volume confirmation.
+Range: First 15 Minutes. Trading Window: Until 10:30 AM.
 """
 import os
 import time
@@ -23,19 +24,31 @@ logger = logging.getLogger(f"ORB_{SYMBOL}")
 
 def get_previous_close(client):
     """Fetch previous day's close price."""
-    # Simulating fetching previous close
-    # prev_ohlc = client.get_ohlc(SYMBOL)
-    # return prev_ohlc['close']
-    return 1000.0 # Placeholder
+    try:
+        # In a real scenario, use history for previous day
+        end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d") # Go back enough to find a trading day
+        df = client.history(symbol=SYMBOL, exchange="NSE", interval="day", start_date=start_date, end_date=end_date)
+        if not df.empty:
+            return df.iloc[-1]['close']
+    except Exception as e:
+        logger.error(f"Error fetching prev close: {e}")
+    return 1000.0 # Fallback
 
 def analyze_gap(open_price, prev_close):
     """Analyze the opening gap."""
+    if prev_close == 0: return "Unknown", 0.0
+
     gap_percent = (open_price - prev_close) / prev_close * 100
     gap_type = "Neutral"
     if gap_percent > 1.0:
         gap_type = "Gap Up"
     elif gap_percent < -1.0:
         gap_type = "Gap Down"
+    elif gap_percent > 0.5:
+         gap_type = "Mild Gap Up"
+    elif gap_percent < -0.5:
+         gap_type = "Mild Gap Down"
 
     return gap_type, gap_percent
 
@@ -64,6 +77,7 @@ def run_strategy():
             # Define ORB period (9:15 to 9:30)
             market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
             orb_end = now.replace(hour=9, minute=30, second=0, microsecond=0)
+            trading_end = now.replace(hour=10, minute=30, second=0, microsecond=0)
             market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
 
             if now < market_open:
@@ -82,32 +96,28 @@ def run_strategy():
                     df = client.history(symbol=SYMBOL, exchange="NSE", interval="1m",
                                         start_date=today_str, end_date=today_str)
 
-                    if not df.empty:
-                        # Assuming 'date' column exists or using index.
-                        # Filtering for data strictly between 9:15 and 9:30
-                        # For simplicity, we assume the history call returns today's data so far
+                    if not df.empty and len(df) >= 15:
+                        # Assuming data starts at 9:15
+                        orb_data = df.iloc[:15] # First 15 mins
+                        orb_high = orb_data['high'].max()
+                        orb_low = orb_data['low'].min()
+                        orb_volume_avg = orb_data['volume'].mean()
 
-                        # Verify we have enough data points
-                        if len(df) >= 15:
-                            orb_data = df.iloc[:15] # First 15 mins
-                            orb_high = orb_data['high'].max()
-                            orb_low = orb_data['low'].min()
-                            orb_volume_avg = orb_data['volume'].mean()
+                        open_price = df.iloc[0]['open']
+                        gap_type, gap_pct = analyze_gap(open_price, prev_close)
 
-                            open_price = df.iloc[0]['open']
-                            gap_type, gap_pct = analyze_gap(open_price, prev_close)
+                        logger.info(f"ORB Calculated: High {orb_high}, Low {orb_low}, Vol Avg {orb_volume_avg:.0f}")
+                        logger.info(f"Gap Analysis: {gap_type} ({gap_pct:.2f}%)")
 
-                            logger.info(f"ORB Calculated: High {orb_high}, Low {orb_low}")
-                            logger.info(f"Gap Analysis: {gap_type} ({gap_pct:.2f}%)")
-
-                            orb_period_complete = True
+                        orb_period_complete = True
                 else:
+                    # Still in ORB period
                     time.sleep(30)
                     continue
 
-            # Trading Logic (Post ORB)
-            if orb_period_complete and position == 0:
-                # Fetch live data (Simulated here via history for consistency)
+            # Trading Logic (Post ORB, until 10:30)
+            if orb_period_complete and position == 0 and now < trading_end:
+                # Fetch live data
                 df = client.history(symbol=SYMBOL, exchange="NSE", interval="1m",
                                     start_date=today_str, end_date=today_str)
 
@@ -134,6 +144,10 @@ def run_strategy():
                                                exchange="NSE", price_type="MARKET", product="MIS",
                                                quantity=qty, position_size=qty)
                         position = -qty
+
+            elif now > trading_end and position == 0:
+                 logger.info("Trading window closed for ORB entries.")
+                 break
 
         except Exception as e:
             logger.error(f"Error: {e}")

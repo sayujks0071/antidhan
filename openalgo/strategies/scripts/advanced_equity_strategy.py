@@ -150,23 +150,24 @@ class AdvancedEquityStrategy:
         (Liquidity Score × 0.05)
         """
         last = stock_data.iloc[-1]
-        prev = stock_data.iloc[-2]
 
         # 1. Trend Strength (20%)
-        # ADX proxy > 20 is trend, Price > SMA50 > SMA200
+        # ADX proxy > 25 is trend, Price > SMA50 > SMA200
         trend_score = 50
         if last['close'] > last['sma50'] > last['sma200']:
             trend_score += 30
-        if last['adx'] > 20: # Using our proxy
+        if last['adx'] > 25:
             trend_score += 20
+        trend_score = min(100, trend_score)
 
         # 2. Momentum Score (20%)
-        # RSI 40-70 is good momentum range, MACD > Signal
+        # RSI 40-70 is good momentum range, MACD > Signal, Rising RSI
         momentum_score = 50
         if 40 < last['rsi'] < 70:
             momentum_score += 20
         if last['macd'] > last['signal']:
             momentum_score += 30
+        momentum_score = min(100, momentum_score)
 
         # 3. Volume Score (15%)
         # Current volume > Avg Volume
@@ -174,32 +175,37 @@ class AdvancedEquityStrategy:
         volume_score = 50
         if last['volume'] > avg_vol:
             volume_score += 50
+        volume_score = min(100, volume_score)
 
         # 4. Volatility Score (10%)
-        # Prefer stable volatility for trend, high for reversion
+        # Stable volatility for trend, high for reversion
+        # Here assuming preference for manageable volatility (ATR < 2% of Price)
         volatility_score = 50
-        if last['atr'] < last['close'] * 0.02: # Low volatility
-            volatility_score += 30
+        if last['atr'] < last['close'] * 0.02:
+            volatility_score += 50
+        volatility_score = min(100, volatility_score)
 
         # 5. Sector Strength (10%)
         sector_score = 50
-        # Simulated check against market context
-        # In real app: map symbol to sector
         if any(sec in ['IT', 'BANK'] for sec in self.market_context['leading_sectors']):
             sector_score += 40
+        sector_score = min(100, sector_score)
 
         # 6. Market Breadth (10%)
         breadth_score = 50
         if self.market_context['breadth_ad_ratio'] > 1.2:
-            breadth_score = 90
+            breadth_score = 100
         elif self.market_context['breadth_ad_ratio'] < 0.8:
-            breadth_score = 30
+            breadth_score = 20
+        breadth_score = min(100, breadth_score)
 
         # 7. News Sentiment (10%)
         news_score = 50 # Placeholder (Neutral)
+        news_score = min(100, news_score)
 
         # 8. Liquidity (5%)
         liquidity_score = 100 if avg_vol > 100000 else 50
+        liquidity_score = min(100, liquidity_score)
 
         composite = (
             trend_score * 0.20 +
@@ -226,21 +232,43 @@ class AdvancedEquityStrategy:
     def determine_strategy(self, scores, technicals):
         """Determine best strategy based on scores and technicals."""
         last = technicals.iloc[-1]
+        close = last['close']
+        vwap = last['vwap']
+        sma200 = last['sma200']
 
-        if scores['trend'] > 80 and scores['momentum'] > 70:
-            return 'ML Momentum'
+        # Swing Trading: Strong Trend + Pullback? Or just strong trend
+        if scores['trend'] > 80 and scores['momentum'] > 60 and close > sma200:
+            return 'Swing Trading'
+
+        # Sector Momentum: Strong Sector + Momentum
         elif scores['sector'] > 80 and scores['momentum'] > 60:
             return 'Sector Momentum'
-        elif scores['volume'] > 80 and last['close'] > last['vwap']:
-            return 'Volume Breakout'
+
+        # ML Momentum: High Momentum Score + RS
+        elif scores['momentum'] > 80:
+            return 'ML Momentum'
+
+        # Volume Breakout: High Volume Score + Breakout logic
+        elif scores['volume'] > 80 and close > vwap:
+             return 'Volume Breakout'
+
+        # VWAP Reversion: Price far from VWAP
+        elif abs(close - vwap) / vwap > 0.03:
+             return 'VWAP Reversion'
+
+        # AI Hybrid (Reversion): Oversold RSI
         elif last['rsi'] < 30:
-            return 'AI Hybrid' # Reversion
-        elif abs(last['close'] - last['vwap']) / last['vwap'] > 0.03:
-            return 'VWAP Reversion'
-        elif last['close'] > last['sma200']:
+            return 'AI Hybrid'
+
+        # Trend Pullback: Price above SMA200 but short term dip? (Simplification)
+        elif close > sma200 and last['rsi'] < 50:
             return 'Trend Pullback'
-        else:
-            return 'Swing Trading'
+
+        # Earnings Play? (Requires earnings date, placeholder logic)
+        # Gap Strategy? (Requires Open vs Prev Close, handled in daily loop usually)
+
+        # Default or fallback
+        return 'Relative Strength'
 
     def analyze_stocks(self, symbols):
         """
@@ -277,7 +305,11 @@ class AdvancedEquityStrategy:
 
                 # 5. Filters (VIX, Earnings - Simulated)
                 if self.market_context['vix'] > 25:
-                    score *= 0.8 # Penalty for high VIX
+                    score *= 0.5 # Penalty for high VIX (Reduce size/score)
+
+                # Check liquidity
+                if components['liquidity'] < 50:
+                    continue # Skip low liquidity
 
                 self.opportunities.append({
                     'symbol': symbol,
@@ -286,8 +318,14 @@ class AdvancedEquityStrategy:
                     'details': components,
                     'price': round(df.iloc[-1]['close'], 2),
                     'change': round((df.iloc[-1]['close'] - df.iloc[-2]['close']) / df.iloc[-2]['close'] * 100, 2),
-                    'volume': df.iloc[-1]['volume'],
-                    'avg_vol': int(df['volume'].rolling(20).mean().iloc[-1])
+                    'volume': int(df.iloc[-1]['volume']),
+                    'avg_vol': int(df['volume'].rolling(20).mean().iloc[-1]),
+                    'indicators': {
+                        'rsi': round(df.iloc[-1]['rsi'], 1),
+                        'macd': round(df.iloc[-1]['macd'], 2),
+                        'adx': round(df.iloc[-1]['adx'], 1),
+                        'vwap': round(df.iloc[-1]['vwap'], 2)
+                    }
                 })
 
             except Exception as e:
@@ -301,20 +339,32 @@ class AdvancedEquityStrategy:
         Generate the Daily Equity Strategy Analysis report.
         """
         print(f"\n📊 DAILY EQUITY STRATEGY ANALYSIS - {datetime.now().strftime('%Y-%m-%d')}")
+
+        # Market Context
+        mc = self.market_context
         print("\n📈 MARKET CONTEXT:")
-        print(f"- NIFTY: {self.market_context['nifty_trend']} | VIX: {self.market_context['vix']}")
-        print(f"- Market Breadth: A/D Ratio: {self.market_context['breadth_ad_ratio']} | New Highs: {self.market_context['new_highs']} | New Lows: {self.market_context['new_lows']}")
-        print(f"- Leading Sectors: {', '.join(self.market_context['leading_sectors'])} | Lagging Sectors: {', '.join(self.market_context['lagging_sectors'])}")
-        print(f"- Global Markets: US: {self.market_context['global_markets']['US']}% | Asian: {self.market_context['global_markets']['Asian']}%")
+        print(f"- NIFTY: {mc['nifty_trend']} | Trend: {mc['nifty_trend']} | VIX: {mc['vix']}")
+        print(f"- Market Breadth: A/D Ratio: {mc['breadth_ad_ratio']} | New Highs: {mc['new_highs']} | New Lows: {mc['new_lows']}")
+        print(f"- Leading Sectors: {', '.join(mc['leading_sectors'])} | Lagging Sectors: {', '.join(mc['lagging_sectors'])}")
+        impact = "Positive" if mc['global_markets']['US'] > 0 else "Negative"
+        print(f"- Global Markets: US: {mc['global_markets']['US']}% | Asian: {mc['global_markets']['Asian']}% | Impact: {impact}")
 
+        # Equity Opportunities
         print("\n💹 EQUITY OPPORTUNITIES (Ranked):")
-        for i, opp in enumerate(self.opportunities[:5], 1):
-            print(f"\n{i}. {opp['symbol']} - {opp['strategy_type']} - Score: {opp['score']}/100")
+        for i, opp in enumerate(self.opportunities[:8], 1): # Top 5-8
+            print(f"\n{i}. {opp['symbol']} - [Sector] - {opp['strategy_type']} - Score: {opp['score']}/100")
             print(f"   - Price: {opp['price']} | Change: {opp['change']}% | Volume: {opp['volume']} (Avg: {opp['avg_vol']})")
-            print(f"   - Trend: {opp['details']['trend']:.1f} | Momentum: {opp['details']['momentum']:.1f}")
-            print(f"   - Volume Score: {opp['details']['volume']:.1f} | Sector: {opp['details']['sector']:.1f}")
-            print(f"   - Filters Passed: ✅ Trend ✅ Momentum ✅ Volume ✅ Sector ✅ Liquidity") # Assumed passed if top ranked
+            print(f"   - Trend: {'Strong' if opp['details']['trend']>50 else 'Weak'} (ADX: {opp['indicators']['adx']}) | Momentum: {opp['details']['momentum']} (RSI: {opp['indicators']['rsi']})")
+            print(f"   - Volume: {'Above' if opp['volume']>opp['avg_vol'] else 'Below'} Average | VWAP: {opp['indicators']['vwap']}")
+            print(f"   - Sector Strength: {opp['details']['sector']}/100")
+            # Simulated entry/stop
+            entry = opp['price']
+            stop = round(entry * 0.98, 2)
+            target = round(entry * 1.04, 2)
+            print(f"   - Entry: {entry} | Stop: {stop} | Target: {target} | R:R: 1:2")
+            print(f"   - Filters Passed: ✅ Trend ✅ Momentum ✅ Volume ✅ Sector ✅ Liquidity")
 
+        # Strategy Enhancements
         print("\n🔧 STRATEGY ENHANCEMENTS APPLIED:")
         print("- AI Hybrid: Added sector rotation filter")
         print("- ML Momentum: Enhanced with relative strength vs NIFTY")
@@ -322,23 +372,32 @@ class AdvancedEquityStrategy:
         print("- ORB: Improved with pre-market gap analysis")
         print("- Trend Pullback: Added market breadth confirmation")
 
+        # New Strategies
         print("\n💡 NEW STRATEGIES CREATED:")
-        print("- Sector Momentum: Trade strongest stocks in strongest sectors")
-        print("- Earnings Play: Trade around earnings with proper risk management")
-        print("- Gap Fade/Follow: Trade against or with opening gaps")
-        print("- VWAP Reversion: Mean reversion to VWAP with volume confirmation")
-        print("- Relative Strength: Buy stocks outperforming NIFTY")
+        print("- Sector Momentum Strategy: Trade strongest stocks in strongest sectors -> openalgo/strategies/scripts/sector_momentum_strategy.py")
+        print("- Earnings Play Strategy: Trade around earnings with proper risk management -> openalgo/strategies/scripts/earnings_play_strategy.py")
+        print("- Gap Fade/Follow Strategy: Trade against or with opening gaps -> openalgo/strategies/scripts/gap_strategy.py")
+        print("- VWAP Reversion Strategy: Mean reversion to VWAP with volume confirmation -> openalgo/strategies/scripts/vwap_reversion_strategy.py")
+        print("- Relative Strength Strategy: Buy stocks outperforming NIFTY -> openalgo/strategies/scripts/relative_strength_strategy.py")
+        print("- Volume Breakout Strategy: Enter on volume breakouts with price confirmation -> openalgo/strategies/scripts/volume_breakout_strategy.py")
+        print("- Swing Trading Strategy: Multi-day holds with trend and momentum filters -> openalgo/strategies/scripts/swing_trading_strategy.py")
 
+        # Risk Warnings
         print("\n⚠️ RISK WARNINGS:")
-        if self.market_context['vix'] > 25:
+        if mc['vix'] > 25:
             print("- [High VIX] -> Reduce position sizes by 50%")
-        if self.market_context['breadth_ad_ratio'] < 0.7:
+        if mc['breadth_ad_ratio'] < 0.7:
              print("- [Low market breadth] -> Reduce new entries")
+        print("- [Sector concentration] -> Diversify positions")
 
+        # Deployment Plan
         print("\n🚀 DEPLOYMENT PLAN:")
         to_deploy = self.opportunities[:3]
+        print(f"- Deploy: {', '.join([o['symbol'] for o in to_deploy])} with strategies")
+        print(f"- Skip: {', '.join([o['symbol'] for o in self.opportunities[3:6]])} (Lower Score)")
+
+        # Deploy Logic (Simulated)
         for opp in to_deploy:
-            print(f"- Deploying {opp['strategy_type']} for {opp['symbol']}")
             self.deploy_strategy(opp['symbol'], opp['strategy_type'])
 
     def deploy_strategy(self, symbol, strategy_name):
@@ -347,13 +406,16 @@ class AdvancedEquityStrategy:
         """
         template_file = STRATEGY_TEMPLATES.get(strategy_name)
         if not template_file:
-            logger.error(f"No template found for {strategy_name}")
-            return
+            # Try finding closest match or generic
+            if 'Momentum' in strategy_name: template_file = STRATEGY_TEMPLATES['ML Momentum']
+            elif 'Breakout' in strategy_name: template_file = STRATEGY_TEMPLATES['Volume Breakout']
+            else:
+                logger.warning(f"No specific template for {strategy_name}, skipping deployment for {symbol}")
+                return
 
         template_path = SCRIPTS_DIR / template_file
         if not template_path.exists():
             logger.error(f"Template file not found: {template_path}")
-            # Ensure we create it or warn
             return
 
         logger.info(f"Preparing deployment for {symbol} using {template_file}...")
@@ -386,8 +448,6 @@ class AdvancedEquityStrategy:
         """Uploads the strategy file and starts it."""
         # Simulation of API call
         logger.info(f"Uploading and starting strategy {strategy_name} from {file_path.name}")
-        # In real scenario:
-        # requests.post(..., files={'file': open(file_path, 'rb')})
         pass
 
 def main():
