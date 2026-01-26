@@ -236,6 +236,7 @@ def detect_market_regime() -> Dict:
     except Exception as e:
         # Fallback for Sandbox/Offline:
         # Check if we have a mock file, otherwise return default
+        regime['regime'] = f"Unknown (Error: {str(e)})"
         pass
 
     return regime
@@ -342,6 +343,23 @@ def reconcile_positions(broker_positions: List[Dict], strategy_metrics: Dict[str
         "missing": missing,
         "mismatch": mismatch
     }
+
+def check_stale_positions(strategy_metrics: Dict[str, Dict]) -> List[str]:
+    """
+    Check for positions that might be stuck (active but log not updated recently).
+    """
+    stale = []
+    now = datetime.now()
+    for sid, data in strategy_metrics.items():
+        active = data.get('active_positions', [])
+        last_upd = data.get('last_updated')
+        if active and last_upd:
+            try:
+                last_dt = datetime.strptime(last_upd, "%Y-%m-%d %H:%M:%S")
+                if (now - last_dt).total_seconds() > 86400: # 24 hours
+                    stale.append(f"{sid}: {len(active)} positions (Last Update: {last_upd})")
+            except ValueError: pass
+    return stale
 
 # -----------------------------------------------------------------------------
 # System Health & Compliance
@@ -509,15 +527,20 @@ def main():
     print("")
 
     # 8. Issues Collection
+    stale_positions = check_stale_positions(strategy_metrics)
+
     issues = []
     if risk['heat'] > 15:
-        issues.append(f"High Portfolio Heat ({risk['heat']:.1f}%) -> High -> Reduce Exposure")
+        issues.append(f"[ALERT] High Portfolio Heat ({risk['heat']:.1f}%) -> High -> Reduce Exposure")
     if not health['kite_api']:
-        issues.append("Kite API Down -> Critical -> Restart Service")
+        issues.append("[ALERT] Kite API Down -> Critical -> Restart Service")
     if not health['dhan_api']:
-        issues.append("Dhan API Down -> Critical -> Restart Service")
+        issues.append("[ALERT] Dhan API Down -> Critical -> Restart Service")
     if recon['orphaned'] or recon['missing']:
-         issues.append("Position Mismatch -> High -> Manual Reconciliation")
+         issues.append("[ALERT] Position Mismatch -> High -> Manual Reconciliation")
+    if stale_positions:
+        for p in stale_positions:
+            issues.append(f"[ALERT] Stuck Positions -> High -> Check {p}")
 
     print("⚠️ RISK ISSUES FOUND:")
     if issues:
