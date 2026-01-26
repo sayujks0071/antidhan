@@ -24,8 +24,8 @@ except ImportError:
     try:
         from strategies.utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
     except ImportError:
-        print("Error: Could not import trading_utils. Ensure you are running from the repo root or openalgo directory.")
-        sys.exit(1)
+        pass # Will handle gracefully in main
+        api = None
 
 # Try native import, fallback to our APIClient
 try:
@@ -67,6 +67,14 @@ def analyze_volume_profile(df, n_bins=20):
 
     return poc_price, poc_volume
 
+def check_sector_correlation(symbol):
+    """Check if the stock is correlated with its sector."""
+    # Simulated check
+    # sector_index = get_sector(symbol)
+    # correlation = calculate_correlation(symbol, sector_index)
+    # return correlation > 0.7
+    return True # Placeholder
+
 def run_strategy(args):
     symbol = args.symbol
     api_key = args.api_key or os.getenv('OPENALGO_APIKEY', 'demo_key')
@@ -76,24 +84,39 @@ def run_strategy(args):
     logger = logging.getLogger(f"VWAP_{symbol}")
 
     # Initialize API Client
+    client = None
     if api:
         client = api(api_key=api_key, host=host)
         logger.info("Using Native OpenAlgo API")
     else:
-        client = APIClient(api_key=api_key, host=host)
-        logger.info("Using Fallback API Client (httpx)")
+        # If openalgo is not installed, we can try to use APIClient if available
+        if 'APIClient' in globals():
+            client = APIClient(api_key=api_key, host=host)
+            logger.info("Using Fallback API Client (httpx)")
+        else:
+             logger.error("No API client available. Install openalgo or ensure utils are accessible.")
+             return
 
     # Initialize Position Manager
-    pm = PositionManager(symbol)
+    pm = None
+    if 'PositionManager' in globals():
+        pm = PositionManager(symbol)
+    else:
+        logger.warning("PositionManager not available. Running without position tracking.")
 
     logger.info(f"Starting SuperTrend VWAP for {symbol} | Qty: {quantity}")
 
     while True:
         try:
             # Market Hour Check
-            if not args.ignore_time and not is_market_open():
+            if not args.ignore_time and 'is_market_open' in globals() and not is_market_open():
                 logger.info("Market is closed. Waiting...")
                 time.sleep(60)
+                continue
+
+            if not check_sector_correlation(symbol):
+                logger.info("Sector Correlation Low. Waiting...")
+                time.sleep(300)
                 continue
 
             # Fetch sufficient history for Volume Profile (last 5 days)
@@ -107,7 +130,13 @@ def run_strategy(args):
                 continue
 
             # Calculate Intraday VWAP (resetting daily)
-            df = calculate_intraday_vwap(df)
+            if 'calculate_intraday_vwap' in globals():
+                df = calculate_intraday_vwap(df)
+            else:
+                # Basic VWAP fallback
+                 df['vwap'] = (df['volume'] * (df['high'] + df['low'] + df['close']) / 3).cumsum() / df['volume'].cumsum()
+                 df['vwap_dev'] = (df['close'] - df['vwap']) / df['vwap']
+
             last = df.iloc[-1]
 
             # Volume Profile Analysis
@@ -127,7 +156,7 @@ def run_strategy(args):
             logger.debug(f"Price: {last['close']} | VWAP: {last['vwap']:.2f} | POC: {poc_price:.2f}")
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended:
-                if not pm.has_position():
+                if pm and not pm.has_position():
                     logger.info(f"VWAP Crossover Buy for {symbol} | POC: {poc_price:.2f} | Dev: {last['vwap_dev']:.4f}")
 
                     # Place Order
@@ -137,6 +166,8 @@ def run_strategy(args):
 
                     if resp: # Assuming resp is not None/Empty on success
                         pm.update_position(quantity, last['close'], 'BUY')
+                elif not pm:
+                     logger.info(f"VWAP Crossover Buy Signal (No PM) for {symbol}")
                 else:
                     logger.debug("Signal detected but position already open.")
 

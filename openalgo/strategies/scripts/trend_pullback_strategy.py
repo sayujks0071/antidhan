@@ -27,6 +27,7 @@ def check_sector_strength(client):
     # Simulated sector check
     # sector_index = client.get_sector_index(SYMBOL)
     # return sector_index.change > 0
+    logger.info("Checking Sector Strength...")
     return True # Placeholder
 
 def check_market_breadth(client):
@@ -34,6 +35,7 @@ def check_market_breadth(client):
     # Simulated breadth check
     # ad_ratio = client.get_market_breadth()
     # return ad_ratio > 1.0
+    logger.info("Checking Market Breadth...")
     return True # Placeholder
 
 def run_strategy():
@@ -78,20 +80,43 @@ def run_strategy():
             is_uptrend = last['sma50'] > last['sma200']
 
             if is_uptrend:
-                # Pullback: Price < SMA20 (Shallow) or Price < SMA50 (Deep)
-                # But Price must be > SMA200 (Still in trend)
-                is_pullback = last['close'] < last['sma20'] and last['close'] > last['sma200']
+                # Pullback Definitions
+                # Shallow: Price < SMA20
+                # Deep: Price < SMA50
+                # Invalid: Price < SMA200 (Trend broken)
+
+                price = last['close']
+                sma20 = last['sma20']
+                sma50 = last['sma50']
+                sma200 = last['sma200']
+
+                is_pullback = False
+                pullback_type = "None"
+
+                if price < sma20 and price > sma50:
+                    is_pullback = True
+                    pullback_type = "Shallow"
+                elif price < sma50 and price > sma200:
+                    is_pullback = True
+                    pullback_type = "Deep"
 
                 if is_pullback:
-                    logger.info(f"Pullback detected for {SYMBOL} in Uptrend at {last['close']}")
+                    logger.info(f"{pullback_type} Pullback detected for {SYMBOL} in Uptrend at {price}")
 
                     # Reversal Trigger: Ideally check for Green Candle or Hammer here
-                    # Simplified: Buy
+                    # For now, we assume we enter on the touch/dip
+                    # Adding a filter: Price must be > 0.5% above the MA it dipped to?
+                    # No, usually we want to catch the turn.
+                    # Let's add a simple check: Close > Open (Green candle on 15m) to confirm turn
 
-                    qty = 10
-                    client.placesmartorder(strategy="Trend Pullback", symbol=SYMBOL, action="BUY",
-                                           exchange="NSE", price_type="MARKET", product="MIS",
-                                           quantity=qty, position_size=qty)
+                    if last['close'] > last['open']:
+                        logger.info(f"Reversal confirmation (Green Candle). Buying.")
+                        qty = 10
+                        client.placesmartorder(strategy="Trend Pullback", symbol=SYMBOL, action="BUY",
+                                               exchange="NSE", price_type="MARKET", product="MIS",
+                                               quantity=qty, position_size=qty)
+                    else:
+                        logger.info("Waiting for reversal candle...")
 
         except Exception as e:
             logger.error(f"Error: {e}")

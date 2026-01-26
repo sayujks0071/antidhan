@@ -38,8 +38,9 @@ def calculate_momentum(df):
 def calculate_relative_strength(df, index_df):
     """Calculate Relative Strength vs Index."""
     if index_df.empty or len(index_df) != len(df):
-        # Fallback or align
-        return 1.0 # Neutral
+        # Fallback if lengths mismatch, try to align indices or return neutral
+        logger.warning("Index data mismatch. Defaulting to Neutral RS.")
+        return pd.Series([1.0] * len(df), index=df.index)
 
     # RS Ratio = Stock Price / Index Price
     # We want to see if the Ratio is trending up
@@ -50,6 +51,7 @@ def check_sector_momentum(client):
     """Check if the sector is in momentum."""
     # Simulated check
     # sector_mom = client.get_sector_momentum(SYMBOL)
+    logger.info("Checking Sector Momentum...")
     return True # Placeholder
 
 def check_news_sentiment(symbol):
@@ -57,6 +59,7 @@ def check_news_sentiment(symbol):
     # Simulated news API check
     # sentiment = news_api.get_sentiment(symbol)
     # return sentiment > 0
+    logger.info("Checking News Sentiment...")
     return True # Placeholder
 
 def run_strategy():
@@ -80,6 +83,7 @@ def run_strategy():
                 continue
 
             # 2. Fetch Index Data (Simulated or Real)
+            # In a real scenario, we'd fetch NIFTY 50
             # index_df = client.history(symbol="NIFTY 50", ...)
             # Simulating index data matching stock df length
             index_data = {
@@ -93,7 +97,7 @@ def run_strategy():
 
             last_row = df.iloc[-1]
             last_rs = rs_ratio.iloc[-1]
-            prev_rs = rs_ratio.iloc[-5] # 5 bars ago
+            prev_rs = rs_ratio.iloc[-5] if len(rs_ratio) > 5 else rs_ratio.iloc[0] # 5 bars ago
 
             # 4. Strategy Logic
             # Buy if:

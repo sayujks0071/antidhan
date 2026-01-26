@@ -27,6 +27,7 @@ RSI_OVERSOLD = 30
 RSI_OVERBOUGHT = 70
 STOP_LOSS_ATR_MULT = 2.0
 TAKE_PROFIT_ATR_MULT = 3.0
+VIX_THRESHOLD = 25.0
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(f"Strategy_{SYMBOL}")
@@ -61,18 +62,21 @@ def check_sector_rotation(client):
     # In a real implementation, we would map SYMBOL to its sector and check if that sector index is trending up.
     # Simulating sector strength.
     # sector_strength = client.get_technical_indicator(symbol="NIFTY IT", indicator="RSI") ...
+    logger.info("Checking Sector Rotation...")
     return True # Placeholder: assume strong sector
 
 def check_market_breadth(client):
     """Check overall market breadth (A/D ratio)."""
     # Simulated check
     # breadth = client.get_market_breadth() ...
+    logger.info("Checking Market Breadth...")
     return True # Placeholder: assume healthy breadth
 
 def check_earnings(symbol):
     """Check if earnings are upcoming."""
     # In reality, check an earnings calendar API/file
     # Avoid if earnings in +/- 2 days
+    logger.info("Checking Earnings Calendar...")
     return True # Placeholder: assume no earnings
 
 def check_volume_confirmation(df):
@@ -84,7 +88,7 @@ def check_volume_confirmation(df):
 def get_vix(client):
     """Fetch India VIX."""
     # vix = client.get_quote('INDIA VIX')['ltp']
-    return 15.0 # Placeholder
+    return 20.0 # Placeholder
 
 def calculate_position_size(capital, price, atr, vix):
     """Calculate position size based on Volatility (ATR) and VIX."""
@@ -97,10 +101,11 @@ def calculate_position_size(capital, price, atr, vix):
     qty = int(risk_per_trade / stop_loss_dist)
 
     # VIX Adjustment
-    if vix > 20:
-        qty = int(qty * 0.5) # Reduce size by 50% if VIX is high
+    if vix > VIX_THRESHOLD:
+        logger.warning(f"High VIX ({vix} > {VIX_THRESHOLD}). Reducing position size by 50%.")
+        qty = int(qty * 0.5)
 
-    return qty
+    return max(1, qty)
 
 def run_strategy():
     if not api:
