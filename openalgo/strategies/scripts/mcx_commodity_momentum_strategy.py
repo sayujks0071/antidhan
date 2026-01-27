@@ -2,11 +2,14 @@
 """
 MCX Commodity Momentum Strategy (Enhanced)
 ------------------------------------------
-A momentum strategy for MCX commodities with global correlation,
-USD/INR adjustment, and seasonality filters.
+Enhanced momentum strategy for MCX commodities (Gold, Silver, Crude Oil, etc.)
+incorporating Global Correlation, USD/INR Volatility, and Seasonality.
 
-Usage:
-    python3 mcx_commodity_momentum_strategy.py
+Strategy Logic:
+- Entry Long: Price > EMA(20), RSI > 50, Global Trend != Down, Seasonality > 40
+- Entry Short: Price < EMA(20), RSI < 50, Global Trend != Up, Seasonality > 40
+- Exit: Target/Stop or Reversal
+- Position Sizing: ATR-based, adjusted for USD/INR volatility.
 """
 
 import os
@@ -14,160 +17,143 @@ import sys
 import pandas as pd
 import numpy as np
 import logging
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 
-# Ensure we can import from openalgo
-project_root = Path(__file__).resolve().parent.parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.append(str(project_root))
-
-try:
-    from openalgo.strategies.utils.trading_utils import APIClient
-except ImportError:
-    print("Warning: openalgo.strategies.utils.trading_utils not found. Using local mocks if needed.")
-    APIClient = None
-
-# Logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Setup Logging
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 logger = logging.getLogger("MCX_Momentum_Enhanced")
 
 class MCXMomentumStrategy:
-    def __init__(self, symbol="GOLD", timeframe="15minute",
-                 usd_inr_factor=1.0, global_correlation_threshold=0.5,
-                 seasonality_factor=1.0):
-
+    def __init__(self, symbol, timeframe="15minute",
+                 global_trend="Neutral", usd_inr_volatility=0.0, seasonality_score=50):
         self.symbol = symbol
         self.timeframe = timeframe
-        self.api_key = os.getenv("KITE_API_KEY", "dummy_key")
-        self.api = APIClient(self.api_key, host="http://127.0.0.1:5001") if APIClient else None
+
+        # External Factors
+        self.global_trend = global_trend # 'Up', 'Down', 'Neutral'
+        self.usd_inr_volatility = usd_inr_volatility # percentage (e.g. 0.5)
+        self.seasonality_score = seasonality_score # 0-100
 
         # Strategy Parameters
         self.ema_period = 20
         self.rsi_period = 14
-        self.stop_loss_pct = 0.01
-        self.target_pct = 0.02
+        self.atr_period = 14
 
-        # Enhanced Filters
-        self.usd_inr_factor = usd_inr_factor
-        self.global_correlation_threshold = global_correlation_threshold
-        self.seasonality_factor = seasonality_factor
-
-        # State
-        self.position = 0
-
-    def fetch_data(self):
-        """Fetch market data via API or simulate."""
-        df = pd.DataFrame()
-        if self.api:
-            try:
-                end_date = datetime.now()
-                start_date = end_date - timedelta(days=5)
-                s_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
-                e_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
-
-                df = self.api.history(self.symbol, exchange="MCX", interval=self.timeframe,
-                                      start_date=s_str, end_date=e_str)
-            except Exception as e:
-                logger.warning(f"API fetch failed: {e}")
-
-        if df.empty:
-            logger.info("Using simulated data.")
-            return self._simulate_data()
-        return df
-
-    def _simulate_data(self):
-        """Simulate data for testing."""
-        dates = pd.date_range(end=datetime.now(), periods=200, freq='15min')
-        prices = [50000]
-        for _ in range(199):
-            prices.append(prices[-1] * (1 + np.random.normal(0, 0.002)))
-
-        data = {
-            'close': prices,
-            'high': [p * 1.001 for p in prices],
-            'low': [p * 0.999 for p in prices],
-            'volume': np.random.randint(100, 1000, 200)
-        }
-        return pd.DataFrame(data, index=dates)
+        # Risk Parameters
+        self.stop_loss_atr_mult = 2.0
+        self.target_atr_mult = 4.0
+        self.base_capital = 100000
 
     def calculate_indicators(self, df):
-        """Calculate EMA and RSI."""
+        """Calculate EMA, RSI, ATR."""
+        if df.empty:
+            return df
+
+        # EMA
         df['ema'] = df['close'].ewm(span=self.ema_period, adjust=False).mean()
 
+        # RSI
         delta = df['close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()
         rs = gain / loss
         df['rsi'] = 100 - (100 / (1 + rs))
+
+        # ATR
+        df['tr'] = np.maximum(df['high'] - df['low'],
+                              np.maximum(abs(df['high'] - df['close'].shift(1)),
+                                         abs(df['low'] - df['close'].shift(1))))
+        df['atr'] = df['tr'].rolling(window=self.atr_period).mean()
+
         return df
 
-    def check_filters(self, signal):
-        """Apply enhanced filters (USD/INR, Seasonality, Correlation)."""
-        # 1. USD/INR Filter (Simulated check)
-        # If buying Gold/Silver, weak INR (High Factor) is good.
-        if self.symbol in ['GOLD', 'SILVER'] and signal == "BUY":
-            if self.usd_inr_factor < 0.99: # Strong INR
-                logger.info("Signal Rejected: USD/INR indicates headwinds (Strong INR)")
-                return False
+    def calculate_position_size(self, price, atr):
+        """
+        Calculate position size based on Volatility (ATR) and USD/INR risk.
+        Logic: Risk 1% of capital. Stop loss distance = 2 * ATR.
+        Size = (Capital * 0.01) / (2 * ATR)
+        Adjustment: Reduce size if USD/INR volatility is high (> 0.5%).
+        """
+        if atr == 0: return 0
 
-        # 2. Seasonality
-        if self.seasonality_factor < 0.5: # Weak season
-            logger.info("Signal Rejected: Weak Seasonality")
-            return False
+        risk_per_trade = self.base_capital * 0.01
+        stop_distance = self.stop_loss_atr_mult * atr
 
-        # 3. Global Correlation (Mock check)
-        # In real usage, this would check correlation with global price
-        # Here we assume it passes if not explicitly set to fail
-        if self.global_correlation_threshold > 0.8:
-            # Stricter check
-            pass
+        raw_size = risk_per_trade / stop_distance
 
-        return True
+        # USD/INR Adjustment
+        # If volatility > 0.5%, reduce size by 30%
+        adjustment_factor = 1.0
+        if self.usd_inr_volatility > 0.5:
+            adjustment_factor = 0.7
+            logger.info(f"High USD/INR Volatility ({self.usd_inr_volatility}%) -> Reducing size by 30%")
+
+        return int(raw_size * adjustment_factor)
 
     def generate_signal(self, df):
-        """Generate Buy/Sell signals with filters."""
-        if df.empty or len(df) < 50:
-            return "NEUTRAL"
+        """Generate Buy/Sell signals with multi-factor filters."""
+        if df.empty or len(df) < self.ema_period:
+            return "NEUTRAL", 0
 
         last = df.iloc[-1]
-
         signal = "NEUTRAL"
-        if last['close'] > last['ema'] and last['rsi'] > 55:
+
+        # 1. Technical Signal
+        if last['close'] > last['ema'] and last['rsi'] > 50:
             signal = "BUY"
-        elif last['close'] < last['ema'] and last['rsi'] < 45:
+        elif last['close'] < last['ema'] and last['rsi'] < 50:
             signal = "SELL"
 
-        if signal != "NEUTRAL":
-            if self.check_filters(signal):
-                return signal
-            else:
-                return "NEUTRAL"
+        # 2. Seasonality Filter (Skip if score is very low)
+        if self.seasonality_score < 40:
+             logger.info(f"Signal filtered by Seasonality Score: {self.seasonality_score}")
+             return "NEUTRAL", 0
 
-        return "NEUTRAL"
+        # 3. Global Trend Filter
+        if signal == "BUY" and self.global_trend == "Down":
+            logger.info("Signal filtered by Global Trend (Down vs Buy)")
+            return "NEUTRAL", 0
+        if signal == "SELL" and self.global_trend == "Up":
+            logger.info("Signal filtered by Global Trend (Up vs Sell)")
+            return "NEUTRAL", 0
+
+        # 4. Position Sizing
+        size = 0
+        if signal != "NEUTRAL":
+            size = self.calculate_position_size(last['close'], last['atr'])
+
+        return signal, size
 
     def run(self):
-        """Execute strategy cycle."""
-        logger.info(f"Running MCX Momentum Strategy for {self.symbol}")
-        logger.info(f"Filters - USD/INR: {self.usd_inr_factor}, Seasonality: {self.seasonality_factor}")
+        """Main execution method."""
+        logger.info(f"Running Enhanced MCX Momentum Strategy for {self.symbol}...")
+        logger.info(f"Context: Global={self.global_trend}, USD/INR Vol={self.usd_inr_volatility}%, Seasonality={self.seasonality_score}")
 
-        df = self.fetch_data()
+        # Simulating data
+        dates = pd.date_range(end=datetime.now(), periods=100, freq='15min')
+        base_price = 50000
+        volatility = 0.002
+        prices = [base_price]
+        for _ in range(99):
+             prices.append(prices[-1] * (1 + np.random.normal(0, volatility)))
+
+        data = {
+            'open': prices,
+            'high': [p*1.001 for p in prices],
+            'low': [p*0.999 for p in prices],
+            'close': prices
+        }
+        df = pd.DataFrame(data, index=dates)
+
         df = self.calculate_indicators(df)
-        signal = self.generate_signal(df)
+        signal, size = self.generate_signal(df)
 
-        logger.info(f"Final Signal: {signal}")
+        logger.info(f"Signal: {signal} | Size: {size} units | Price: {df.iloc[-1]['close']:.2f} | ATR: {df.iloc[-1]['atr']:.2f}")
 
-        if signal in ["BUY", "SELL"]:
-            # Position Sizing Logic (Volatility Based)
-            atr = df['close'].rolling(14).mean().iloc[-1] * 0.01 # Approx ATR
-            risk_per_share = atr * 2
-            capital_risk = 10000 # Fixed risk amount
-            qty = int(capital_risk / risk_per_share) if risk_per_share > 0 else 1
-
-            logger.info(f"Suggested Entry: {df.iloc[-1]['close']:.2f}, Qty: {qty}")
-            # Order placement code would go here using self.api.placesmartorder
+        # Here we would place orders via API
+        return signal, size
 
 if __name__ == "__main__":
-    # Example usage with different filter settings
-    strategy = MCXMomentumStrategy(symbol="GOLD", usd_inr_factor=1.01, seasonality_factor=0.9)
+    # Test Run
+    strategy = MCXMomentumStrategy(symbol="GOLD", global_trend="Up", usd_inr_volatility=0.6, seasonality_score=80)
     strategy.run()
