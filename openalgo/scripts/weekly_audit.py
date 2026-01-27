@@ -171,6 +171,17 @@ def detect_market_regime() -> Dict:
         "disabled_strategies": []
     }
 
+    # Check for manual override/fallback via market_regime.json
+    regime_file = BASE_DIR / "market_regime.json"
+    if regime_file.exists():
+        try:
+            manual_data = json.loads(regime_file.read_text())
+            regime.update(manual_data)
+            regime['recommendation'] += " (Manual Override)"
+            return regime
+        except Exception:
+            pass
+
     if not HAS_PANDAS:
         return regime
 
@@ -554,6 +565,39 @@ def main():
     # 10. Compliance
     comp = check_compliance(strategy_metrics)
     print("✅ COMPLIANCE CHECK:")
+
+    # P&L Attribution Table
+    if strategy_metrics:
+        print("- P&L Attribution by Strategy:")
+        headers = ["Strategy", "Entries", "Exits", "Errors", "PnL (₹)"]
+        rows = []
+        total_pnl = 0.0
+        for sid, data in strategy_metrics.items():
+            pnl = data.get('pnl', 0.0)
+            total_pnl += pnl
+            rows.append([
+                sid.replace("strategy_", "").replace("_", " ").title(),
+                data.get('entries', 0),
+                data.get('exits', 0),
+                data.get('errors', 0),
+                f"{pnl:,.2f}"
+            ])
+
+        # Add Total Row
+        rows.append(["TOTAL", "", "", "", f"{total_pnl:,.2f}"])
+
+        try:
+            from tabulate import tabulate
+            print(tabulate(rows, headers=headers, tablefmt="simple"))
+        except ImportError:
+            # Fallback for no tabulate
+            print(f"  {'Strategy':<25} {'Ent':<5} {'Ext':<5} {'Err':<5} {'PnL (₹)':>10}")
+            print("  " + "-"*55)
+            for row in rows:
+                if row[0] == "TOTAL": print("  " + "-"*55)
+                print(f"  {row[0]:<25} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:>10}")
+        print("")
+
     print(f"- Trade Logging: {comp['status']}")
     if comp['missing']:
         print(f"  • Missing logs for: {', '.join(comp['missing'])}")
