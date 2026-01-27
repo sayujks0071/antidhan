@@ -28,9 +28,11 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 # Pepper must be at least 32 bytes (64 hex characters) for cryptographic security
 _pepper_value = os.getenv('API_KEY_PEPPER')
 if not _pepper_value:
+    logger.critical("API_KEY_PEPPER not found in environment variables.")
     raise RuntimeError(
         "CRITICAL: API_KEY_PEPPER environment variable is not set. "
         "This is required for secure password and API key hashing. "
+        "Please add API_KEY_PEPPER to your .env file. "
         "Generate one using: python -c \"import secrets; print(secrets.token_hex(32))\""
     )
 if len(_pepper_value) < 32:
@@ -43,10 +45,20 @@ PEPPER = _pepper_value
 # Setup Fernet encryption for auth tokens
 def get_encryption_key():
     """Generate a Fernet key from the pepper"""
+    # Use SALT from environment if available, otherwise fall back to legacy hardcoded salt
+    # Warning: Changing SALT invalidates all encrypted tokens
+    salt_value = os.getenv('SALT')
+
+    if not salt_value:
+        logger.warning("Using legacy hardcoded salt. Set 'SALT' in .env for better security.")
+        salt = b'openalgo_static_salt'
+    else:
+        salt = salt_value.encode()
+
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
-        salt=b'openalgo_static_salt',
+        salt=salt,
         iterations=100000,
     )
     key = base64.urlsafe_b64encode(kdf.derive(PEPPER.encode()))
