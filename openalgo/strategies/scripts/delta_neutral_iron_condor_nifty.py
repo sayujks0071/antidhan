@@ -6,7 +6,9 @@ Enhanced with Multi-Factor Analysis (VIX, Sentiment, GIFT Nifty)
 import os
 import time
 import logging
-import requests
+import json
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 
 try:
@@ -48,9 +50,13 @@ class DeltaNeutralIronCondor:
         try:
             if 'apikey' not in payload:
                 payload['apikey'] = API_KEY
-            response = requests.post(url, json=payload, timeout=10)
-            if response.status_code == 200:
-                return response.json()
+
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    return json.loads(response.read().decode('utf-8'))
         except Exception as e:
             logger.error(f"API Error {endpoint}: {e}")
         return None
