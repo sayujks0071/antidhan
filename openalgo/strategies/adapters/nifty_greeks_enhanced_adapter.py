@@ -42,8 +42,17 @@ class NiftyGreeksEnhancedAdapter(StrategyAdapter):
             os.path.dirname(__file__), '..', 'scripts',
             'nifty_greeks_enhanced_20260122.py'
         )
-        super().__init__(name, params or {}, strategy_path)
+        params = params or {}
+        super().__init__(name, params, strategy_path)
         
+        # Strategy Parameters with Defaults
+        self.delta_min = params.get('delta_min', MIN_DELTA)
+        self.delta_max = params.get('delta_max', MAX_DELTA)
+        self.iv_rank_min = params.get('iv_rank_min', IV_RANK_MIN)
+        self.iv_rank_max = params.get('iv_rank_max', IV_RANK_MAX)
+        self.min_adx = params.get('min_adx', MIN_ADX)
+        self.rsi_period = params.get('rsi_period', RSI_PERIOD)
+
         # Initialize heat tracker
         self.heat_tracker = PortfolioHeatTracker(ACCOUNT_SIZE, max_heat_pct=2.0)
         self.daily_pnl = 0.0
@@ -87,7 +96,7 @@ class NiftyGreeksEnhancedAdapter(StrategyAdapter):
         vwap_dist = (price - current_vwap) / current_vwap if current_vwap > 0 else 0
         
         # Basic filters
-        if current_adx < MIN_ADX:
+        if current_adx < self.min_adx:
             return signals
         if atr_pct < MIN_ATR_PCT or atr_pct > MAX_ATR_PCT:
             return signals
@@ -96,6 +105,9 @@ class NiftyGreeksEnhancedAdapter(StrategyAdapter):
         direction = None
         momentum_score = 0
         
+        # Use RSI from indicators but we rely on hardcoded thresholds from imports for now
+        # unless we override them too. For minimal change, we keep constants but using self.rsi_period above
+
         if ema_fast > ema_slow and RSI_LONG_MIN <= current_rsi <= RSI_LONG_MAX and vwap_dist >= VWAP_MIN_DIST:
             direction = "LONG"
             momentum_score = min(100, (current_adx / 50) * 50 + (current_rsi - 50) * 0.5)
@@ -128,12 +140,12 @@ class NiftyGreeksEnhancedAdapter(StrategyAdapter):
         
         # Check IV Rank (simplified)
         iv_rank = self._calculate_iv_rank_simple(strike_info.get('iv', 0.15))
-        if iv_rank < IV_RANK_MIN or iv_rank > IV_RANK_MAX:
+        if iv_rank < self.iv_rank_min or iv_rank > self.iv_rank_max:
             return signals
         
         # Check delta
         delta = strike_info.get('delta', 0)
-        if delta < MIN_DELTA or delta > MAX_DELTA:
+        if delta < self.delta_min or delta > self.delta_max:
             return signals
         
         # Check theta
@@ -326,8 +338,9 @@ class NiftyGreeksEnhancedAdapter(StrategyAdapter):
         dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di)
         return dx.rolling(window=period).mean()
     
-    def _rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
+    def _rsi(self, df: pd.DataFrame, period: int = None) -> pd.Series:
         """Calculate RSI"""
+        period = period or self.rsi_period
         delta = df["close"].diff()
         gain = delta.where(delta > 0, 0.0)
         loss = -delta.where(delta < 0, 0.0)
