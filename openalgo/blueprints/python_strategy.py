@@ -38,7 +38,7 @@ python_strategy_bp = Blueprint('python_strategy_bp', __name__, url_prefix='/pyth
 RUNNING_STRATEGIES = {}  # {strategy_id: {'process': subprocess.Popen, 'started_at': datetime}}
 STRATEGY_CONFIGS = {}    # {strategy_id: config_dict}
 SCHEDULER = None
-PROCESS_LOCK = threading.Lock()  # Thread lock for process operations
+PROCESS_LOCK = threading.RLock()  # Reentrant lock for process operations (needed because cleanup_dead_processes calls sync_running_processes)
 
 # Timezone configuration - Indian Standard Time
 IST = pytz.timezone('Asia/Kolkata')
