@@ -1,3 +1,23 @@
+================================================================================
+📊 MONITORING SESSION REPORT - 2026-01-27
+================================================================================
+
+1. SCRIPT EXECUTION: openalgo/scripts/monitor_trades.py
+--------------------------------------------------------------------------------
+Time: 05:56:42 IST
+Status: 0 running strategy processes found.
+Result: No active strategies to monitor via script.
+
+2. LOG INSPECTION
+--------------------------------------------------------------------------------
+Checking for alerts in: openalgo/log/alerts.log
+Result: File not found.
+
+Checking for strategy logs in: openalgo/strategies/logs/
+Result: Found 'strategy_report_2026-01-25.txt'
+
+3. STRATEGY REPORT CONTENT
+--------------------------------------------------------------------------------
 📊 DAILY OPTIONS STRATEGY ANALYSIS - 2026-01-25
 
 📈 MARKET DATA SUMMARY:
@@ -37,3 +57,4 @@
 - Bull Spreads: Added GIFT Nifty Gap filter
 
 ⚠️ RISK WARNINGS:
+--------------------------------------------------------------------------------
