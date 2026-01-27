@@ -35,7 +35,10 @@ class ORBStrategy:
     def __init__(self, symbol, quantity, api_key=None, host=None):
         self.symbol = symbol
         self.quantity = quantity
-        self.api_key = api_key or os.getenv('OPENALGO_APIKEY', 'demo_key')
+        self.api_key = api_key or os.getenv('OPENALGO_APIKEY')
+        if not self.api_key:
+             raise ValueError("API Key must be provided via --api_key or OPENALGO_APIKEY env var")
+
         self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
 
         self.logger = logging.getLogger(f"ORB_{symbol}")
@@ -185,6 +188,11 @@ if __name__ == "__main__":
     parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
     parser.add_argument("--api_key", type=str, help="OpenAlgo API Key")
     parser.add_argument("--host", type=str, help="OpenAlgo Server Host")
+    parser.add_argument("--port", type=int, default=5001, help="OpenAlgo Server Port (default: 5001)")
 
     args = parser.parse_args()
+
+    if not args.host:
+        args.host = f"http://127.0.0.1:{args.port}"
+
     run_strategy(args)
