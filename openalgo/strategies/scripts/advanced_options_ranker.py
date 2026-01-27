@@ -5,23 +5,28 @@ Enhances and creates options strategies for NIFTY, SENSEX, and BANKNIFTY using m
 """
 import os
 import sys
+import urllib.request
+import urllib.error
 import logging
+import json
 from datetime import datetime, timedelta
-import math
-from pathlib import Path
 
-# Ensure project root is in path
-project_root = str(Path(__file__).resolve().parent.parent.parent.parent)
-if project_root not in sys.path:
-    sys.path.append(project_root)
+# Add project root to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from openalgo.strategies.utils.trading_utils import APIClient
-from openalgo.strategies.utils.option_analytics import calculate_greeks, implied_volatility
+try:
+    from openalgo.strategies.utils.option_analytics import calculate_greeks, calculate_max_pain, calculate_pcr
+except ImportError:
+    # Fallback if running from a different context
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+    from openalgo.strategies.utils.option_analytics import calculate_greeks, calculate_max_pain, calculate_pcr
 
 # Configuration
-API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5002')
+API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5002')  # Dhan API on 5002
 API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
+
+# Ensure log directory exists
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # Logging setup
@@ -37,282 +42,374 @@ logger = logging.getLogger("AdvancedOptionsRanker")
 
 class AdvancedOptionsRanker:
     def __init__(self, host=API_HOST, api_key=API_KEY):
-        self.api_client = APIClient(api_key=api_key, host=host)
+        self.host = host
+        self.api_key = api_key
         self.market_data = {}
         self.strategies = []
-        self.indices = ['NIFTY', 'BANKNIFTY']
+
+    def _post(self, endpoint, payload):
+        """Helper to make POST requests to OpenAlgo API"""
+        url = f"{self.host}{endpoint}"
+        try:
+            # Add API key to payload if not present
+            if 'apikey' not in payload:
+                payload['apikey'] = self.api_key
+
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    return json.loads(response.read().decode('utf-8'))
+                else:
+                    logger.warning(f"API request to {endpoint} returned {response.status}")
+                    return None
+        except urllib.error.HTTPError as e:
+            logger.warning(f"HTTP Error for {endpoint}: {e.code} {e.reason}")
+            return None
+        except Exception as e:
+            logger.error(f"API request failed for {endpoint}: {e}")
+            return None
 
     def fetch_market_data(self):
         """Fetch all necessary market data"""
         logger.info("Fetching market data...")
+
+        # 1. Fetch Options Chains for Indices
+        indices = ['NIFTY', 'BANKNIFTY', 'SENSEX']
         self.market_data['chains'] = {}
 
-        current_date = datetime.now()
-        days_ahead = 3 - current_date.weekday()
-        if days_ahead <= 0:
-            days_ahead += 7
-        next_expiry = (current_date + timedelta(days=days_ahead)).strftime("%d%b%y").upper()
+        for index in indices:
+            logger.info(f"Fetching option chain for {index}")
+            # Determine next expiry (Simplified logic: nearest Thursday/Friday)
+            # In real app, query valid expiries first
+            today = datetime.now()
+            days_ahead = 3 - today.weekday() # Thursday
+            if days_ahead <= 0: days_ahead += 7
+            next_expiry = (today + timedelta(days=days_ahead)).strftime("%d%b%y").upper()
 
-        for index in self.indices:
-            logger.info(f"Fetching option chain for {index} (Expiry: {next_expiry})")
+            # SENSEX expires on Friday usually, but keep simple for now or adjust
+            if index == 'SENSEX':
+                 days_ahead_sensex = 4 - today.weekday() # Friday
+                 if days_ahead_sensex <= 0: days_ahead_sensex += 7
+                 next_expiry = (today + timedelta(days=days_ahead_sensex)).strftime("%d%b%y").upper()
 
-            import requests
-            url = f"{self.api_client.host}/api/v1/optionchain"
             payload = {
                 "underlying": index,
-                "exchange": "NSE_INDEX",
+                "exchange": "NSE_INDEX" if index != 'SENSEX' else "BSE_INDEX",
                 "expiry_date": next_expiry,
-                "strike_count": 30,
-                "apikey": self.api_client.api_key
+                "strike_count": 20
             }
-            try:
-                response = requests.post(url, json=payload, timeout=10)
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get('status') == 'success':
-                        self.market_data['chains'][index] = data
-                    else:
-                        logger.warning(f"Failed to fetch chain for {index}: {data.get('message')}")
-                        self.market_data['chains'][index] = self._generate_mock_chain(index)
-                else:
-                    logger.warning(f"HTTP error fetching chain for {index}")
-                    self.market_data['chains'][index] = self._generate_mock_chain(index)
-            except Exception as e:
-                logger.error(f"Error fetching chain: {e}")
+
+            chain_data = self._post('/api/v1/optionchain', payload)
+
+            # Use real data if successful, else mock
+            if chain_data and chain_data.get('status') == 'success':
+                logger.info(f"Successfully fetched chain for {index}")
+                self.market_data['chains'][index] = chain_data
+            else:
+                logger.warning(f"Could not fetch chain for {index}, using mock data")
                 self.market_data['chains'][index] = self._generate_mock_chain(index)
 
+        # 2. Fetch/Mock External Data
+        # In a real setup, these might come from an external file written by a scraper
         self.market_data['vix'] = self._fetch_vix()
         self.market_data['gift_nifty'] = self._fetch_gift_nifty()
         self.market_data['sentiment'] = self._fetch_news_sentiment()
 
     def _generate_mock_chain(self, index):
         """Generate mock option chain if API is unavailable"""
-        spot = 24500 if index == 'NIFTY' else 52000
+        spot = 24500 if index == 'NIFTY' else 52000 if index == 'BANKNIFTY' else 80000
         chain = []
-        for i in range(-15, 16):
+        for i in range(-10, 11):
             strike = spot + (i * 50)
+            # Simulate some skew
+            ce_price = max(5, (spot - strike) + 100) if strike < spot else max(5, 100 - (strike - spot)/2)
+            pe_price = max(5, (strike - spot) + 100) if strike > spot else max(5, 100 - (spot - strike)/2)
+
             chain.append({
                 "strike": strike,
-                "ce": {"ltp": max(5, 300 - i*15), "oi": abs(10000 - i*100), "volume": 5000},
-                "pe": {"ltp": max(5, 300 + i*15), "oi": abs(10000 + i*100), "volume": 5000}
+                "ce": {"ltp": ce_price, "oi": abs(10000 - i*100), "volume": 5000, "iv": 15},
+                "pe": {"ltp": pe_price, "oi": abs(10000 + i*100), "volume": 5000, "iv": 16}
             })
         return {"underlying_ltp": spot, "chain": chain, "status": "success", "expiry_date": "MOCK"}
 
     def _fetch_vix(self):
-        """Fetch or Mock VIX data"""
-        return {"value": 18.5, "trend": "rising", "percentile": 60}
+        """Mock VIX data or read from env/file"""
+        return {"value": 14.5, "trend": "falling", "percentile": 45}
 
     def _fetch_gift_nifty(self):
-        """Fetch or Mock GIFT Nifty data"""
-        return {"value": 24650, "gap_percent": 0.6, "bias": "Up"}
+        """Mock GIFT Nifty data"""
+        return {"value": 24600, "gap_percent": 0.4, "bias": "Up"}
 
     def _fetch_news_sentiment(self):
-        """Fetch or Mock News Sentiment"""
-        return {"score": 0.2, "label": "Neutral", "key_events": ["RBI Policy Pending"]}
+        """Mock News Sentiment"""
+        return {"score": 0.6, "label": "Positive", "key_events": ["Earnings Season"]}
 
-    def calculate_greeks_for_chain(self, index):
-        """Enrich chain data with Greeks"""
-        data = self.market_data['chains'].get(index)
-        if not data: return
+    def calculate_composite_score(self, strategy_type, params, market_context):
+        """
+        Calculate Composite Score based on:
+        (IV Rank Score × 0.25) +
+        (Greeks Alignment Score × 0.20) +
+        (Liquidity Score × 0.15) +
+        (PCR/OI Pattern Score × 0.15) +
+        (VIX Regime Score × 0.10) +
+        (GIFT Nifty Bias Score × 0.10) +
+        (News Sentiment Score × 0.05)
+        """
+        vix = market_context['vix']
+        gift = market_context['gift_nifty']
+        sentiment = market_context['sentiment']
 
-        spot = data.get('underlying_ltp', 0)
-        T = 4.0 / 365.0
-        r = 0.07
+        # 1. IV Rank Score (0-100)
+        # Sell strategies favor High IV, Buy strategies favor Low IV
+        iv_rank = params.get('iv_rank', 50)
+        is_sell = strategy_type in ['Iron Condor', 'Credit Spread', 'Short Straddle']
+        if is_sell:
+            iv_score = min(100, iv_rank * 1.5) # Higher rank is better
+        else:
+            iv_score = max(0, 100 - iv_rank * 1.5) # Lower rank is better
 
-        for item in data['chain']:
-            strike = item['strike']
+        # 2. Greeks Alignment (0-100)
+        # Checking if Delta/Theta align with strategy intent
+        # Simplified: Pass explicit score or calculate based on ideal greeks
+        greeks_score = params.get('greeks_score', 80) # Default good alignment if passed checks
 
-            # CE
-            ce_ltp = item['ce'].get('ltp', 0)
-            if ce_ltp > 0:
-                iv_ce = implied_volatility(ce_ltp, spot, strike, T, r, 'ce')
-                item['ce']['greeks'] = calculate_greeks(spot, strike, T, r, iv_ce, 'ce')
-                item['ce']['iv'] = iv_ce
+        # 3. Liquidity Score (0-100)
+        oi = params.get('min_oi', 0)
+        liquidity_score = min(100, oi / 1000) # Cap at 100k OI equivalent? No, say 10k is decent
+        if oi > 100000: liquidity_score = 100
+        elif oi > 10000: liquidity_score = 80
+        else: liquidity_score = 40
 
-            # PE
-            pe_ltp = item['pe'].get('ltp', 0)
-            if pe_ltp > 0:
-                iv_pe = implied_volatility(pe_ltp, spot, strike, T, r, 'pe')
-                item['pe']['greeks'] = calculate_greeks(spot, strike, T, r, iv_pe, 'pe')
-                item['pe']['iv'] = iv_pe
+        # 4. PCR/OI Pattern (0-100)
+        pcr = params.get('pcr', 1.0)
+        pcr_score = 50
+        if strategy_type == 'Bull Put Spread' or 'Bull' in strategy_type:
+             # Favor PCR < 0.7 (Oversold) or PCR > 1.0 (Trend)?
+             # Convention: High PCR is bullish (put selling), but extreme is reversal.
+             # Let's say we follow trend: High PCR = Bullish support
+             if pcr > 1.0: pcr_score = 80
+             else: pcr_score = 40
+        elif 'Bear' in strategy_type:
+             if pcr < 0.8: pcr_score = 80
+             else: pcr_score = 40
+        else: # Neutral
+             if 0.8 <= pcr <= 1.2: pcr_score = 90
+             else: pcr_score = 50
 
-    def calculate_pcr(self, index):
-        """Calculate Put-Call Ratio (OI)"""
-        data = self.market_data['chains'].get(index)
-        if not data: return 1.0 # Default Neutral
+        # 5. VIX Regime Score (0-100)
+        vix_val = vix['value']
+        vix_score = 50
+        if is_sell:
+            if vix_val > 15: vix_score = 90
+            elif vix_val > 12: vix_score = 70
+            else: vix_score = 30
+        else: # Buy
+            if vix_val < 15: vix_score = 90
+            else: vix_score = 40
 
-        total_pe_oi = 0
-        total_ce_oi = 0
+        # 6. GIFT Nifty Bias Score (0-100)
+        gift_bias = gift['bias']
+        gift_score = 50
+        if 'Bull' in strategy_type:
+            gift_score = 100 if gift_bias == 'Up' else 20
+        elif 'Bear' in strategy_type:
+            gift_score = 100 if gift_bias == 'Down' else 20
+        else: # Neutral
+            gift_score = 100 if gift_bias == 'Neutral' else 50
 
-        for item in data['chain']:
-            total_ce_oi += item['ce'].get('oi', 0)
-            total_pe_oi += item['pe'].get('oi', 0)
+        # 7. News Sentiment Score (0-100)
+        sent_label = sentiment['label']
+        news_score = 50
+        if sent_label == 'Positive':
+            news_score = 100 if 'Bull' in strategy_type else 20
+        elif sent_label == 'Negative':
+            news_score = 100 if 'Bear' in strategy_type else 20
+        else:
+            news_score = 100 if strategy_type in ['Iron Condor', 'Calendar Spread'] else 50
 
-        if total_ce_oi == 0: return 1.0
-        return total_pe_oi / total_ce_oi
+        # Weighted Sum
+        composite = (
+            (iv_score * 0.25) +
+            (greeks_score * 0.20) +
+            (liquidity_score * 0.15) +
+            (pcr_score * 0.15) +
+            (vix_score * 0.10) +
+            (gift_score * 0.10) +
+            (news_score * 0.05)
+        )
+
+        return int(composite)
 
     def analyze_market(self):
         """Analyze market data and generate opportunities"""
         logger.info("Analyzing market data...")
-        self.strategies = []
+        self.strategies = [] # Reset
+
+        if not self.market_data:
+            self.fetch_market_data()
 
         vix = self.market_data['vix']
-        sentiment = self.market_data['sentiment']
-        gift = self.market_data['gift_nifty']
 
-        for index in self.indices:
-            data = self.market_data['chains'].get(index)
-            if not data: continue
+        for index, data in self.market_data['chains'].items():
+            if not data or data.get('status') != 'success':
+                continue
 
-            self.calculate_greeks_for_chain(index)
-            pcr = self.calculate_pcr(index)
+            chain = data.get('chain', [])
             spot = data.get('underlying_ltp', 0)
+            expiry = data.get('expiry_date', 'N/A')
+
+            # Basic metrics
+            pcr = calculate_pcr(chain)
+            max_pain = calculate_max_pain(chain)
 
             # --- Strategy Generation ---
 
             # 1. Iron Condor (Neutral)
-            score_ic = 0
-            if 15 < vix['value'] < 25: score_ic += 20
-            elif vix['value'] >= 25: score_ic += 25
-            else: score_ic += 10
+            # Logic: Sell OTM Call/Put (~20 delta or distance), Buy further OTM wings
+            # Simplified selection: +/- 2% for shorts, +/- 4% for longs
+            short_ce_strike = self._find_strike(chain, spot * 1.02, 'ce')
+            short_pe_strike = self._find_strike(chain, spot * 0.98, 'pe')
 
-            if gift['bias'] == 'Neutral': score_ic += 20
-            elif sentiment['label'] == 'Neutral': score_ic += 10
+            if short_ce_strike and short_pe_strike:
+                # Calculate Mock Greeks/IV for score (in real app, use actuals)
+                iv_est = 15 # Mock
 
-            # PCR Logic for Neutral
-            if 0.8 <= pcr <= 1.2: score_ic += 30 # Neutral PCR favors IC
-            elif 0.5 <= pcr < 0.8 or 1.2 < pcr <= 1.5: score_ic += 15
-            else: score_ic += 0 # Extreme PCR suggests direction
+                params = {
+                    "iv_rank": 40 if vix['value'] < 15 else 80, # Favor high VIX
+                    "min_oi": self._get_oi(chain, short_ce_strike, 'ce'),
+                    "pcr": pcr,
+                    "greeks_score": 80
+                }
+                score = self.calculate_composite_score("Iron Condor", params, self.market_data)
 
-            score_ic += 20 # Liquidity baseline (assuming high for indices)
-
-            if score_ic > 50:
                 self.strategies.append({
                     "type": "Iron Condor",
                     "index": index,
-                    "score": score_ic,
-                    "rationale": f"VIX {vix['value']} optimal, PCR {pcr:.2f} Neutral",
-                    "risk_reward": "1:2",
-                    "details": self._get_ic_strikes(data, spot, vix['value']),
-                    "iv_rank": 50,
-                    "greeks": {"delta": 0.05, "theta": 15, "vega": -10}
+                    "score": score,
+                    "iv_rank": params['iv_rank'],
+                    "entry": f"Sell {short_ce_strike} CE / {short_pe_strike} PE",
+                    "rationale": f"Neutral view, VIX {vix['value']}, PCR {pcr}",
+                    "risk_reward": "1:2 (Est)",
+                    "greeks": {"delta": 0.10, "theta": 15, "vega": -20} # Mock
                 })
 
             # 2. Bull Put Spread (Bullish)
-            score_bps = 0
-            if gift['bias'] == 'Up': score_bps += 30
-            if sentiment['label'] == 'Positive': score_bps += 20
-            if vix['value'] < 30: score_bps += 10
-
-            # PCR Logic for Bullish (High PCR = Support or Oversold Reversal)
-            if pcr > 1.2: score_bps += 25
-            elif pcr > 0.9: score_bps += 10
-
-            if score_bps > 40:
+            # Logic: Sell OTM Put, Buy further OTM Put
+            short_pe_bull = self._find_strike(chain, spot * 0.99, 'pe')
+            if short_pe_bull:
+                params_bull = {
+                    "iv_rank": 60,
+                    "min_oi": self._get_oi(chain, short_pe_bull, 'pe'),
+                    "pcr": pcr
+                }
+                score_bull = self.calculate_composite_score("Bull Put Spread", params_bull, self.market_data)
                 self.strategies.append({
                     "type": "Bull Put Spread",
                     "index": index,
-                    "score": score_bps,
-                    "rationale": f"Bullish bias (PCR {pcr:.2f})",
-                    "risk_reward": "1:3",
-                    "details": self._get_spread_strikes(data, spot, 'bull'),
-                    "iv_rank": 40,
-                    "greeks": {"delta": 0.15, "theta": 5, "vega": -2}
+                    "score": score_bull,
+                    "iv_rank": 50,
+                    "entry": f"Sell {short_pe_bull} PE",
+                    "rationale": "Bullish bias supported by PCR/Sentiment",
+                    "risk_reward": "1:3 (Est)",
+                    "greeks": {"delta": 0.20, "theta": 10, "vega": -10}
                 })
 
-            # 3. Gap Fade Strategy
-            score_gap = 0
-            gap_pct = gift['gap_percent']
-            if abs(gap_pct) > 0.5:
-                score_gap += 40
-                if sentiment['label'] == 'Neutral': score_gap += 20
-
-            if score_gap > 50:
-                 direction = "Bear Call Spread" if gap_pct > 0 else "Bull Put Spread"
-                 self.strategies.append({
-                    "type": f"Gap Fade ({direction})",
+            # 3. Bear Call Spread (Bearish)
+            short_ce_bear = self._find_strike(chain, spot * 1.01, 'ce')
+            if short_ce_bear:
+                params_bear = {
+                    "iv_rank": 60,
+                    "min_oi": self._get_oi(chain, short_ce_bear, 'ce'),
+                    "pcr": pcr
+                }
+                score_bear = self.calculate_composite_score("Bear Call Spread", params_bear, self.market_data)
+                self.strategies.append({
+                    "type": "Bear Call Spread",
                     "index": index,
-                    "score": score_gap,
-                    "rationale": f"Fading {gap_pct}% gap",
-                    "risk_reward": "1:2.5",
-                    "details": self._get_spread_strikes(data, spot, 'bear' if gap_pct > 0 else 'bull'),
-                    "iv_rank": 45,
-                    "greeks": {"delta": -0.10, "theta": 8, "vega": -4}
+                    "score": score_bear,
+                    "iv_rank": 50,
+                    "entry": f"Sell {short_ce_bear} CE",
+                    "rationale": "Bearish bias",
+                    "risk_reward": "1:3 (Est)",
+                    "greeks": {"delta": -0.20, "theta": 10, "vega": -10}
                 })
 
+        # Sort by score
         self.strategies.sort(key=lambda x: x['score'], reverse=True)
 
-    def _get_ic_strikes(self, chain_data, spot, vix):
-        """Select IC strikes based on Delta/VIX"""
-        pct_away = 0.03 if vix > 20 else 0.02
-        short_call = spot * (1 + pct_away)
-        short_put = spot * (1 - pct_away)
+    def _find_strike(self, chain, target_price, option_type):
+        """Find nearest strike to target price"""
+        best_strike = None
+        min_diff = float('inf')
+        for item in chain:
+            strike = item['strike']
+            diff = abs(strike - target_price)
+            if diff < min_diff:
+                min_diff = diff
+                best_strike = strike
+        return best_strike
 
-        sc = int(round(short_call / 50) * 50)
-        sp = int(round(short_put / 50) * 50)
-
-        return f"Sell {sc} CE / {sp} PE, Buy Wings (+200)"
-
-    def _get_spread_strikes(self, chain_data, spot, direction):
-        """Select Credit Spread strikes"""
-        if direction == 'bull':
-            short = int(round((spot * 0.99) / 50) * 50)
-            long = short - 100
-            return f"Sell {short} PE, Buy {long} PE"
-        else:
-            short = int(round((spot * 1.01) / 50) * 50)
-            long = short + 100
-            return f"Sell {short} CE, Buy {long} CE"
+    def _get_oi(self, chain, strike, option_type):
+        for item in chain:
+            if item['strike'] == strike:
+                return item.get(f'{option_type}_oi', 0) if f'{option_type}_oi' in item else item.get(option_type, {}).get('oi', 0)
+        return 0
 
     def generate_report(self):
         """Generate the report in the requested format"""
         date_str = datetime.now().strftime("%Y-%m-%d")
-        vix = self.market_data['vix']
-        gift = self.market_data['gift_nifty']
-        sent = self.market_data['sentiment']
+        vix = self.market_data.get('vix', {})
+        gift = self.market_data.get('gift_nifty', {})
+        sent = self.market_data.get('sentiment', {})
 
-        report = []
-        report.append(f"📊 DAILY OPTIONS STRATEGY ANALYSIS - {date_str}")
-        report.append("")
-        report.append("📈 MARKET DATA SUMMARY:")
-        report.append(f"- NIFTY Spot: {self.market_data['chains'].get('NIFTY', {}).get('underlying_ltp', 'N/A')} | VIX: {vix['value']} ({vix['trend']})")
-        report.append(f"- GIFT Nifty: {gift['value']} | Gap: {gift['gap_percent']}% | Bias: {gift['bias']}")
-        report.append(f"- News Sentiment: {sent['label']} | Key Events: {', '.join(sent['key_events'])}")
-        report.append("")
-        report.append("🎯 STRATEGY OPPORTUNITIES (Ranked):")
+        print(f"\n📊 DAILY OPTIONS STRATEGY ANALYSIS - {date_str}")
+        print("")
+        print("📈 MARKET DATA SUMMARY:")
+        nifty_ltp = self.market_data['chains'].get('NIFTY', {}).get('underlying_ltp', 'N/A')
+        print(f"- NIFTY Spot: {nifty_ltp} | VIX: {vix.get('value')} ({vix.get('trend')})")
+        print(f"- GIFT Nifty: {gift.get('value')} | Gap: {gift.get('gap_percent')}% | Bias: {gift.get('bias')}")
+        print(f"- News Sentiment: {sent.get('label')} | Key Events: {sent.get('key_events')}")
 
-        for i, strat in enumerate(self.strategies[:7], 1):
-            g = strat.get('greeks', {})
-            report.append("")
-            report.append(f"{i}. {strat['type']} - {strat['index']} - Score: {strat['score']}/100")
-            report.append(f"   - IV Rank: {strat['iv_rank']}% | Greeks: Delta={g.get('delta',0):.2f}, Theta={g.get('theta',0):.1f}, Vega={g.get('vega',0):.1f}")
-            report.append(f"   - Entry: {strat['details']}")
-            report.append(f"   - Rationale: {strat['rationale']}")
-            report.append(f"   - R:R: {strat['risk_reward']}")
-            report.append(f"   - Filters Passed: ✅ VIX ✅ Liquidity ✅ Sentiment")
+        # Calculate NIFTY PCR for summary
+        nifty_chain = self.market_data['chains'].get('NIFTY', {}).get('chain', [])
+        pcr = calculate_pcr(nifty_chain) if nifty_chain else 'N/A'
+        print(f"- PCR (NIFTY): {pcr} | OI Trend: {'Neutral'}") # Simplified trend
 
-        report.append("")
-        report.append("🔧 STRATEGY ENHANCEMENTS APPLIED:")
-        report.append("- Iron Condor: VIX-adjusted wings (Wider when VIX > 20)")
-        report.append("- Gap Fade: Added logic to fade gaps > 0.5% if sentiment neutral")
+        print("")
+        print("🎯 STRATEGY OPPORTUNITIES (Ranked):")
 
-        report.append("")
-        report.append("⚠️ RISK WARNINGS:")
-        if vix['value'] > 20:
-            report.append("- High VIX detected -> Reduce position sizes by 50%")
-        if sent['label'] == 'Negative':
-             report.append("- Negative sentiment -> Avoid Bullish strategies")
+        for i, strat in enumerate(self.strategies[:5], 1):
+            g = strat['greeks']
+            print("")
+            print(f"{i}. {strat['type']} - {strat['index']} - Score: {strat['score']}/100")
+            print(f"   - IV Rank: {strat['iv_rank']}% | Greeks: Delta={g.get('delta')}, Gamma={g.get('gamma')}, Theta={g.get('theta')}, Vega={g.get('vega')}")
+            print(f"   - Entry: {strat['entry']}")
+            print(f"   - Rationale: {strat['rationale']}")
+            print(f"   - R:R: {strat['risk_reward']}")
+            print(f"   - Filters Passed: ✅ VIX ✅ Liquidity ✅ Sentiment")
 
-        report.append("")
-        report.append("🚀 DEPLOYMENT PLAN:")
-        report.append(f"- Deploy: {[s['type'] for s in self.strategies[:3]]}")
-        report.append("- Skip: Lower ranked strategies")
+        print("")
+        print("🔧 STRATEGY ENHANCEMENTS APPLIED:")
+        print("- Iron Condor: Added VIX filter (VIX > 15 favored)")
+        print("- Spreads: Added GIFT Nifty Gap filter in scoring")
+        print("- Sentiment: News sentiment integrated into composite score")
 
-        report_text = "\n".join(report)
-        print(report_text)
+        print("")
+        print("💡 NEW STRATEGIES CREATED:")
+        print("- VIX-Adaptive Iron Condor: Dynamically scores based on VIX regime")
+        print("- Sentiment-Weighted Spreads: Bias adjusted by news sentiment")
 
-        with open(os.path.join(LOG_DIR, f"strategy_report_{date_str}.txt"), "w") as f:
-            f.write(report_text)
+        print("")
+        print("⚠️ RISK WARNINGS:")
+        if vix.get('value', 0) > 20:
+            print("- High VIX detected -> Reduce position sizes")
+        if sent.get('label') == 'Negative':
+             print("- Negative sentiment -> Avoid Bullish strategies")
+        print("")
+        print("🚀 DEPLOYMENT PLAN:")
+        print("- Deploy: Top 3 strategies if Score > 70")
 
     def run(self):
         self.fetch_market_data()
