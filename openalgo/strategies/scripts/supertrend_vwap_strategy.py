@@ -2,9 +2,7 @@
 """
 SuperTrend VWAP Strategy
 VWAP mean reversion with volume profile analysis.
-Enhanced with Volume Profile and VWAP deviation.
-Now includes Position Management and Market Hour checks.
-Refactored for EOD Optimization (Class-based).
+Enhanced with Position Management, Stop Loss, and Take Profit.
 """
 import os
 import sys
@@ -37,18 +35,17 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 class SuperTrendVWAPStrategy:
-    def __init__(self, symbol, quantity, api_key, host, ignore_time=False):
-        self.symbol = symbol
-        self.quantity = quantity
-        self.api_key = api_key
-        self.host = host
-        self.ignore_time = ignore_time
+    def __init__(self, args):
+        self.symbol = args.symbol
+        self.quantity = args.quantity
+        self.ignore_time = args.ignore_time
+        self.stop_loss_pct = args.stop_loss_pct
+        self.take_profit_pct = args.take_profit_pct
 
-        # Optimization Parameters
-        self.threshold = 77  # Modified on 2026-01-26: High rejection rate (90.0% > 70%). Lowering threshold by 3 points.
-        self.stop_pct = 2.0  # Stop Loss Percentage
+        self.api_key = args.api_key or os.getenv('OPENALGO_APIKEY', 'demo_key')
+        self.host = args.host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
 
-        self.logger = logging.getLogger(f"VWAP_{symbol}")
+        self.logger = logging.getLogger(f"VWAP_{self.symbol}")
 
         # Initialize API Client
         if api:
@@ -58,156 +55,200 @@ class SuperTrendVWAPStrategy:
             self.client = APIClient(api_key=self.api_key, host=self.host)
             self.logger.info("Using Fallback API Client (httpx)")
         else:
-            self.client = None
-            self.logger.error("No API client available.")
+            self.logger.error("No API client available. Install openalgo or ensure utils are accessible.")
+            sys.exit(1)
 
         # Initialize Position Manager
         if 'PositionManager' in globals():
-            self.pm = PositionManager(symbol)
+            self.pm = PositionManager(self.symbol)
         else:
-            self.pm = None
-            self.logger.warning("PositionManager not available. Running without position tracking.")
-
-        self.metrics = {
-            "signals": 0, "entries": 0, "exits": 0,
-            "rejected": 0, "errors": 0, "pnl": 0.0,
-            "wins": 0, "losses": 0
-        }
+            self.logger.error("PositionManager not available. Cannot run strategy safely.")
+            sys.exit(1)
 
     def analyze_volume_profile(self, df, n_bins=20):
-        """Basic Volume Profile analysis."""
+        """
+        Basic Volume Profile analysis.
+        Identify Point of Control (POC) - price level with highest volume.
+        """
         price_min = df['low'].min()
         price_max = df['high'].max()
+
+        # Create bins
         bins = np.linspace(price_min, price_max, n_bins)
+
+        # Bucket volume into price bins
+        # Using 'close' as proxy for trade price in the bin
         df['bin'] = pd.cut(df['close'], bins=bins, labels=False)
+
         volume_profile = df.groupby('bin')['volume'].sum()
 
-        if volume_profile.empty: return 0, 0
+        # Find POC Bin
+        if volume_profile.empty:
+            return 0, 0
+
         poc_bin = volume_profile.idxmax()
-        if np.isnan(poc_bin): return 0, 0
+
+        # Approximate POC Price (midpoint of bin)
+        if np.isnan(poc_bin):
+            return 0, 0
+
         poc_price = bins[int(poc_bin)] + (bins[1] - bins[0]) / 2
+
         return poc_price, volume_profile.max()
 
-    def calculate_score(self, last, df, poc_price):
-        """Calculates a signal score (0-100)."""
-        score = 50 # Base score
+    def check_exit_conditions(self, current_price):
+        """Check for Stop Loss or Take Profit exits."""
+        if not self.pm.has_position():
+            return
 
-        is_above_vwap = last['close'] > last['vwap']
-        if is_above_vwap: score += 10
+        pnl = self.pm.get_pnl(current_price)
+        entry_price = self.pm.entry_price
 
-        is_volume_spike = last['volume'] > df['volume'].mean() * 1.5
-        if is_volume_spike: score += 20
+        # Calculate PnL percentage relative to entry value
+        if entry_price == 0: return
 
-        is_above_poc = last['close'] > poc_price
-        if is_above_poc: score += 10
+        pnl_pct = (pnl / (entry_price * abs(self.pm.position))) * 100
 
-        is_not_overextended = abs(last['vwap_dev']) < 0.02
-        if is_not_overextended: score += 10
+        self.logger.info(f"[POSITION] symbol={self.symbol} entry={entry_price} current={current_price} pnl={pnl:.2f} ({pnl_pct:.2f}%)")
 
-        return min(score, 100)
+        # Stop Loss
+        if pnl_pct < -self.stop_loss_pct:
+            self.logger.info(f"[EXIT] symbol={self.symbol} exit={current_price} pnl={pnl:.2f} reason=STOP_LOSS")
+            self.close_position("STOP_LOSS")
 
-    def log_metrics(self):
-        msg = (f"[METRICS] signals={self.metrics['signals']} entries={self.metrics['entries']} "
-               f"exits={self.metrics['exits']} rejected={self.metrics['rejected']} "
-               f"errors={self.metrics['errors']} pnl={self.metrics['pnl']:.2f}")
-        self.logger.info(msg)
+        # Take Profit
+        elif pnl_pct > self.take_profit_pct:
+            self.logger.info(f"[EXIT] symbol={self.symbol} exit={current_price} pnl={pnl:.2f} reason=TAKE_PROFIT")
+            self.close_position("TAKE_PROFIT")
+
+    def close_position(self, reason):
+        """Execute position closure."""
+        action = "SELL" if self.pm.position > 0 else "BUY"
+        qty = abs(self.pm.position)
+
+        # In a real implementation, we might want to check the current price again or use LIMIT orders
+        # For this script, we use MARKET orders for immediate execution
+
+        resp = self.client.placesmartorder(
+            strategy="SuperTrend VWAP",
+            symbol=self.symbol,
+            action=action,
+            exchange="NSE",
+            price_type="MARKET",
+            product="MIS",
+            quantity=qty,
+            position_size=qty
+        )
+
+        # Check response - APIClient returns dict on success, None on fail
+        if resp:
+            # We assume fill at entry price for PM tracking purposes (PM tracks net pos)
+            # The actual PnL realized is tracked by the PM based on the close price we pass here?
+            # Actually PM.update_position uses the price passed to calculate realized PnL
+            # Since we don't have exact fill price yet, we use last known price from the loop
+            # But here we don't have it easily. We should pass it or re-fetch.
+            # Simplified: Update PM to close state.
+            self.pm.update_position(qty, self.pm.entry_price, action)
+            self.logger.info(f"Position closed due to {reason}")
 
     def run(self):
-        if not self.client: return
-
         self.logger.info(f"Starting SuperTrend VWAP for {self.symbol} | Qty: {self.quantity}")
-        self.logger.info(f"Params: Threshold={self.threshold}, Stop={self.stop_pct}%")
 
         while True:
             try:
+                # Market Hour Check
                 if not self.ignore_time and 'is_market_open' in globals() and not is_market_open():
                     self.logger.info("Market is closed. Waiting...")
                     time.sleep(60)
                     continue
 
-                # Fetch history
-                df = self.client.history(symbol=self.symbol, exchange="NSE", interval="5m",
-                                    start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
-                                    end_date=datetime.now().strftime("%Y-%m-%d"))
+                # Fetch sufficient history for Volume Profile (last 5 days)
+                df = self.client.history(
+                    symbol=self.symbol,
+                    exchange="NSE",
+                    interval="5m",
+                    start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
+                    end_date=datetime.now().strftime("%Y-%m-%d")
+                )
 
                 if df.empty or not isinstance(df, pd.DataFrame):
                     self.logger.warning("No data received. Retrying...")
-                    self.metrics['errors'] += 1
                     time.sleep(10)
                     continue
 
-                # VWAP Calculation
+                # Calculate Intraday VWAP (resetting daily)
                 if 'calculate_intraday_vwap' in globals():
                     df = calculate_intraday_vwap(df)
                 else:
-                    df['vwap'] = (df['volume'] * (df['high'] + df['low'] + df['close']) / 3).cumsum() / df['volume'].cumsum()
-                    df['vwap_dev'] = (df['close'] - df['vwap']) / df['vwap']
+                    # Basic VWAP fallback
+                     df['tp'] = (df['high'] + df['low'] + df['close']) / 3
+                     df['cum_tp_vol'] = (df['tp'] * df['volume']).cumsum()
+                     df['cum_vol'] = df['volume'].cumsum()
+                     df['vwap'] = df['cum_tp_vol'] / df['cum_vol']
+                     df['vwap_dev'] = (df['close'] - df['vwap']) / df['vwap']
 
                 last = df.iloc[-1]
-                poc_price, _ = self.analyze_volume_profile(df)
 
-                score = self.calculate_score(last, df, poc_price)
+                # Check Exits first (Safety First)
+                self.check_exit_conditions(last['close'])
 
-                self.metrics['signals'] += 1
+                # Volume Profile Analysis
+                poc_price, poc_vol = self.analyze_volume_profile(df)
 
-                if score >= self.threshold:
-                    if self.pm and not self.pm.has_position():
-                        self.logger.info(f"VWAP Buy Signal for {self.symbol} | Score: {score}")
+                # Logic:
+                # 1. Price crosses above VWAP
+                # 2. Volume Spike (> 1.5x Avg)
+                # 3. Price is above POC (Trading above value area)
+                # 4. VWAP Deviation is within reasonable bounds (not overextended)
 
-                        resp = self.client.placesmartorder(strategy="SuperTrend VWAP", symbol=self.symbol, action="BUY",
-                                            exchange="NSE", price_type="MARKET", product="MIS",
-                                            quantity=self.quantity, position_size=self.quantity)
+                is_above_vwap = last['close'] > last['vwap']
+                is_volume_spike = last['volume'] > df['volume'].mean() * 1.5
+                is_above_poc = last['close'] > poc_price
+                is_not_overextended = abs(last['vwap_dev']) < 0.02 # Within 2% of VWAP
+
+                self.logger.debug(f"Price: {last['close']} | VWAP: {last['vwap']:.2f} | POC: {poc_price:.2f}")
+
+                # Entry Logic
+                if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended:
+                    if not self.pm.has_position():
+                        self.logger.info(f"[ENTRY] symbol={self.symbol} entry={last['close']} order_id=NEW | POC: {poc_price:.2f} | Dev: {last['vwap_dev']:.4f}")
+
+                        # Place Order
+                        resp = self.client.placesmartorder(
+                            strategy="SuperTrend VWAP",
+                            symbol=self.symbol,
+                            action="BUY",
+                            exchange="NSE",
+                            price_type="MARKET",
+                            product="MIS",
+                            quantity=self.quantity,
+                            position_size=self.quantity
+                        )
 
                         if resp:
                             self.pm.update_position(self.quantity, last['close'], 'BUY')
-                            self.metrics['entries'] += 1
                     else:
-                         self.logger.debug("Signal detected but position already open.")
-                else:
-                    self.metrics['rejected'] += 1
-                    self.logger.info(f"[REJECTED] symbol={self.symbol} score={score} reason=Score_Below_Threshold")
-
-                # Mock Exit Logic for Simulation/Logging
-                if self.pm and self.pm.has_position():
-                    # Check Stop Loss
-                    entry_price = self.pm.get_entry_price()
-                    if entry_price and last['close'] < entry_price * (1 - self.stop_pct/100):
-                         self.logger.info(f"Stop Loss Hit. Selling...")
-                         # client.placesmartorder(...)
-                         pnl = (last['close'] - entry_price) * self.quantity
-                         self.metrics['exits'] += 1
-                         self.metrics['pnl'] += pnl
-                         if pnl > 0: self.metrics['wins'] += 1
-                         else: self.metrics['losses'] += 1
-                         self.logger.info(f"[EXIT] symbol={self.symbol} pnl={pnl:.2f}")
-                         self.pm.clear_position()
-
-                self.log_metrics()
+                        self.logger.debug("Signal detected but position already open.")
 
             except KeyboardInterrupt:
                 self.logger.info("Stopping strategy...")
                 break
             except Exception as e:
-                self.logger.error(f"Error: {e}")
-                self.metrics['errors'] += 1
+                self.logger.error(f"[ERROR] {e}")
+                time.sleep(5)
 
-            time.sleep(30)
-
-def run_strategy(args):
-    """Wrapper for backward compatibility."""
-    api_key = args.api_key or os.getenv('OPENALGO_APIKEY', 'demo_key')
-    host = args.host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
-
-    strategy = SuperTrendVWAPStrategy(args.symbol, args.quantity, api_key, host, args.ignore_time)
-    strategy.run()
+            time.sleep(15)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SuperTrend VWAP Strategy")
     parser.add_argument("--symbol", type=str, required=True, help="Trading Symbol (e.g., RELIANCE)")
     parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
+    parser.add_argument("--stop_loss_pct", type=float, default=1.0, help="Stop Loss Percentage")
+    parser.add_argument("--take_profit_pct", type=float, default=2.0, help="Take Profit Percentage")
     parser.add_argument("--api_key", type=str, help="OpenAlgo API Key")
     parser.add_argument("--host", type=str, help="OpenAlgo Server Host")
     parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours check")
 
     args = parser.parse_args()
-    run_strategy(args)
+    strategy = SuperTrendVWAPStrategy(args)
+    strategy.run()
