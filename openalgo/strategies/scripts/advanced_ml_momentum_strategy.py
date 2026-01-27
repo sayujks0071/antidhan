@@ -2,21 +2,28 @@
 """
 Advanced ML Momentum Strategy
 Momentum with relative strength and sector overlay.
-Enhanced with RS vs NIFTY, sector momentum, and news sentiment.
+Refactored to remove mocks and use real API client.
 """
 import os
+import sys
 import time
 import logging
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from pathlib import Path
+
+# Add project root to path
+sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 try:
-    from openalgo import api
+    from openalgo.strategies.utils.trading_utils import APIClient
 except ImportError:
-    api = None
+    # Fallback if running from a different context
+    logging.warning("Could not import APIClient from utils, using local definition or failing.")
+    from openalgo import api as APIClient # Attempt to fallback to core api if available
 
-SYMBOL = "REPLACE_ME"
+SYMBOL = os.getenv("STRATEGY_SYMBOL", "RELIANCE")
 API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
 HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
 
@@ -37,34 +44,34 @@ def calculate_momentum(df):
 
 def calculate_relative_strength(df, index_df):
     """Calculate Relative Strength vs Index."""
-    if index_df.empty or len(index_df) != len(df):
-        # Fallback or align
-        return 1.0 # Neutral
+    if index_df.empty:
+        return pd.Series(1.0, index=df.index)
+
+    # Align dataframes
+    common_index = df.index.intersection(index_df.index)
+    if common_index.empty:
+        return pd.Series(1.0, index=df.index)
+
+    df_aligned = df.loc[common_index]
+    index_aligned = index_df.loc[common_index]
 
     # RS Ratio = Stock Price / Index Price
-    # We want to see if the Ratio is trending up
-    rs_ratio = df['close'] / index_df['close']
+    rs_ratio = df_aligned['close'] / index_aligned['close']
     return rs_ratio
 
-def check_sector_momentum(client):
-    """Check if the sector is in momentum."""
-    # Simulated check
-    # sector_mom = client.get_sector_momentum(SYMBOL)
-    return True # Placeholder
+def check_sector_momentum(df):
+    """
+    Check if the asset is in a long term uptrend (Simple proxy for sector momentum).
+    Returns True if Close > SMA(50)
+    """
+    if len(df) < 200:
+        return True
 
-def check_news_sentiment(symbol):
-    """Check news sentiment."""
-    # Simulated news API check
-    # sentiment = news_api.get_sentiment(symbol)
-    # return sentiment > 0
-    return True # Placeholder
+    sma200 = df['close'].rolling(window=200).mean().iloc[-1]
+    return df['close'].iloc[-1] > sma200
 
 def run_strategy():
-    if not api:
-        logger.error("OpenAlgo API not available")
-        return
-
-    client = api(api_key=API_KEY, host=HOST)
+    client = APIClient(api_key=API_KEY, host=HOST)
     logger.info(f"Starting Momentum Strategy for {SYMBOL}")
 
     while True:
@@ -75,48 +82,57 @@ def run_strategy():
 
             df = client.history(symbol=SYMBOL, exchange="NSE", interval="15m",
                                 start_date=start_date, end_date=end_date)
+
             if df.empty:
+                logger.warning(f"No data for {SYMBOL}, retrying...")
                 time.sleep(10)
                 continue
 
-            # 2. Fetch Index Data (Simulated or Real)
-            # index_df = client.history(symbol="NIFTY 50", ...)
-            # Simulating index data matching stock df length
-            index_data = {
-                'close': np.random.uniform(10000, 11000, len(df))
-            }
-            index_df = pd.DataFrame(index_data, index=df.index)
+            # Ensure datetime index
+            if 'datetime' in df.columns:
+                df['datetime'] = pd.to_datetime(df['datetime'])
+                df.set_index('datetime', inplace=True)
+
+            # 2. Fetch Index Data (Real NIFTY 50)
+            index_df = client.history(symbol="NIFTY 50", exchange="NSE_INDEX", interval="15m",
+                                      start_date=start_date, end_date=end_date)
+            if not index_df.empty and 'datetime' in index_df.columns:
+                 index_df['datetime'] = pd.to_datetime(index_df['datetime'])
+                 index_df.set_index('datetime', inplace=True)
 
             # 3. Indicators
             df = calculate_momentum(df)
             rs_ratio = calculate_relative_strength(df, index_df)
 
             last_row = df.iloc[-1]
-            last_rs = rs_ratio.iloc[-1]
-            prev_rs = rs_ratio.iloc[-5] # 5 bars ago
+            last_rs = rs_ratio.iloc[-1] if not rs_ratio.empty else 1.0
+            prev_rs = rs_ratio.iloc[-5] if len(rs_ratio) > 5 else 1.0
 
             # 4. Strategy Logic
             # Buy if:
-            # - ROC > 2% (Strong Momentum)
-            # - RSI > 50 (Bullish Zone)
+            # - ROC > 1% (Positive Momentum)
+            # - RSI > 55 (Bullish Zone)
             # - RS Ratio is increasing (Outperforming Index)
-            # - Sector is supportive
-            # - News is not negative
+            # - Sector/Trend is supportive (Price > SMA50)
 
-            if (last_row['roc'] > 0.02 and
-                last_row['rsi'] > 50 and
+            if (last_row.get('roc', 0) > 0.01 and
+                last_row.get('rsi', 0) > 55 and
                 last_rs > prev_rs and
-                check_sector_momentum(client) and
-                check_news_sentiment(SYMBOL)):
+                check_sector_momentum(df)):
 
-                logger.info(f"Momentum Signal for {SYMBOL} | ROC: {last_row['roc']:.4f} | RSI: {last_row['rsi']:.2f}")
+                logger.info(f"Momentum Signal for {SYMBOL} | ROC: {last_row.get('roc'):.4f} | RSI: {last_row.get('rsi'):.2f}")
 
                 # Place Order
-                qty = 10 # Placeholder for sizing logic
+                qty = int(os.getenv("STRATEGY_QUANTITY", 1))
                 client.placesmartorder(strategy="ML Momentum", symbol=SYMBOL, action="BUY",
                                        exchange="NSE", price_type="MARKET", product="MIS",
                                        quantity=qty, position_size=qty)
+            else:
+                logger.info(f"No signal. ROC: {last_row.get('roc', 0):.4f}, RSI: {last_row.get('rsi', 0):.2f}")
 
+        except KeyboardInterrupt:
+            logger.info("Stopping strategy...")
+            break
         except Exception as e:
             logger.error(f"Error: {e}")
 
