@@ -1,0 +1,41 @@
+
+[94m🔄[0m Configuration version check passed ([92m1.0.5[0m)
+🔐 DAILY LOGIN HEALTH CHECK - 2026-01-26 02:38:44
+
+✅ KITE CONNECT (Port 5001):
+- Server Status: 🔴 Down
+- Auth Token: 🔴 Missing
+
+✅ DHAN API (Port 5002):
+- Server Status: 🔴 Down
+- Access Token: 🔴 Missing
+
+✅ OPENALGO AUTH:
+- Login Status: 🔴 Failed
+- API Keys: 0/0 strategies configured
+- CSRF Handling: ✅ Working
+
+⚠️ ISSUES DETECTED:
+1. Kite Server Down → Process not running → Start server
+2. Kite Token Missing → No login found → Login required
+3. Dhan Server Down → Process not running → Start server
+4. Dhan Token Missing → No login found → Login required
+
+🔧 AUTOMATED ACTIONS TAKEN:
+- None
+
+📋 MANUAL ACTIONS REQUIRED:
+- Start Kite server on port 5001
+- Login to Kite: http://127.0.0.1:5001/auth/login
+- Start Dhan server on port 5002
+- Login to Dhan: http://127.0.0.1:5002/auth/login
+
+🔄 TOKEN STATUS:
+- Kite: Expired/Missing - Expires: 2026-01-26 03:00:00
+- Dhan: Expired/Missing - Expires: 2026-01-26 03:00:00
+- Next Refresh Check: 03:08
+
+✅ STRATEGY AUTH CHECK:
+- Strategies with valid API keys: 0/0
+- Strategies with auth errors: None
+- Actions: None

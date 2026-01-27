@@ -452,6 +452,15 @@ def fetch_positionbook(api_key: str) -> List[Dict]:
     return []
 
 
+def log_alert(message: str, level: str = "WARNING"):
+    """Log alert to alerts file."""
+    alert_file = BASE_DIR / "log/alerts.log"
+    alert_file.parent.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(alert_file, "a") as f:
+        f.write(f"[{timestamp}] [{level}] {message}\n")
+
 def generate_fine_tuning_recommendations(analysis: Dict) -> List[str]:
     """Generate fine-tuning recommendations based on analysis."""
     recommendations = []
@@ -480,9 +489,9 @@ def generate_fine_tuning_recommendations(analysis: Dict) -> List[str]:
         # Check error rate
         errors = metrics.get('errors', 0)
         if errors > 5:
-            recommendations.append(
-                f"🔴 {strategy_id}: High error count ({errors}). Check logs for issues."
-            )
+            msg = f"🔴 {strategy_id}: High error count ({errors}). Check logs for issues."
+            recommendations.append(msg)
+            log_alert(msg, level="CRITICAL")
         
         # Analyze rejected signals
         if rejected:

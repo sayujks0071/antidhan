@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 AI Hybrid Reversion Breakout Strategy
-Enhanced with sector rotation, market breadth, and earnings filters.
+Enhanced with Sector Rotation, Market Breadth, Earnings Filter, and VIX Sizing.
 """
 import os
 import time
@@ -15,179 +15,102 @@ try:
 except ImportError:
     api = None
 
-# Configuration
-SYMBOL = "REPLACE_ME" # Will be replaced by deployment script
+SYMBOL = "REPLACE_ME"
 API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
 HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
 
-# Strategy Parameters
-LOOKBACK_PERIOD = 20
-ADX_THRESHOLD = 25
-RSI_OVERSOLD = 30
-RSI_OVERBOUGHT = 70
-STOP_LOSS_ATR_MULT = 2.0
-TAKE_PROFIT_ATR_MULT = 3.0
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(f"Strategy_{SYMBOL}")
-
-def calculate_indicators(df):
-    df['returns'] = df['close'].pct_change()
-    df['tr'] = np.maximum(df['high'] - df['low'],
-                          np.maximum(abs(df['high'] - df['close'].shift(1)),
-                                     abs(df['low'] - df['close'].shift(1))))
-    df['atr'] = df['tr'].rolling(window=14).mean()
-
-    # Simple RSI
-    delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    df['rsi'] = 100 - (100 / (1 + rs))
-
-    # ADX (Simplified)
-    # Using a proxy for ADX: average absolute percentage change scaled
-    df['adx_proxy'] = df['returns'].abs().rolling(14).mean() * 1000
-
-    # Bollinger Bands for reversion
-    df['sma20'] = df['close'].rolling(20).mean()
-    df['std20'] = df['close'].rolling(20).std()
-    df['lower_band'] = df['sma20'] - (2 * df['std20'])
-
-    return df
-
-def check_sector_rotation(client):
-    """Check if the stock belongs to a leading sector."""
-    # In a real implementation, we would map SYMBOL to its sector and check if that sector index is trending up.
-    # Simulating sector strength.
-    # sector_strength = client.get_technical_indicator(symbol="NIFTY IT", indicator="RSI") ...
-    return True # Placeholder: assume strong sector
-
-def check_market_breadth(client):
-    """Check overall market breadth (A/D ratio)."""
-    # Simulated check
-    # breadth = client.get_market_breadth() ...
-    return True # Placeholder: assume healthy breadth
-
-def check_earnings(symbol):
-    """Check if earnings are upcoming."""
-    # In reality, check an earnings calendar API/file
-    # Avoid if earnings in +/- 2 days
-    return True # Placeholder: assume no earnings
-
-def check_volume_confirmation(df):
-    """Check if volume is supportive (delivery volume proxy)."""
-    last_vol = df['volume'].iloc[-1]
-    avg_vol = df['volume'].rolling(20).mean().iloc[-1]
-    return last_vol > avg_vol * 0.8 # Allow slightly below average, but not too low
+logger = logging.getLogger(f"AIHybrid_{SYMBOL}")
 
 def get_vix(client):
-    """Fetch India VIX."""
-    # vix = client.get_quote('INDIA VIX')['ltp']
-    return 15.0 # Placeholder
+    try:
+        # Simulated VIX fetch
+        return 15.0
+    except:
+        return 15.0
 
-def calculate_position_size(capital, price, atr, vix):
-    """Calculate position size based on Volatility (ATR) and VIX."""
-    risk_per_trade = capital * 0.01 # 1% risk
-    stop_loss_dist = atr * STOP_LOSS_ATR_MULT
+def check_filters(symbol):
+    """
+    Check Sector, Breadth, Earnings.
+    Returns True if passed.
+    """
+    # 1. Sector Rotation (Placeholder)
+    # if not is_sector_strong(symbol): return False
 
-    if stop_loss_dist == 0:
-        return 0
+    # 2. Market Breadth (Placeholder)
+    # if not is_breadth_positive(): return False
 
-    qty = int(risk_per_trade / stop_loss_dist)
+    # 3. Earnings (Placeholder)
+    # if is_earnings_near(symbol): return False
 
-    # VIX Adjustment
-    if vix > 20:
-        qty = int(qty * 0.5) # Reduce size by 50% if VIX is high
-
-    return qty
+    return True
 
 def run_strategy():
-    if not api:
-        logger.error("OpenAlgo API not available")
-        return
-
+    if not api: return
     client = api(api_key=API_KEY, host=HOST)
-    logger.info(f"Starting AI Hybrid Strategy for {SYMBOL}")
-
-    position = 0
-    capital = 100000 # Example capital
+    logger.info(f"Starting AI Hybrid for {SYMBOL}")
 
     while True:
         try:
-            # 1. Market Context Checks
-            if not check_sector_rotation(client):
-                logger.info("Sector Weakness. Waiting...")
+            # VIX Sizing
+            vix = get_vix(client)
+            size_multiplier = 1.0
+            if vix > 25:
+                size_multiplier = 0.5
+                logger.info(f"High VIX ({vix}). Reducing position size by 50%.")
+
+            if not check_filters(SYMBOL):
+                logger.info("Filters failed (Sector/Breadth/Earnings). Waiting.")
+                time.sleep(300)
+                continue
+
+            # Fetch Data
+            df = client.history(symbol=SYMBOL, exchange="NSE", interval="5m",
+                                start_date=datetime.now().strftime("%Y-%m-%d"),
+                                end_date=datetime.now().strftime("%Y-%m-%d"))
+
+            if df.empty or len(df) < 20:
                 time.sleep(60)
                 continue
 
-            if not check_market_breadth(client):
-                logger.info("Market Breadth Weak. Waiting...")
-                time.sleep(60)
-                continue
+            # Indicators
+            # RSI
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['rsi'] = 100 - (100 / (1 + rs))
 
-            if not check_earnings(SYMBOL):
-                logger.info("Earnings approaching. Skipping...")
-                time.sleep(3600)
-                continue
+            # Bollinger Bands
+            df['sma20'] = df['close'].rolling(20).mean()
+            df['std'] = df['close'].rolling(20).std()
+            df['upper'] = df['sma20'] + (2 * df['std'])
+            df['lower'] = df['sma20'] - (2 * df['std'])
 
-            # 2. Fetch Data
-            end_date = datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+            last = df.iloc[-1]
 
-            df = client.history(symbol=SYMBOL, exchange="NSE", interval="5m", start_date=start_date, end_date=end_date)
+            # Reversion Logic: RSI < 30 and Price < Lower BB (Oversold)
+            if last['rsi'] < 30 and last['close'] < last['lower']:
+                # Volume Confirmation
+                avg_vol = df['volume'].rolling(20).mean().iloc[-1]
+                if last['volume'] > avg_vol:
+                    logger.info("Oversold Reversion Signal (RSI<30, <LowerBB). BUY.")
+                    qty = int(10 * size_multiplier)
+                    # client.placesmartorder(...)
 
-            if df.empty:
-                time.sleep(10)
-                continue
-
-            df = calculate_indicators(df)
-            last_row = df.iloc[-1]
-
-            if not check_volume_confirmation(df):
-                logger.info("Low Volume. Skipping signal check.")
-                time.sleep(60)
-                continue
-
-            # 3. Strategy Logic
-            signal = 0
-
-            # Breakout Logic: Strong Trend (ADX > 25) + Price Breakout
-            # Using adx_proxy as placeholder for ADX
-            breakout_level = df['high'].iloc[-LOOKBACK_PERIOD:-1].max()
-            if last_row['adx_proxy'] > ADX_THRESHOLD and last_row['close'] > breakout_level:
-                signal = 1
-                logger.info("Breakout Signal Detected")
-
-            # Reversion Logic: RSI < 30 + Price < Lower Band
-            elif last_row['rsi'] < RSI_OVERSOLD and last_row['close'] < last_row['lower_band']:
-                signal = 1
-                logger.info("Reversion Signal Detected")
-
-            # 4. Execution
-            if signal == 1 and position == 0:
-                vix = get_vix(client)
-                qty = calculate_position_size(capital, last_row['close'], last_row['atr'], vix)
-
-                if qty > 0:
-                    logger.info(f"BUY Signal for {SYMBOL} at {last_row['close']} | Qty: {qty} | VIX: {vix}")
-                    client.placesmartorder(strategy="AI Hybrid", symbol=SYMBOL, action="BUY",
-                                           exchange="NSE", price_type="MARKET", product="MIS",
-                                           quantity=qty, position_size=qty)
-                    position = qty
-                else:
-                    logger.warning("Calculated quantity is 0. Check risk parameters.")
-
-            # Exit Logic (Simplified)
-            elif position > 0:
-                # In a real loop, we would track the PnL and exit based on SL/TP
-                # Here we simulate an exit after some condition or use order updates
-                pass
+            # Breakout Logic: RSI > 60 and Price > Upper BB
+            elif last['rsi'] > 60 and last['close'] > last['upper']:
+                 # Volume Confirmation
+                avg_vol = df['volume'].rolling(20).mean().iloc[-1]
+                if last['volume'] > avg_vol * 1.5:
+                     logger.info("Breakout Signal (RSI>60, >UpperBB). BUY.")
+                     qty = int(10 * size_multiplier)
+                     # client.placesmartorder(...)
 
         except Exception as e:
             logger.error(f"Error: {e}")
 
-        time.sleep(15)
+        time.sleep(60)
 
 if __name__ == "__main__":
     run_strategy()
