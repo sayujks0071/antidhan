@@ -37,15 +37,11 @@ ALT_LOG_DIR = BASE_DIR / "log/strategies"
 BASE_URL = "http://127.0.0.1:5001"
 
 # Strategy name mappings (from process command to strategy ID)
+# Automatically populated by find_running_strategy_processes if not here
 STRATEGY_NAME_MAP = {
     'mcx_commodity_momentum': 'mcx_commodity_momentum_strategy',
     'ai_hybrid_reversion_breakout': 'ai_hybrid_reversion_breakout',
-    'advanced_ml_momentum': 'advanced_ml_momentum_strategy_20260120112512',
-    'supertrend_vwap': 'supertrend_vwap_strategy_20260120112816',
-    'orb_strategy': 'orb_strategy',
-    'trend_pullback': 'trend_pullback_strategy',
-    'delta_neutral_iron_condor': 'delta_neutral_iron_condor_nifty',
-    'options_ranker': 'options_ranker_strategy',
+    # 'advanced_ml_momentum': 'advanced_ml_momentum_strategy_20260120112512', # Example of dynamic override
 }
 
 
@@ -87,10 +83,10 @@ def find_running_strategy_processes() -> Dict[str, Dict]:
                                 }
                                 matched = True
                                 break
-                        # Fallback to script basename
+                        # Dynamic Fallback: Use script filename as strategy_id
                         if not matched and script_path:
-                            fallback_id = Path(script_path).stem
-                            running[fallback_id] = {
+                            strategy_id = Path(script_path).stem
+                            running[strategy_id] = {
                                 'pid': int(pid),
                                 'name': 'python',
                                 'cmdline': parts[10:],
@@ -111,40 +107,33 @@ def find_running_strategy_processes() -> Dict[str, Dict]:
             # Check if it's a Python process running a strategy
             cmd_str = ' '.join(cmdline).lower()
             
-            # Match strategy scripts
-            for key, strategy_id in STRATEGY_NAME_MAP.items():
-                if key in cmd_str and 'strategy' in cmd_str:
-                    # Extract script path
-                    script_path = None
-                    for arg in cmdline:
-                        if 'strategy' in arg.lower() and arg.endswith('.py'):
-                            script_path = arg
-                            break
-                    
-                    running[strategy_id] = {
-                        'pid': proc.info['pid'],
-                        'name': proc.info['name'],
-                        'cmdline': cmdline,
-                        'script_path': script_path,
-                        'start_time': datetime.fromtimestamp(proc.create_time()).strftime('%Y-%m-%d %H:%M:%S')
-                    }
+            # Only consider python processes running scripts in strategies/scripts/
+            if 'strategies/scripts/' not in cmd_str and 'strategies\\scripts\\' not in cmd_str:
+                 continue
+
+            script_path = None
+            for arg in cmdline:
+                if arg.endswith('.py') and ('strategies/scripts/' in arg or 'strategies\\scripts\\' in arg):
+                    script_path = arg
                     break
-            else:
-                # Fallback: use script basename if a strategy script is found
-                script_path = None
-                for arg in cmdline:
-                    if 'strategies/scripts/' in arg and arg.endswith('.py'):
-                        script_path = arg
+
+            if script_path:
+                strategy_id = Path(script_path).stem
+
+                # Check explicit map override
+                for key, mapped_id in STRATEGY_NAME_MAP.items():
+                    if key in strategy_id:
+                        strategy_id = mapped_id
                         break
-                if script_path:
-                    fallback_id = Path(script_path).stem
-                    running[fallback_id] = {
-                        'pid': proc.info['pid'],
-                        'name': proc.info['name'],
-                        'cmdline': cmdline,
-                        'script_path': script_path,
-                        'start_time': datetime.fromtimestamp(proc.create_time()).strftime('%Y-%m-%d %H:%M:%S')
-                    }
+
+                running[strategy_id] = {
+                    'pid': proc.info['pid'],
+                    'name': proc.info['name'],
+                    'cmdline': cmdline,
+                    'script_path': script_path,
+                    'start_time': datetime.fromtimestamp(proc.create_time()).strftime('%Y-%m-%d %H:%M:%S')
+                }
+
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             continue
     

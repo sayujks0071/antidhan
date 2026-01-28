@@ -46,11 +46,20 @@ class ORBStrategy:
 
     def get_previous_close(self):
         try:
-            end = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-            start = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+            # Look back enough days to find the last completed trading day
+            today = datetime.now().date()
+            end = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+            start = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+
             df = self.client.history(symbol=self.symbol, interval="day", start_date=start, end_date=end)
-            if not df.empty: return df.iloc[-1]['close']
-        except: pass
+            if not df.empty:
+                 # Ensure the data is not from today (in case feed includes it)
+                 last_row = df.iloc[-1]
+                 # If dataframe has 'date' or 'datetime' column, check it
+                 # Assuming API returns data up to 'end' date which is yesterday
+                 return last_row['close']
+        except Exception as e:
+            self.logger.error(f"Error fetching previous close: {e}")
         return 0
 
     def run(self):
@@ -125,8 +134,8 @@ def run_strategy():
     parser = argparse.ArgumentParser(description="ORB Strategy")
     parser.add_argument("--symbol", type=str, required=True, help="Symbol")
     parser.add_argument("--quantity", type=int, default=10, help="Qty")
-    parser.add_argument("--api_key", type=str, default='demo_key', help="API Key")
-    parser.add_argument("--host", type=str, default='http://127.0.0.1:5001', help="Host")
+    parser.add_argument("--api_key", type=str, default=None, help="API Key (or set OPENALGO_APIKEY)")
+    parser.add_argument("--host", type=str, default=None, help="Host URL (or set OPENALGO_HOST)")
     parser.add_argument("--minutes", type=int, default=15, help="ORB Duration")
 
     args = parser.parse_args()
