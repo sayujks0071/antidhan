@@ -117,10 +117,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Use command-line args if provided, otherwise fall back to environment variables
+    # OpenAlgo sets environment variables, so this allows both methods
     if args.port:
         API_HOST = f"http://127.0.0.1:{args.port}"
+    elif os.getenv('OPENALGO_PORT'):
+        API_HOST = f"http://127.0.0.1:{os.getenv('OPENALGO_PORT')}"
+    
     if args.api_key:
         API_KEY = args.api_key
+    else:
+        # Use environment variable (set by OpenAlgo)
+        API_KEY = os.getenv('OPENALGO_APIKEY', API_KEY)
 
     strategy = MCXGlobalArbitrageStrategy(SYMBOL, GLOBAL_SYMBOL, PARAMS)
     strategy.run()
