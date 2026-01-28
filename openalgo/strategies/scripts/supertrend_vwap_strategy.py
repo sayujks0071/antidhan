@@ -36,8 +36,8 @@ class SuperTrendVWAPStrategy:
         self.sector_benchmark = sector_benchmark
 
         # Optimization Parameters
-        self.threshold = 150  # Volume Spike %
-        self.stop_pct = 2.0   # Stop Loss %
+        self.threshold = 155  # Modified on 2026-01-27: Low Win Rate (40.0% < 60%). Tightening filters (threshold +5).
+        self.stop_pct = 1.8  # Modified on 2026-01-27: Low R:R (1.00 < 1.5). Tightening stop_pct to improve R:R.
 
         self.logger = logging.getLogger(f"VWAP_{symbol}")
         self.client = APIClient(api_key=self.api_key, host=self.host)
