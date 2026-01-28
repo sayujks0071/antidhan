@@ -2,141 +2,156 @@
 """
 Advanced ML Momentum Strategy
 Momentum with relative strength and sector overlay.
-Refactored to remove mocks and use real API client.
 """
 import os
 import sys
 import time
+import argparse
 import logging
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from pathlib import Path
 
 # Add project root to path
-sys.path.append(str(Path(__file__).resolve().parents[3]))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
 try:
-    from openalgo.strategies.utils.trading_utils import APIClient
+    from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
 except ImportError:
-    # Fallback if running from a different context
-    logging.warning("Could not import APIClient from utils, using local definition or failing.")
-    from openalgo import api as APIClient # Attempt to fallback to core api if available
-
-SYMBOL = os.getenv("STRATEGY_SYMBOL", "RELIANCE")
-API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
-HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
+    print("Warning: openalgo package not found or imports failed.")
+    APIClient = None
+    PositionManager = None
+    is_market_open = lambda: True
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(f"Momentum_{SYMBOL}")
 
-def calculate_momentum(df):
-    df['roc'] = df['close'].pct_change(periods=10)
+class MLMomentumStrategy:
+    def __init__(self, symbol, api_key, port, threshold=0.01, stop_pct=1.0):
+        self.symbol = symbol
+        self.host = f"http://127.0.0.1:{port}"
+        self.client = APIClient(api_key=api_key, host=self.host)
+        self.logger = logging.getLogger(f"MLMomentum_{symbol}")
+        self.pm = PositionManager(symbol) if PositionManager else None
 
-    # RSI
-    delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    df['rsi'] = 100 - (100 / (1 + rs))
+        self.roc_threshold = threshold
+        self.stop_pct = stop_pct
 
-    return df
+    def calculate_relative_strength(self, df, index_df):
+        if index_df.empty: return 1.0
 
-def calculate_relative_strength(df, index_df):
-    """Calculate Relative Strength vs Index."""
-    if index_df.empty:
-        return pd.Series(1.0, index=df.index)
-
-    # Align dataframes
-    common_index = df.index.intersection(index_df.index)
-    if common_index.empty:
-        return pd.Series(1.0, index=df.index)
-
-    df_aligned = df.loc[common_index]
-    index_aligned = index_df.loc[common_index]
-
-    # RS Ratio = Stock Price / Index Price
-    rs_ratio = df_aligned['close'] / index_aligned['close']
-    return rs_ratio
-
-def check_sector_momentum(df):
-    """
-    Check if the asset is in a long term uptrend (Simple proxy for sector momentum).
-    Returns True if Close > SMA(50)
-    """
-    if len(df) < 200:
-        return True
-
-    sma200 = df['close'].rolling(window=200).mean().iloc[-1]
-    return df['close'].iloc[-1] > sma200
-
-def run_strategy():
-    client = APIClient(api_key=API_KEY, host=HOST)
-    logger.info(f"Starting Momentum Strategy for {SYMBOL}")
-
-    while True:
+        # Align timestamps (simplistic approach using last N periods)
+        # Assuming both DFs are same interval and roughly aligned
         try:
-            # 1. Fetch Stock Data
-            end_date = datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
+            stock_roc = df['close'].pct_change(10).iloc[-1]
+            index_roc = index_df['close'].pct_change(10).iloc[-1]
+            return stock_roc - index_roc # Excess Return
+        except:
+            return 0.0
 
-            df = client.history(symbol=SYMBOL, exchange="NSE", interval="15m",
-                                start_date=start_date, end_date=end_date)
+    def get_news_sentiment(self):
+        # Simulated
+        return 0.5 # Neutral to Positive
 
-            if df.empty:
-                logger.warning(f"No data for {SYMBOL}, retrying...")
-                time.sleep(10)
+    def run(self):
+        self.logger.info(f"Starting ML Momentum Strategy for {self.symbol}")
+
+        while True:
+            if not is_market_open():
+                time.sleep(60)
                 continue
 
-            # Ensure datetime index
-            if 'datetime' in df.columns:
-                df['datetime'] = pd.to_datetime(df['datetime'])
-                df.set_index('datetime', inplace=True)
+            try:
+                # 1. Fetch Stock Data
+                end_date = datetime.now().strftime("%Y-%m-%d")
+                start_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
 
-            # 2. Fetch Index Data (Real NIFTY 50)
-            index_df = client.history(symbol="NIFTY 50", exchange="NSE_INDEX", interval="15m",
-                                      start_date=start_date, end_date=end_date)
-            if not index_df.empty and 'datetime' in index_df.columns:
-                 index_df['datetime'] = pd.to_datetime(index_df['datetime'])
-                 index_df.set_index('datetime', inplace=True)
+                df = self.client.history(symbol=self.symbol, interval="15m",
+                                    start_date=start_date, end_date=end_date)
 
-            # 3. Indicators
-            df = calculate_momentum(df)
-            rs_ratio = calculate_relative_strength(df, index_df)
+                if df.empty or len(df) < 50:
+                    time.sleep(60)
+                    continue
 
-            last_row = df.iloc[-1]
-            last_rs = rs_ratio.iloc[-1] if not rs_ratio.empty else 1.0
-            prev_rs = rs_ratio.iloc[-5] if len(rs_ratio) > 5 else 1.0
+                # 2. Fetch Index Data
+                index_df = self.client.history(symbol="NIFTY 50", interval="15m",
+                                          start_date=start_date, end_date=end_date)
 
-            # 4. Strategy Logic
-            # Buy if:
-            # - ROC > 1% (Positive Momentum)
-            # - RSI > 55 (Bullish Zone)
-            # - RS Ratio is increasing (Outperforming Index)
-            # - Sector/Trend is supportive (Price > SMA50)
+                # 3. Indicators
+                df['roc'] = df['close'].pct_change(periods=10)
 
-            if (last_row.get('roc', 0) > 0.01 and
-                last_row.get('rsi', 0) > 55 and
-                last_rs > prev_rs and
-                check_sector_momentum(df)):
+                # RSI
+                delta = df['close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rs_val = gain / loss
+                df['rsi'] = 100 - (100 / (1 + rs_val))
 
-                logger.info(f"Momentum Signal for {SYMBOL} | ROC: {last_row.get('roc'):.4f} | RSI: {last_row.get('rsi'):.2f}")
+                # SMA for Trend
+                df['sma50'] = df['close'].rolling(50).mean()
 
-                # Place Order
-                qty = int(os.getenv("STRATEGY_QUANTITY", 1))
-                client.placesmartorder(strategy="ML Momentum", symbol=SYMBOL, action="BUY",
-                                       exchange="NSE", price_type="MARKET", product="MIS",
-                                       quantity=qty, position_size=qty)
-            else:
-                logger.info(f"No signal. ROC: {last_row.get('roc', 0):.4f}, RSI: {last_row.get('rsi', 0):.2f}")
+                last = df.iloc[-1]
+                current_price = last['close']
 
-        except KeyboardInterrupt:
-            logger.info("Stopping strategy...")
-            break
-        except Exception as e:
-            logger.error(f"Error: {e}")
+                # Relative Strength
+                rs_excess = self.calculate_relative_strength(df, index_df)
 
-        time.sleep(60)
+                # News Sentiment
+                sentiment = self.get_news_sentiment()
+
+                # Manage Position
+                if self.pm and self.pm.has_position():
+                    pnl = self.pm.get_pnl(current_price)
+                    entry = self.pm.entry_price
+
+                    if (self.pm.position > 0 and current_price < entry * (1 - self.stop_pct/100)):
+                        self.logger.info(f"Stop Loss Hit. PnL: {pnl}")
+                        self.pm.update_position(abs(self.pm.position), current_price, 'SELL')
+
+                    # Exit if Momentum Fades (RSI < 50)
+                    elif (self.pm.position > 0 and last['rsi'] < 50):
+                         self.logger.info(f"Momentum Faded (RSI < 50). Exit. PnL: {pnl}")
+                         self.pm.update_position(abs(self.pm.position), current_price, 'SELL')
+
+                    time.sleep(60)
+                    continue
+
+                # Entry Logic
+                # ROC > Threshold
+                # RSI > 55
+                # Relative Strength > 0 (Outperforming)
+                # Price > SMA50 (Uptrend)
+                # Sentiment > 0 (Not Negative)
+                # Volume > Avg (Not checked here explicitly but good to have)
+
+                if (last['roc'] > self.roc_threshold and
+                    last['rsi'] > 55 and
+                    rs_excess > 0 and
+                    current_price > last['sma50'] and
+                    sentiment >= 0):
+
+                    # Volume check
+                    avg_vol = df['volume'].rolling(20).mean().iloc[-1]
+                    if last['volume'] > avg_vol * 0.8: # At least decent volume
+                        self.logger.info(f"Strong Momentum Signal (ROC: {last['roc']:.3f}, RS: {rs_excess:.3f}). BUY.")
+                        self.pm.update_position(100, current_price, 'BUY')
+
+            except Exception as e:
+                self.logger.error(f"Error: {e}")
+                time.sleep(60)
+
+            time.sleep(60)
+
+def run_strategy():
+    parser = argparse.ArgumentParser(description='ML Momentum Strategy')
+    parser.add_argument('--symbol', type=str, required=True, help='Stock Symbol')
+    parser.add_argument('--port', type=int, default=5001, help='API Port')
+    parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
+    parser.add_argument('--threshold', type=float, default=0.01, help='ROC Threshold')
+
+    args = parser.parse_args()
+
+    strategy = MLMomentumStrategy(args.symbol, args.api_key, args.port, threshold=args.threshold)
+    strategy.run()
 
 if __name__ == "__main__":
     run_strategy()
