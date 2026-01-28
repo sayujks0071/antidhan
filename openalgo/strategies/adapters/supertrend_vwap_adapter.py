@@ -38,12 +38,45 @@ class SuperTrendVWAPAdapter(StrategyAdapter):
         # Strategy Parameters
         self.symbol = params.get('symbol', 'NIFTY')
         self.quantity = params.get('quantity', 50) # 1 Lot
+        self.use_regime_filter = params.get('use_regime_filter', True)
+        self.atr_period = params.get('atr_period', 14)
+        self.atr_sl_mult = params.get('atr_sl_mult', 2.0)
+        self.atr_tp_mult = params.get('atr_tp_mult', 4.0)
 
         # State
         self.last_trade_date = None
+        self.current_date = None
+        self.regime_bullish = True
 
     def _reset_state(self):
         self.last_trade_date = None
+        self.current_date = None
+        self.regime_bullish = True
+
+    def _reset_daily_state(self, current_date, mock=None):
+        self.current_date = current_date
+
+        # Update Regime
+        if self.use_regime_filter and mock:
+            try:
+                # Use a cached method or fetch once per day
+                daily_resp = mock.post_json("history", {
+                    "symbol": self.symbol,
+                    "exchange": "NSE",
+                    "interval": "1d",
+                    "start_date": (current_date - timedelta(days=100)).strftime("%Y-%m-%d"),
+                    "end_date": current_date.strftime("%Y-%m-%d"),
+                })
+
+                if daily_resp.get("status") == "success" and daily_resp.get("data"):
+                    daily_df = pd.DataFrame(daily_resp["data"])
+                    if not daily_df.empty:
+                        daily_df['close'] = pd.to_numeric(daily_df['close'])
+                        daily_ema50 = daily_df['close'].ewm(span=50, adjust=False).mean().iloc[-1]
+                        current_close = daily_df['close'].iloc[-1]
+                        self.regime_bullish = current_close > daily_ema50
+            except Exception:
+                pass
 
     def analyze_volume_profile(self, df, n_bins=20):
         """
@@ -88,6 +121,19 @@ class SuperTrendVWAPAdapter(StrategyAdapter):
         poc_price = bins[poc_bin] + (bins[poc_bin+1] - bins[poc_bin]) / 2
 
         return poc_price, poc_volume
+
+    def calculate_atr(self, df, period=14):
+        """Calculate ATR"""
+        high = df['high']
+        low = df['low']
+        close = df['close']
+
+        tr1 = high - low
+        tr2 = (high - close.shift(1)).abs()
+        tr3 = (low - close.shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.ewm(alpha=1/period, adjust=False).mean()
+        return atr
 
     def calculate_supertrend(self, df, period=10, multiplier=3.0):
         """Calculate SuperTrend Indicator"""
@@ -172,6 +218,10 @@ class SuperTrendVWAPAdapter(StrategyAdapter):
         if not mock:
             return signals
 
+        current_date = context.timestamp.date()
+        if self.current_date != current_date:
+            self._reset_daily_state(current_date, mock=mock)
+
         # 1. Get Historical Data (Last 5 days for Volume Profile and Indicators)
         end_date = context.timestamp
         start_date = end_date - timedelta(days=5)
@@ -203,6 +253,9 @@ class SuperTrendVWAPAdapter(StrategyAdapter):
         # SuperTrend
         df = self.calculate_supertrend(df, period=10, multiplier=3)
 
+        # ATR for Dynamic Risk
+        df['atr'] = self.calculate_atr(df, period=self.atr_period)
+
         last = df.iloc[-1]
 
         # Check if we are at the latest timestamp (approx)
@@ -227,6 +280,9 @@ class SuperTrendVWAPAdapter(StrategyAdapter):
 
         # Signal Generation
         if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and is_supertrend_bullish:
+            # Regime Filter
+            if self.use_regime_filter and not self.regime_bullish:
+                return signals
 
             # Select ATM Call Option to Buy
             strike_info = self._get_atm_call_option(mock, self.symbol, last['close'])
@@ -244,10 +300,23 @@ class SuperTrendVWAPAdapter(StrategyAdapter):
                 tick_size=0.05
             )
 
-            # Risk Management (Example)
+            # Dynamic Risk Management using ATR
             entry_price = strike_info['ltp']
-            stop_loss = entry_price * 0.90 # 10% SL
-            take_profit = entry_price * 1.20 # 20% Target
+
+            # Use Underlying ATR to estimate Option Volatility or just use fixed % if Option ATR not avail
+            # Since we have Spot ATR, we can try to translate it to Option terms via Delta ~0.5
+            # Or simplified: Option moves approx 50% of underlying.
+            spot_atr = last['atr']
+            # Option SL distance ~ 0.5 * (2 * Spot ATR)
+            option_sl_dist = 0.5 * (self.atr_sl_mult * spot_atr)
+            option_tp_dist = 0.5 * (self.atr_tp_mult * spot_atr)
+
+            # Ensure minimum SL (e.g. 5%)
+            min_sl_dist = entry_price * 0.05
+            option_sl_dist = max(option_sl_dist, min_sl_dist)
+
+            stop_loss = entry_price - option_sl_dist
+            take_profit = entry_price + option_tp_dist
 
             signal = self._create_signal(
                 instrument=instrument,
@@ -256,7 +325,7 @@ class SuperTrendVWAPAdapter(StrategyAdapter):
                 stop_loss=stop_loss,
                 take_profit_1=take_profit,
                 confidence=0.8,
-                rationale=f"VWAP+SuperTrend: Price={last['close']:.2f}, ST=Bullish, POC={poc_price:.2f}"
+                rationale=f"VWAP+SuperTrend: Price={last['close']:.2f}, ST=Bullish, POC={poc_price:.2f}, Regime={self.regime_bullish}"
             )
             signals.append(signal)
 
