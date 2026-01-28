@@ -13,29 +13,58 @@ def write_log(strategy_name, content):
     print(f"Generated {filepath}")
 
 def generate_vwap_log():
-    # Simulate High Rejection Rate (> 70%) to trigger threshold lowering
-    # Signals: 100, Entries: 20, Rejected: 80
+    # Simulate Low Win Rate (< 60%) AND Low R:R (< 1.5)
+    # Target: Trigger "Tighten Filters" (Increase Threshold) AND "Tighten Stop"
+
+    # Metrics:
+    # Signals: 20
+    # Entries: 20
+    # Rejected: 0 (Rejection Rate 0%, so no conflict with Threshold Tuning)
+    # Wins: 8 (40% WR < 60%)
+    # Losses: 12
+    # Avg Win: 100
+    # Avg Loss: 100
+    # R:R: 1.0 (< 1.5)
+
     content = []
-    content.append("2024-10-24 09:15:00 - VWAP_RELIANCE - INFO - Starting SuperTrend VWAP")
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+    content.append(f"{timestamp} 09:15:00 - VWAP_RELIANCE - INFO - Starting SuperTrend VWAP")
 
-    # Generate rejections
-    for i in range(80):
-        content.append(f"2024-10-24 10:{i%60:02d}:00 - VWAP_RELIANCE - INFO - [REJECTED] symbol=RELIANCE score={random.uniform(1.0, 1.4):.2f} reason=Threshold")
+    total_pnl = 0
+    total_win_pnl = 0
+    total_loss_pnl = 0
 
-    # Generate entries
+    # Generate 20 trades
     for i in range(20):
-        content.append(f"2024-10-24 11:{i%60:02d}:00 - VWAP_RELIANCE - INFO - [ENTRY] Buy order placed")
+        # Entry
+        content.append(f"{timestamp} 10:{i:02d}:00 - VWAP_RELIANCE - INFO - [ENTRY] Buy order placed")
+
+        if i < 8: # 8 Wins
+            pnl = 100.0
+            total_win_pnl += pnl
+        else: # 12 Losses
+            pnl = -100.0
+            total_loss_pnl += abs(pnl)
+
+        total_pnl += pnl
+        content.append(f"{timestamp} 10:{i:02d}:30 - VWAP_RELIANCE - INFO - [EXIT] symbol=RELIANCE pnl={pnl}")
 
     # Metrics line
-    content.append(f"2024-10-24 15:30:00 - VWAP_RELIANCE - INFO - [METRICS] signals=100 entries=20 exits=20 rejected=80 errors=0 pnl=500.0")
+    # Note: parsing logic in perform_eod_optimization.py looks for [METRICS] ...
+    # It aggregates pnl, win_pnl etc from individual lines or the METRICS line?
+    # parse_log_file reads METRICS line for summary counts.
+    # It reads [EXIT] lines for wins/losses/pnl calculations.
+    # So the METRICS line counts must match.
+
+    content.append(f"{timestamp} 15:30:00 - VWAP_RELIANCE - INFO - [METRICS] signals=20 entries=20 exits=20 rejected=0 errors=0 pnl={total_pnl}")
 
     write_log("supertrend_vwap_strategy", "\n".join(content))
 
 def generate_momentum_log():
-    # Simulate Low R:R (< 1.5) to trigger stop tightening
-    # Wins: 10, Losses: 10. Avg Win: 100, Avg Loss: 80. R:R = 1.25
+    # Use existing logic but update timestamp
     content = []
-    content.append("2024-10-24 09:15:00 - Momentum_RELIANCE - INFO - Starting Momentum Strategy")
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+    content.append(f"{timestamp} 09:15:00 - Momentum_RELIANCE - INFO - Starting Momentum Strategy")
 
     # Generate trades
     total_pnl = 0
@@ -43,12 +72,11 @@ def generate_momentum_log():
         win = 100
         loss = -80
         total_pnl += win + loss
-        content.append(f"2024-10-24 10:{i*2:02d}:00 - Momentum_RELIANCE - INFO - [EXIT] symbol=RELIANCE pnl={win}")
-        content.append(f"2024-10-24 11:{i*2:02d}:00 - Momentum_RELIANCE - INFO - [EXIT] symbol=RELIANCE pnl={loss}")
+        content.append(f"{timestamp} 10:{i*2:02d}:00 - Momentum_RELIANCE - INFO - [EXIT] symbol=RELIANCE pnl={win}")
+        content.append(f"{timestamp} 11:{i*2:02d}:00 - Momentum_RELIANCE - INFO - [EXIT] symbol=RELIANCE pnl={loss}")
 
     # Metrics line
-    # Signals=40, Entries=20, Exits=20, Rejected=20
-    content.append(f"2024-10-24 15:30:00 - Momentum_RELIANCE - INFO - [METRICS] signals=40 entries=20 exits=20 rejected=20 errors=0 pnl={total_pnl}")
+    content.append(f"{timestamp} 15:30:00 - Momentum_RELIANCE - INFO - [METRICS] signals=40 entries=20 exits=20 rejected=20 errors=0 pnl={total_pnl}")
 
     write_log("advanced_ml_momentum_strategy", "\n".join(content))
 
