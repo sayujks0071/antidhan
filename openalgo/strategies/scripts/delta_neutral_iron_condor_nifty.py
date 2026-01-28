@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 Delta Neutral Iron Condor Strategy for NIFTY
-Enhanced with Multi-Factor Analysis (VIX, Sentiment, GIFT Nifty)
-Refactored to implement execution logic and remove hardcoded data.
+Enhanced with Multi-Factor Analysis (VIX, Sentiment, GIFT Nifty) and Dynamic Wing Sizing.
 """
 import os
 import sys
@@ -125,30 +124,35 @@ class DeltaNeutralIronCondor:
 
         vix = self.market_data.get('vix', 20)
 
-        # --- Dynamic Wing Width based on VIX ---
-        # If VIX > 20, use wider wings (more room for error, higher premium available further out)
-        # If VIX < 15, use tighter wings (lower premiums require tighter structures for credit)
+        # --- Dynamic Wing Width based on VIX (Refined) ---
+        # Low VIX (<13): Very tight wings, Market is complacent. Risk is expansion.
+        # Mid VIX (13-18): Standard wings.
+        # High VIX (18-24): Wide wings.
+        # Extreme VIX (>24): Very wide wings or stay out.
 
-        # Assuming spot ~24500
-        # VIX 20 -> ~1.25% daily move
+        if vix < 13:
+            short_dist_pct = 0.012 # 1.2% OTM
+            wing_width_pct = 0.008 # 0.8% Width
+        elif vix < 18:
+            short_dist_pct = 0.020 # 2.0% OTM
+            wing_width_pct = 0.015 # 1.5% Width
+        elif vix < 24:
+            short_dist_pct = 0.030 # 3.0% OTM
+            wing_width_pct = 0.020 # 2.0% Width
+        else: # Extreme
+            short_dist_pct = 0.040 # 4.0% OTM
+            wing_width_pct = 0.025 # 2.5% Width
 
-        if vix > 20:
-            short_dist_pct = 0.025 # 2.5% OTM
-            wing_width_pct = 0.020 # 2% wide wings
-        elif vix < 15:
-            short_dist_pct = 0.015 # 1.5% OTM
-            wing_width_pct = 0.010 # 1% wide wings
-        else:
-            short_dist_pct = 0.020
-            wing_width_pct = 0.015
+        # Skew based on Gap (Delta Minimization Attempt)
+        # If Gap Up, Call premiums inflate? Actually usually Puts have skew.
+        # If Gap Up, we might want to shift range UP to be Delta Neutral relative to NEW price range expectation.
 
-        # Skew based on Gap
         gap_bias = self.market_data.get('gift_gap', 0.0)
         skew_pct = 0.0
-        if gap_bias > 0.3:
-            skew_pct = 0.005 # Shift 0.5% up
-        elif gap_bias < -0.3:
-            skew_pct = -0.005 # Shift 0.5% down
+        if gap_bias > 0.5:
+            skew_pct = 0.005 # Shift Up
+        elif gap_bias < -0.5:
+            skew_pct = -0.005 # Shift Down
 
         short_ce_strike = int(round(spot * (1 + short_dist_pct + skew_pct) / 50) * 50)
         long_ce_strike = int(round(spot * (1 + short_dist_pct + wing_width_pct + skew_pct) / 50) * 50)
@@ -173,11 +177,10 @@ class DeltaNeutralIronCondor:
 
         if vix < VIX_MIN_SELL:
             self.logger.info(f"VIX {vix} too low for selling (Min {VIX_MIN_SELL})")
+            # In low VIX, maybe switch to Calendars? For now just skip.
             return False
 
-        # Sentiment Filter: If sentiment is extremely Negative, maybe avoid Bull Put side?
-        # For Iron Condor (Neutral), we want Neutral or Low Volatility sentiment.
-        # If 'Negative' sentiment usually implies high vol downside, maybe skip.
+        # Sentiment Filter
         if self.market_data['sentiment'] == "Negative" and vix > 25:
              self.logger.info("Skipping Iron Condor due to Negative Sentiment + High VIX")
              return False
@@ -191,12 +194,12 @@ class DeltaNeutralIronCondor:
 
         if vix > 30:
             self.logger.warning(f"High VIX ({vix}) detected. Reducing position size by 50%.")
-            return base_qty # Actually, let's keep it 1 lot minimum, but in real logic we'd scale down contracts
+            return base_qty
 
         if vix > 25:
             return base_qty
 
-        return base_qty * 2 # Scale up in lower vol? Or keep standard. Let's keep standard.
+        return base_qty * 2
 
     def place_iron_condor(self, strikes):
         """Place the 4-leg order"""

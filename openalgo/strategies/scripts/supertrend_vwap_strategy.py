@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 SuperTrend VWAP Strategy
-VWAP mean reversion with volume profile analysis and Sector Correlation.
+VWAP mean reversion with volume profile analysis, Enhanced Sector RSI Filter, and Dynamic Risk.
 """
 import os
 import sys
@@ -39,17 +39,39 @@ class SuperTrendVWAPStrategy:
         self.sector_benchmark = sector_benchmark
 
         # Optimization Parameters
-        self.threshold = 155  # Modified on 2026-01-27: Low Win Rate (40.0% < 60%). Tightening filters (threshold +5).
-        self.stop_pct = 1.8  # Modified on 2026-01-27: Low R:R (1.00 < 1.5). Tightening stop_pct to improve R:R.
+        self.threshold = 155
+        self.stop_pct = 1.8
+
+        # State
+        self.trailing_stop = 0.0
+        self.atr = 0.0
 
         self.logger = logging.getLogger(f"VWAP_{symbol}")
         self.client = APIClient(api_key=self.api_key, host=self.host)
         self.pm = PositionManager(symbol) if PositionManager else None
 
+    def calculate_rsi(self, series, period=14):
+        delta = series.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        return 100 - (100 / (1 + rs))
+
+    def calculate_atr(self, df, period=14):
+        high = df['high']
+        low = df['low']
+        close = df['close']
+        tr1 = high - low
+        tr2 = (high - close.shift(1)).abs()
+        tr3 = (low - close.shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        return tr.rolling(period).mean().iloc[-1]
+
     def analyze_volume_profile(self, df, n_bins=20):
         """Find Point of Control (POC)."""
         price_min = df['low'].min()
         price_max = df['high'].max()
+        if price_min == price_max: return 0, 0
         bins = np.linspace(price_min, price_max, n_bins)
         df['bin'] = pd.cut(df['close'], bins=bins, labels=False)
         volume_profile = df.groupby('bin')['volume'].sum()
@@ -60,24 +82,28 @@ class SuperTrendVWAPStrategy:
         poc_volume = volume_profile.max()
         if np.isnan(poc_bin): return 0, 0
 
-        poc_price = bins[int(poc_bin)] + (bins[1] - bins[0]) / 2
+        poc_bin = int(poc_bin)
+        if poc_bin >= len(bins)-1: poc_bin = len(bins)-2
+
+        poc_price = bins[poc_bin] + (bins[1] - bins[0]) / 2
         return poc_price, poc_volume
 
     def check_sector_correlation(self):
-        """Check if sector is correlated (Positive Trend)."""
+        """Check if sector is correlated (RSI > 50)."""
         try:
-            # Fetch Sector Data
             end = datetime.now().strftime("%Y-%m-%d")
-            start = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+            start = (datetime.now() - timedelta(days=20)).strftime("%Y-%m-%d")
             df = self.client.history(symbol=self.sector_benchmark, interval="day", start_date=start, end_date=end)
 
-            if not df.empty and len(df) >= 2:
-                # Check 5 day trend
-                if df.iloc[-1]['close'] > df.iloc[-5]['close']:
-                    return True # Uptrend
-            return False # Neutral or Downtrend
-        except:
-            return True # Fail open if sector data missing
+            if not df.empty and len(df) > 15:
+                df['rsi'] = self.calculate_rsi(df['close'])
+                last_rsi = df.iloc[-1]['rsi']
+                self.logger.info(f"Sector {self.sector_benchmark} RSI: {last_rsi:.2f}")
+                return last_rsi > 50
+            return True # Default to True if not enough data
+        except Exception as e:
+            self.logger.warning(f"Sector Check Failed: {e}")
+            return True
 
     def run(self):
         self.logger.info(f"Starting SuperTrend VWAP for {self.symbol}")
@@ -98,29 +124,50 @@ class SuperTrendVWAPStrategy:
                     continue
 
                 df = calculate_intraday_vwap(df)
+                self.atr = self.calculate_atr(df)
                 last = df.iloc[-1]
 
                 # Volume Profile
                 poc_price, poc_vol = self.analyze_volume_profile(df)
 
-                # Sector Check
-                sector_bullish = self.check_sector_correlation()
-
                 # Logic
                 is_above_vwap = last['close'] > last['vwap']
-                is_volume_spike = last['volume'] > df['volume'].mean() * (self.threshold / 100.0)
+
+                # Dynamic Volume Threshold (Mean + 1.5 StdDev)
+                vol_mean = df['volume'].rolling(20).mean().iloc[-1]
+                vol_std = df['volume'].rolling(20).std().iloc[-1]
+                dynamic_threshold = vol_mean + (1.5 * vol_std)
+                is_volume_spike = last['volume'] > dynamic_threshold
+
                 is_above_poc = last['close'] > poc_price
                 is_not_overextended = abs(last['vwap_dev']) < 0.02
 
                 if self.pm and self.pm.has_position():
-                    # Manage Position (Simple Stop/Target handled by PM logic usually, or here)
-                    # For brevity, rely on logging or external monitor
-                    pass
+                    # Manage Position (Trailing Stop)
+                    if self.trailing_stop == 0:
+                        self.trailing_stop = last['close'] - (2 * self.atr) # Initial SL
+
+                    # Update Trailing Stop (Only move up)
+                    new_stop = last['close'] - (2 * self.atr)
+                    if new_stop > self.trailing_stop:
+                        self.trailing_stop = new_stop
+                        self.logger.info(f"Trailing Stop Updated: {self.trailing_stop:.2f}")
+
+                    # Check Exit
+                    if last['close'] < self.trailing_stop:
+                        self.logger.info(f"Trailing Stop Hit at {last['close']:.2f}")
+                        self.pm.update_position(self.quantity, last['close'], 'SELL')
+                        self.trailing_stop = 0.0
+
                 else:
+                    # Entry Logic
+                    sector_bullish = self.check_sector_correlation()
+
                     if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
-                        self.logger.info(f"VWAP Crossover Buy. POC: {poc_price:.2f}, Sector: Bullish")
+                        self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, Vol: {last['volume']}, Sector: Bullish")
                         if self.pm:
                             self.pm.update_position(self.quantity, last['close'], 'BUY')
+                            self.trailing_stop = last['close'] - (2 * self.atr)
 
             except Exception as e:
                 self.logger.error(f"Error: {e}")
