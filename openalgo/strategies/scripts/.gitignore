@@ -29,7 +29,6 @@ __pycache__/
 !orb_strategy.py
 !trend_pullback_strategy.py
 !sector_momentum_strategy.py
-!advanced_options_ranker.py
-!delta_neutral_iron_condor_nifty.py
 !mcx_advanced_strategy.py
 !mcx_commodity_momentum_strategy.py
+!mcx_global_arbitrage_strategy.py

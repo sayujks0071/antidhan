@@ -1,99 +1,152 @@
-#!/usr/bin/env python3
-"""
-MCX Commodity Momentum Strategy
--------------------------------
-A basic momentum strategy for MCX commodities (Gold, Silver, Crude Oil, etc.)
-using EMA crossovers and RSI filters.
-
-Strategy Logic:
-- Entry Long: Price > EMA(20) and RSI > 50
-- Entry Short: Price < EMA(20) and RSI < 50
-- Exit: Target/Stop or Reversal
-"""
-
 import os
-import sys
+import time
+import logging
 import pandas as pd
 import numpy as np
-import logging
+import requests
 from datetime import datetime
 
+# Configuration
+SYMBOL = "REPLACE_ME" # Replaced by manager
+API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
+API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
+
+# Strategy Parameters (Can be injected or default)
+PARAMS = {
+    'period_adx': 14,
+    'period_rsi': 14,
+    'period_atr': 14,
+    'adx_threshold': 25,
+    'rsi_overbought': 70,
+    'rsi_oversold': 30,
+    'use_global_filter': False,
+    'use_seasonality': False,
+    'risk_per_trade': 0.02, # 2% of capital
+}
+
 # Setup Logging
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
-logger = logging.getLogger("MCX_Momentum")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(f"MCX_Momentum_{SYMBOL}")
 
 class MCXMomentumStrategy:
-    def __init__(self, symbol, timeframe="15minute"):
+    def __init__(self, symbol, params):
         self.symbol = symbol
-        self.timeframe = timeframe
+        self.params = params
+        self.position = 0
+        self.data = pd.DataFrame()
 
-        # Strategy Parameters
-        self.ema_period = 20
-        self.rsi_period = 14
-        self.rsi_upper = 60
-        self.rsi_lower = 40
-        self.stop_loss_pct = 0.01
-        self.target_pct = 0.02
+    def fetch_data(self):
+        """Fetch live or historical data from OpenAlgo."""
+        try:
+            # Simulated data fetching
+            # response = requests.get(f"{API_HOST}/api/history?symbol={self.symbol}&interval=15m")
+            # if response.status_code == 200:
+            #     self.data = pd.DataFrame(response.json())
 
-        # Enhanced Parameters (Placeholders for Advanced Strategy to inject)
-        self.usd_inr_factor = 1.0
-        self.global_correlation_threshold = 0.0
-        self.seasonality_adjustment = 1.0
-        self.volatility_sizing = True
+            # Mocking data for structure
+            logger.info(f"Fetching data for {self.symbol}...")
+            dates = pd.date_range(end=datetime.now(), periods=100, freq='15min')
+            self.data = pd.DataFrame({
+                'open': np.random.uniform(100, 200, 100),
+                'high': np.random.uniform(100, 200, 100),
+                'low': np.random.uniform(100, 200, 100),
+                'close': np.random.uniform(100, 200, 100),
+                'volume': np.random.randint(1000, 10000, 100)
+            }, index=dates)
 
-    def calculate_indicators(self, df):
-        """Calculate EMA and RSI."""
-        if df.empty:
-            return df
+            # Ensure high/low consistency
+            self.data['high'] = self.data[['open', 'close', 'high']].max(axis=1)
+            self.data['low'] = self.data[['open', 'close', 'low']].min(axis=1)
 
-        # EMA
-        df['ema'] = df['close'].ewm(span=self.ema_period, adjust=False).mean()
+        except Exception as e:
+            logger.error(f"Error fetching data: {e}")
+
+    def calculate_indicators(self):
+        """Calculate technical indicators."""
+        if self.data.empty:
+            return
+
+        df = self.data
 
         # RSI
         delta = df['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()
+        gain = (delta.where(delta > 0, 0)).rolling(window=self.params['period_rsi']).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=self.params['period_rsi']).mean()
         rs = gain / loss
         df['rsi'] = 100 - (100 / (1 + rs))
 
-        return df
+        # ATR
+        high_low = df['high'] - df['low']
+        high_close = np.abs(df['high'] - df['close'].shift())
+        low_close = np.abs(df['low'] - df['close'].shift())
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = np.max(ranges, axis=1)
+        df['atr'] = true_range.rolling(window=self.params['period_atr']).mean()
 
-    def generate_signal(self, df):
-        """Generate Buy/Sell signals."""
-        if df.empty or len(df) < self.ema_period:
-            return "NEUTRAL"
+        # ADX (Simplified)
+        df['adx'] = np.random.uniform(10, 50, len(df)) # Placeholder for complex ADX calc
 
-        last = df.iloc[-1]
+        self.data = df
 
-        # Long Condition
-        if last['close'] > last['ema'] and last['rsi'] > 50:
-            return "BUY"
+    def check_signals(self):
+        """Check entry and exit conditions."""
+        if self.data.empty:
+            return
 
-        # Short Condition
-        elif last['close'] < last['ema'] and last['rsi'] < 50:
-            return "SELL"
+        current = self.data.iloc[-1]
+        prev = self.data.iloc[-2]
 
-        return "NEUTRAL"
+        # Global Filter Check (Mock)
+        global_alignment = True
+        if self.params['use_global_filter']:
+            # Fetch global trend and compare
+            # if global_trend != current_trend: global_alignment = False
+            pass
+
+        # Entry Logic
+        if self.position == 0:
+            if (current['adx'] > self.params['adx_threshold'] and
+                current['rsi'] > 50 and
+                current['close'] > prev['close'] and
+                global_alignment):
+
+                self.entry("BUY", current['close'])
+
+            elif (current['adx'] > self.params['adx_threshold'] and
+                  current['rsi'] < 50 and
+                  current['close'] < prev['close'] and
+                  global_alignment):
+
+                self.entry("SELL", current['close'])
+
+        # Exit Logic
+        elif self.position > 0: # Long
+            if current['close'] < prev['low']: # Simple trailing stop
+                self.exit("SELL", current['close'])
+
+        elif self.position < 0: # Short
+            if current['close'] > prev['high']:
+                self.exit("BUY", current['close'])
+
+    def entry(self, side, price):
+        logger.info(f"SIGNAL: {side} {self.symbol} at {price:.2f}")
+        # Execute trade via API
+        # requests.post(f"{API_HOST}/api/orders", json={...})
+        self.position = 1 if side == "BUY" else -1
+
+    def exit(self, side, price):
+        logger.info(f"SIGNAL: {side} {self.symbol} at {price:.2f}")
+        # Execute trade via API
+        self.position = 0
 
     def run(self):
-        """Main execution method."""
-        logger.info(f"Running MCX Momentum Strategy for {self.symbol}...")
-
-        # In a real scenario, we would fetch live data here.
-        # simulating data for demonstration
-        dates = pd.date_range(end=datetime.now(), periods=100, freq='15min')
-        data = {
-            'close': np.random.uniform(50000, 51000, 100)  # Example Gold prices
-        }
-        df = pd.DataFrame(data, index=dates)
-
-        df = self.calculate_indicators(df)
-        signal = self.generate_signal(df)
-
-        logger.info(f"Signal for {self.symbol}: {signal} (Price: {df.iloc[-1]['close']:.2f}, RSI: {df.iloc[-1]['rsi']:.2f})")
-
-        # Here we would place orders via API
+        logger.info(f"Starting MCX Momentum Strategy for {self.symbol}")
+        while True:
+            self.fetch_data()
+            self.calculate_indicators()
+            self.check_signals()
+            time.sleep(900) # 15 minutes
 
 if __name__ == "__main__":
-    strategy = MCXMomentumStrategy(symbol="GOLD", timeframe="15minute")
+    strategy = MCXMomentumStrategy(SYMBOL, PARAMS)
     strategy.run()
