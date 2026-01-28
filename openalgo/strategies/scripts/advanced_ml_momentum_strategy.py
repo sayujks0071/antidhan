@@ -124,14 +124,14 @@ class MLMomentumStrategy:
                 # Volume > Avg (Not checked here explicitly but good to have)
 
                 if (last['roc'] > self.roc_threshold and
-                    last['rsi'] > 55 and
+                    last['rsi'] > 50 and
                     rs_excess > 0 and
                     current_price > last['sma50'] and
                     sentiment >= 0):
 
                     # Volume check
                     avg_vol = df['volume'].rolling(20).mean().iloc[-1]
-                    if last['volume'] > avg_vol * 0.8: # At least decent volume
+                    if last['volume'] > avg_vol * 0.5: # At least decent volume
                         self.logger.info(f"Strong Momentum Signal (ROC: {last['roc']:.3f}, RS: {rs_excess:.3f}). BUY.")
                         self.pm.update_position(100, current_price, 'BUY')
 
