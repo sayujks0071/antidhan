@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import argparse
 import pandas as pd
 import numpy as np
 import requests
@@ -10,6 +11,7 @@ from datetime import datetime
 SYMBOL = "REPLACE_ME"
 GLOBAL_SYMBOL = "REPLACE_ME_GLOBAL"
 API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
+API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
 
 # Strategy Parameters
 PARAMS = {
@@ -109,5 +111,16 @@ class MCXGlobalArbitrageStrategy:
             time.sleep(60) # Check every minute for arbitrage
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='MCX Global Arbitrage Strategy')
+    parser.add_argument('--port', type=int, help='API Port')
+    parser.add_argument('--api_key', type=str, help='API Key')
+
+    args = parser.parse_args()
+
+    if args.port:
+        API_HOST = f"http://127.0.0.1:{args.port}"
+    if args.api_key:
+        API_KEY = args.api_key
+
     strategy = MCXGlobalArbitrageStrategy(SYMBOL, GLOBAL_SYMBOL, PARAMS)
     strategy.run()
