@@ -39,6 +39,9 @@ class ORBAdapter(StrategyAdapter):
         self.quantity = params.get('quantity', 50)
         self.orb_start_time = time(9, 15)
         self.orb_end_time = time(9, 30)
+        self.use_regime_filter = params.get('use_regime_filter', True)
+        self.atr_period = params.get('atr_period', 14)
+        self.atr_sl_mult = params.get('atr_sl_mult', 2.0)
 
         # State (reset daily)
         self.current_date = None
@@ -46,13 +49,54 @@ class ORBAdapter(StrategyAdapter):
         self.orb_low = None
         self.orb_vol_avg = None
         self.has_traded_today = False
+        self.regime_trend = 0  # 0=Neutral, 1=Bullish, -1=Bearish
 
-    def _reset_daily_state(self, current_date):
+    def _reset_daily_state(self, current_date, mock=None):
         self.current_date = current_date
         self.orb_high = None
         self.orb_low = None
         self.orb_vol_avg = None
         self.has_traded_today = False
+        self.regime_trend = 0
+
+        # Update Regime
+        if self.use_regime_filter and mock:
+            try:
+                # Use a cached method or fetch once per day
+                daily_resp = mock.post_json("history", {
+                    "symbol": self.symbol,
+                    "exchange": "NSE",
+                    "interval": "1d",
+                    "start_date": (current_date - timedelta(days=100)).strftime("%Y-%m-%d"),
+                    "end_date": current_date.strftime("%Y-%m-%d"),
+                })
+
+                if daily_resp.get("status") == "success" and daily_resp.get("data"):
+                    daily_df = pd.DataFrame(daily_resp["data"])
+                    if not daily_df.empty:
+                        daily_df['close'] = pd.to_numeric(daily_df['close'])
+                        daily_ema50 = daily_df['close'].ewm(span=50, adjust=False).mean().iloc[-1]
+                        daily_close = daily_df['close'].iloc[-1]
+
+                        if daily_close > daily_ema50:
+                            self.regime_trend = 1
+                        else:
+                            self.regime_trend = -1
+            except Exception:
+                pass
+
+    def calculate_atr(self, df, period=14):
+        """Calculate ATR"""
+        high = df['high']
+        low = df['low']
+        close = df['close']
+
+        tr1 = high - low
+        tr2 = (high - close.shift(1)).abs()
+        tr3 = (low - close.shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.ewm(alpha=1/period, adjust=False).mean()
+        return atr
 
     def _extract_signals(self, context: StrategyContext) -> List[Signal]:
         signals = []
@@ -66,7 +110,7 @@ class ORBAdapter(StrategyAdapter):
 
         # Reset state if new day
         if self.current_date != current_date:
-            self._reset_daily_state(current_date)
+            self._reset_daily_state(current_date, mock=mock)
 
         # 1. Wait for ORB period to end
         if current_time <= self.orb_end_time:
@@ -151,16 +195,29 @@ class ORBAdapter(StrategyAdapter):
         except:
             return signals
 
+        # Calculate ATR for this candle (approx) or use recent
+        # Re-using df which is 1m data for ATR might be noisy, but better than nothing
+        # Better: use daily ATR or 15m ATR. Let's use 1m data but with longer period or just calculate it.
+        df['atr'] = self.calculate_atr(df, period=14)
+        current_atr = df['atr'].iloc[-1] if not pd.isna(df['atr'].iloc[-1]) else last['close'] * 0.01
+
         # Logic
         signal_side = None
         rationale = ""
 
+        # Breakout UP
         if last['close'] > self.orb_high and last['volume'] > self.orb_vol_avg:
-            signal_side = SignalSide.LONG
-            rationale = f"ORB Breakout UP: Price {last['close']} > {self.orb_high}, Vol > Avg"
+            # Regime Filter: Only Long if Trend is Up or Neutral (skipping if Down)
+            if not self.use_regime_filter or self.regime_trend >= 0:
+                signal_side = SignalSide.LONG
+                rationale = f"ORB Breakout UP: Price {last['close']} > {self.orb_high}, Trend={self.regime_trend}"
+
+        # Breakout DOWN
         elif last['close'] < self.orb_low and last['volume'] > self.orb_vol_avg:
-            signal_side = SignalSide.SHORT
-            rationale = f"ORB Breakout DOWN: Price {last['close']} < {self.orb_low}, Vol > Avg"
+            # Regime Filter: Only Short if Trend is Down or Neutral
+            if not self.use_regime_filter or self.regime_trend <= 0:
+                signal_side = SignalSide.SHORT
+                rationale = f"ORB Breakout DOWN: Price {last['close']} < {self.orb_low}, Trend={self.regime_trend}"
 
         if signal_side:
             self.has_traded_today = True # One trade per day
@@ -185,9 +242,17 @@ class ORBAdapter(StrategyAdapter):
             )
 
             entry_price = strike_info['ltp']
-            # Simple Risk Management
-            stop_loss = entry_price * 0.90
-            take_profit = entry_price * 1.30
+
+            # Dynamic Risk Management
+            # Spot ATR translated to Option ATR (approx 0.5 delta)
+            option_atr = current_atr * 0.5
+            sl_dist = option_atr * self.atr_sl_mult
+
+            # Sanity check
+            sl_dist = max(sl_dist, entry_price * 0.05) # Min 5%
+
+            stop_loss = entry_price - sl_dist
+            take_profit = entry_price + (sl_dist * 2) # 1:2 R:R
 
             signal = self._create_signal(
                 instrument=instrument,
