@@ -448,6 +448,24 @@ def check_compliance(strategy_metrics: Dict[str, Dict]) -> Dict:
 # -----------------------------------------------------------------------------
 
 def main():
+    report_path = BASE_DIR / "log/audit_reports"
+    report_path.mkdir(parents=True, exist_ok=True)
+    report_file = report_path / f"audit_{datetime.now().strftime('%Y%m%d')}.txt"
+
+    # Simple Tee Logger
+    class Tee(object):
+        def __init__(self, name, mode):
+            self.file = open(name, mode)
+            self.stdout = sys.stdout
+        def write(self, data):
+            self.file.write(data)
+            self.stdout.write(data)
+        def flush(self):
+            self.file.flush()
+            self.stdout.flush()
+
+    sys.stdout = Tee(report_file, "w")
+
     print(f"🛡️ WEEKLY RISK & HEALTH AUDIT - Week of {datetime.now().strftime('%Y-%m-%d')}\n")
 
     # 1. Setup
