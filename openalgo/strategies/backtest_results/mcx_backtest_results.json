@@ -1,0 +1,16 @@
+[
+  {
+    "error": "No data available",
+    "strategy_name": "Natural Gas Clawdbot",
+    "symbol": "NATURALGAS24FEB26FUT",
+    "start_date": "2025-12-01",
+    "end_date": "2025-12-10"
+  },
+  {
+    "error": "No data available",
+    "strategy_name": "Crude Oil Enhanced",
+    "symbol": "CRUDEOIL19FEB26FUT",
+    "start_date": "2025-12-01",
+    "end_date": "2025-12-10"
+  }
+]

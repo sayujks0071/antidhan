@@ -145,6 +145,47 @@ def tune_strategy(strategy_name, metrics):
                     "reason": f"Low R:R ({rr_ratio:.2f} < 1.5). Tightening stop_pct to improve R:R."
                 })
 
+    # 3. Filter Refinement (Win Rate)
+    win_rate = (metrics['wins'] / metrics['exits']) * 100 if metrics['exits'] > 0 else 0
+
+    if win_rate < 60 and metrics['entries'] > 5:
+        # Tighten filters: Increase threshold
+        with open(filepath, 'r') as f:
+            content = f.read()
+            match = re.search(r'self.threshold\s*=\s*([\d.]+)', content)
+            if match:
+                current_threshold = float(match.group(1))
+                new_threshold = int(current_threshold + 5) # Increase by 5 points
+
+                # Check if we already adjusted threshold in this run
+                already_adjusted = any(adj['param'] == 'threshold' for adj in adjustments)
+                if not already_adjusted:
+                    adjustments.append({
+                        "param": "threshold",
+                        "old": current_threshold,
+                        "new": new_threshold,
+                        "reason": f"Low Win Rate ({win_rate:.1f}% < 60%). Tightening filters (threshold +5)."
+                    })
+
+    elif win_rate > 80 and metrics['entries'] > 5:
+         # Relax filters: Decrease threshold
+         with open(filepath, 'r') as f:
+            content = f.read()
+            match = re.search(r'self.threshold\s*=\s*([\d.]+)', content)
+            if match:
+                current_threshold = float(match.group(1))
+                new_threshold = int(current_threshold - 2) # Decrease by 2 points
+                if new_threshold < 0: new_threshold = 0
+
+                already_adjusted = any(adj['param'] == 'threshold' for adj in adjustments)
+                if not already_adjusted:
+                    adjustments.append({
+                        "param": "threshold",
+                        "old": current_threshold,
+                        "new": new_threshold,
+                        "reason": f"High Win Rate ({win_rate:.1f}% > 80%). Relaxing filters (threshold -2)."
+                    })
+
     if adjustments:
         apply_adjustments(filepath, adjustments)
 
