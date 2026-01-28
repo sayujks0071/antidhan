@@ -28,7 +28,10 @@ class ORBStrategy:
     def __init__(self, symbol, quantity, api_key=None, host=None, range_mins=15):
         self.symbol = symbol
         self.quantity = quantity
-        self.api_key = api_key or os.getenv('OPENALGO_APIKEY', 'demo_key')
+        self.api_key = api_key or os.getenv('OPENALGO_APIKEY')
+        if not self.api_key:
+             raise ValueError("API Key must be provided via --api_key or OPENALGO_APIKEY env var")
+
         self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
         self.range_mins = range_mins
 
