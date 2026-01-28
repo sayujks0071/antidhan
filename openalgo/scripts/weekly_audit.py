@@ -171,6 +171,17 @@ def detect_market_regime() -> Dict:
         "disabled_strategies": []
     }
 
+    # Check for manual override/fallback via market_regime.json
+    regime_file = BASE_DIR / "market_regime.json"
+    if regime_file.exists():
+        try:
+            manual_data = json.loads(regime_file.read_text())
+            regime.update(manual_data)
+            regime['recommendation'] += " (Manual Override)"
+            return regime
+        except Exception:
+            pass
+
     if not HAS_PANDAS:
         return regime
 
@@ -236,6 +247,7 @@ def detect_market_regime() -> Dict:
     except Exception as e:
         # Fallback for Sandbox/Offline:
         # Check if we have a mock file, otherwise return default
+        regime['regime'] = f"Unknown (Error: {str(e)})"
         pass
 
     return regime
@@ -343,6 +355,23 @@ def reconcile_positions(broker_positions: List[Dict], strategy_metrics: Dict[str
         "mismatch": mismatch
     }
 
+def check_stale_positions(strategy_metrics: Dict[str, Dict]) -> List[str]:
+    """
+    Check for positions that might be stuck (active but log not updated recently).
+    """
+    stale = []
+    now = datetime.now()
+    for sid, data in strategy_metrics.items():
+        active = data.get('active_positions', [])
+        last_upd = data.get('last_updated')
+        if active and last_upd:
+            try:
+                last_dt = datetime.strptime(last_upd, "%Y-%m-%d %H:%M:%S")
+                if (now - last_dt).total_seconds() > 86400: # 24 hours
+                    stale.append(f"{sid}: {len(active)} positions (Last Update: {last_upd})")
+            except ValueError: pass
+    return stale
+
 # -----------------------------------------------------------------------------
 # System Health & Compliance
 # -----------------------------------------------------------------------------
@@ -419,6 +448,24 @@ def check_compliance(strategy_metrics: Dict[str, Dict]) -> Dict:
 # -----------------------------------------------------------------------------
 
 def main():
+    report_path = BASE_DIR / "log/audit_reports"
+    report_path.mkdir(parents=True, exist_ok=True)
+    report_file = report_path / f"audit_{datetime.now().strftime('%Y%m%d')}.txt"
+
+    # Simple Tee Logger
+    class Tee(object):
+        def __init__(self, name, mode):
+            self.file = open(name, mode)
+            self.stdout = sys.stdout
+        def write(self, data):
+            self.file.write(data)
+            self.stdout.write(data)
+        def flush(self):
+            self.file.flush()
+            self.stdout.flush()
+
+    sys.stdout = Tee(report_file, "w")
+
     print(f"🛡️ WEEKLY RISK & HEALTH AUDIT - Week of {datetime.now().strftime('%Y-%m-%d')}\n")
 
     # 1. Setup
@@ -509,15 +556,20 @@ def main():
     print("")
 
     # 8. Issues Collection
+    stale_positions = check_stale_positions(strategy_metrics)
+
     issues = []
     if risk['heat'] > 15:
-        issues.append(f"High Portfolio Heat ({risk['heat']:.1f}%) -> High -> Reduce Exposure")
+        issues.append(f"[ALERT] High Portfolio Heat ({risk['heat']:.1f}%) -> High -> Reduce Exposure")
     if not health['kite_api']:
-        issues.append("Kite API Down -> Critical -> Restart Service")
+        issues.append("[ALERT] Kite API Down -> Critical -> Restart Service")
     if not health['dhan_api']:
-        issues.append("Dhan API Down -> Critical -> Restart Service")
+        issues.append("[ALERT] Dhan API Down -> Critical -> Restart Service")
     if recon['orphaned'] or recon['missing']:
-         issues.append("Position Mismatch -> High -> Manual Reconciliation")
+         issues.append("[ALERT] Position Mismatch -> High -> Manual Reconciliation")
+    if stale_positions:
+        for p in stale_positions:
+            issues.append(f"[ALERT] Stuck Positions -> High -> Check {p}")
 
     print("⚠️ RISK ISSUES FOUND:")
     if issues:
@@ -554,6 +606,39 @@ def main():
     # 10. Compliance
     comp = check_compliance(strategy_metrics)
     print("✅ COMPLIANCE CHECK:")
+
+    # P&L Attribution Table
+    if strategy_metrics:
+        print("- P&L Attribution by Strategy:")
+        headers = ["Strategy", "Entries", "Exits", "Errors", "PnL (₹)"]
+        rows = []
+        total_pnl = 0.0
+        for sid, data in strategy_metrics.items():
+            pnl = data.get('pnl', 0.0)
+            total_pnl += pnl
+            rows.append([
+                sid.replace("strategy_", "").replace("_", " ").title(),
+                data.get('entries', 0),
+                data.get('exits', 0),
+                data.get('errors', 0),
+                f"{pnl:,.2f}"
+            ])
+
+        # Add Total Row
+        rows.append(["TOTAL", "", "", "", f"{total_pnl:,.2f}"])
+
+        try:
+            from tabulate import tabulate
+            print(tabulate(rows, headers=headers, tablefmt="simple"))
+        except ImportError:
+            # Fallback for no tabulate
+            print(f"  {'Strategy':<25} {'Ent':<5} {'Ext':<5} {'Err':<5} {'PnL (₹)':>10}")
+            print("  " + "-"*55)
+            for row in rows:
+                if row[0] == "TOTAL": print("  " + "-"*55)
+                print(f"  {row[0]:<25} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:>10}")
+        print("")
+
     print(f"- Trade Logging: {comp['status']}")
     if comp['missing']:
         print(f"  • Missing logs for: {', '.join(comp['missing'])}")
