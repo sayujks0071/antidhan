@@ -1,0 +1,68 @@
+🛡️ WEEKLY RISK & HEALTH AUDIT - Week of 2026-01-29
+
+⚠️  RUNNING IN MOCK MODE - USING SIMULATED DATA ⚠️
+
+📊 PORTFOLIO RISK STATUS:
+- Total Exposure: ₹567,650.00
+- Portfolio Heat: 567.65% (Limit: 15%) [Default Capital Used]
+- Max Drawdown: 0.00% (Limit: 20%)
+- Active Positions: 6
+- Risk Status: 🔴 CRITICAL (Heat > 15%)
+- Concentration Risk: ⚠️ Found
+  • NIFTY24JAN21500CE: 12.0%
+  • RELIANCE: 260.0%
+  • HDFCBANK: 290.0%
+- Sector Overlap: ⚠️ High
+  • Energy: 260.0%
+  • Financials: 290.0%
+- Sector Distribution:
+  • Index: ₹17,150.00
+  • Energy: ₹260,000.00
+  • Other: ₹500.00
+  • Financials: ₹290,000.00
+
+🔍 POSITION RECONCILIATION:
+- Broker Positions: 5
+- Tracked Positions: 4
+- Discrepancies: ⚠️ Found
+  • Orphaned (Broker Only): BANKNIFTY24JAN45000PE (Qty: 15.0), HDFCBANK (Qty: 200.0)
+  • Missing (Internal Only): MISSING_POS (Qty: 50)
+- Actions: [Manual review needed]
+
+🔌 SYSTEM HEALTH:
+- Kite API: ✅ Healthy
+- Dhan API: ✅ Healthy
+- Data Feed: ✅ Stable
+- Process Health: 0 strategies running
+- Resource Usage: CPU 0.0%, Memory 0.0%
+
+📈 MARKET REGIME:
+- Current Regime: Uptrend / High Volatility
+- VIX Level: 22.50
+- Recommended Strategy Mix: Tighten stops, reduce position sizes
+- Disabled Strategies: Iron Condor, Mean Reversion
+
+⚠️ RISK ISSUES FOUND:
+1. [ALERT] High Portfolio Heat (567.6%) → High → Reduce Exposure
+2. [ALERT] Position Mismatch → High → Manual Reconciliation
+
+🔧 INFRASTRUCTURE IMPROVEMENTS:
+1. Monitoring → Review alert thresholds
+
+✅ COMPLIANCE CHECK:
+- P&L Attribution by Strategy:
+Strategy    Entries    Exits    Errors    PnL (₹)    OrderIDs
+----------  ---------  -------  --------  ---------  ----------
+Orb         5          4        0         2,500.00   5
+Supertrend  2          2        1         -500.00    1
+Stuck       1          0        0         0.00       1
+Ghost       10         10       0         5,000.00   10
+TOTAL                                     7,000.00
+
+- Trade Logging: ⚠️ Outdated Logs
+- Audit Trail: ✅ Intact
+- Unauthorized Activity: ✅ None detected
+  • ⚠️ Found 1 strategies with potential missing Order IDs
+
+📋 ACTION ITEMS FOR NEXT WEEK:
+- [High] Reduce Portfolio Heat < 15% → Risk Manager

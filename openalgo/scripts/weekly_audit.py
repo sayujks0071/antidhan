@@ -19,6 +19,7 @@ import os
 import sys
 import re
 import math
+import argparse
 from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -125,7 +126,7 @@ def find_strategy_log(strategy_id: str) -> Optional[Path]:
     return max(candidates, key=lambda p: p.stat().st_mtime)
 
 def parse_log_metrics(log_file: Path) -> Dict:
-    metrics = {'entries': 0, 'exits': 0, 'errors': 0, 'pnl': 0.0, 'last_updated': None, 'active_positions': []}
+    metrics = {'entries': 0, 'exits': 0, 'errors': 0, 'pnl': 0.0, 'last_updated': None, 'active_positions': [], 'order_ids_count': 0}
     if not log_file or not log_file.exists(): return metrics
     metrics['last_updated'] = datetime.fromtimestamp(log_file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
     try:
@@ -136,6 +137,11 @@ def parse_log_metrics(log_file: Path) -> Dict:
                 if 'entry' in line_lower and ('placed' in line_lower or 'successful' in line_lower or '[entry]' in line_lower): metrics['entries'] += 1
                 if 'exit' in line_lower and ('closed' in line_lower or 'pnl' in line_lower or '[exit]' in line_lower): metrics['exits'] += 1
                 if 'error' in line_lower or 'exception' in line_lower or 'failed' in line_lower: metrics['errors'] += 1
+
+                # Order ID Check
+                if re.search(r'order_id[:=]\s*(\w+)', line_lower) or re.search(r'order id[:=]\s*(\w+)', line_lower):
+                    metrics['order_ids_count'] += 1
+
                 pnl_match = re.search(r'pnl[:=]\s*([-\d.]+)', line_lower)
                 if pnl_match:
                     try: metrics['pnl'] += float(pnl_match.group(1))
@@ -158,11 +164,14 @@ def parse_log_metrics(log_file: Path) -> Dict:
 # Market Regime Detection
 # -----------------------------------------------------------------------------
 
-def detect_market_regime() -> Dict:
+def detect_market_regime(mock_data: Optional[Dict] = None) -> Dict:
     """
     Analyze market conditions: Volatility, Trend, Regime.
     Attempts to use yfinance for NIFTY data, or fails gracefully.
     """
+    if mock_data:
+        return mock_data
+
     regime = {
         "regime": "Unknown (Data Unavailable)",
         "vix": "N/A",
@@ -266,6 +275,7 @@ def perform_risk_analysis(kite_positions: Optional[List[Dict]], dhan_positions: 
     active_count = 0
     symbols = set()
     sector_exposure = defaultdict(float)
+    symbol_exposure = defaultdict(float)
 
     for pos in all_positions:
         qty = float(pos.get("quantity", 0))
@@ -283,16 +293,34 @@ def perform_risk_analysis(kite_positions: Optional[List[Dict]], dhan_positions: 
             base_sym = re.split(r'\d', sym)[0] # Strip numbers (e.g. NIFTY24JAN...)
             sector = SECTOR_MAP.get(base_sym, 'Other')
             sector_exposure[sector] += exposure
+            symbol_exposure[sym] += exposure
 
     heat = (total_exposure / capital) * 100 if capital > 0 else 0
 
     status = "✅ SAFE"
     if kite_positions is None or dhan_positions is None:
         status = "⚠️ UNKNOWN (Broker Unreachable)"
-    elif heat > 25:
-        status = "🔴 CRITICAL (Overleveraged > 25%)"
     elif heat > 15:
-        status = "⚠️ WARNING (High Heat > 15%)"
+        status = "🔴 CRITICAL (Heat > 15%)"
+    elif heat > 10:
+        status = "⚠️ WARNING (Heat > 10%)"
+
+    # Concentration Check
+    concentration_issues = []
+    for sym, exp in symbol_exposure.items():
+        conc_pct = (exp / capital) * 100
+        if conc_pct > 10:
+            concentration_issues.append(f"{sym}: {conc_pct:.1f}%")
+
+    # Sector Overlap Check
+    # (Simple count of distinct symbols per sector for now, ideally strategies)
+    sector_overlap = {}
+    for sec, exp in sector_exposure.items():
+         # In a real scenario we'd check which strategies hold which sector
+         # For now, we just report high sector concentration
+         sec_pct = (exp / capital) * 100
+         if sec_pct > 20:
+             sector_overlap[sec] = f"{sec_pct:.1f}%"
 
     return {
         "total_exposure": total_exposure,
@@ -302,6 +330,8 @@ def perform_risk_analysis(kite_positions: Optional[List[Dict]], dhan_positions: 
         "status": status,
         "capital_used": capital,
         "sector_exposure": dict(sector_exposure),
+        "concentration_issues": concentration_issues,
+        "sector_overlap": sector_overlap,
         "max_drawdown": 0.0 # Placeholder: Would need equity curve
     }
 
@@ -444,10 +474,74 @@ def check_compliance(strategy_metrics: Dict[str, Dict]) -> Dict:
     }
 
 # -----------------------------------------------------------------------------
+# Mock Data Generation
+# -----------------------------------------------------------------------------
+
+def generate_mock_data() -> Tuple[List[Dict], List[Dict], Dict[str, Dict], Dict]:
+    """Generates dummy data for testing the audit report."""
+    print("⚠️  RUNNING IN MOCK MODE - USING SIMULATED DATA ⚠️\n")
+
+    # Mock Positions
+    kite_pos = [
+        {'tradingsymbol': 'NIFTY24JAN21500CE', 'quantity': 50, 'last_price': 120.5, 'average_price': 110.0},
+        {'tradingsymbol': 'BANKNIFTY24JAN45000PE', 'quantity': 15, 'last_price': 340.0, 'average_price': 350.0},
+        {'tradingsymbol': 'RELIANCE', 'quantity': 100, 'last_price': 2600.0, 'average_price': 2550.0},
+        {'tradingsymbol': 'STUCK_POS', 'quantity': 10, 'last_price': 50.0, 'average_price': 50.0}, # Orphan check
+    ]
+
+    dhan_pos = [
+        {'tradingsymbol': 'NIFTY24JAN21500CE', 'quantity': 50, 'last_price': 120.5, 'average_price': 110.0}, # Matching Kite
+        {'tradingsymbol': 'HDFCBANK', 'quantity': 200, 'last_price': 1450.0, 'average_price': 1400.0},
+    ]
+
+    # Mock Strategy Metrics
+    strategy_metrics = {
+        'strategy_orb': {
+            'entries': 5, 'exits': 4, 'errors': 0, 'pnl': 2500.0,
+            'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'active_positions': [{'symbol': 'NIFTY24JAN21500CE', 'qty': 100}], # Note: 50+50=100 in broker
+            'order_ids_count': 5
+        },
+        'strategy_supertrend': {
+            'entries': 2, 'exits': 2, 'errors': 1, 'pnl': -500.0,
+            'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'active_positions': [{'symbol': 'RELIANCE', 'qty': 100}],
+            'order_ids_count': 1 # Missing one ID
+        },
+        'strategy_stuck': {
+            'entries': 1, 'exits': 0, 'errors': 0, 'pnl': 0.0,
+            'last_updated': (datetime.now() - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S"), # Stale
+            'active_positions': [{'symbol': 'STUCK_POS', 'qty': 10}],
+            'order_ids_count': 1
+        },
+        'strategy_ghost': {
+             'entries': 10, 'exits': 10, 'errors': 0, 'pnl': 5000.0,
+             'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+             'active_positions': [{'symbol': 'MISSING_POS', 'qty': 50}], # Missing in broker
+             'order_ids_count': 10
+        }
+    }
+
+    # Mock Regime
+    regime = {
+        "regime": "Uptrend / High Volatility",
+        "vix": "22.50",
+        "trend": "Uptrend",
+        "recommendation": "Tighten stops, reduce position sizes",
+        "disabled_strategies": ["Iron Condor", "Mean Reversion"]
+    }
+
+    return kite_pos, dhan_pos, strategy_metrics, regime
+
+# -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
 
 def main():
+    parser = argparse.ArgumentParser(description='Weekly Risk & Health Audit')
+    parser.add_argument('--mock', action='store_true', help='Run in mock mode with simulated data')
+    args = parser.parse_args()
+
     report_path = BASE_DIR / "log/audit_reports"
     report_path.mkdir(parents=True, exist_ok=True)
     report_file = report_path / f"audit_{datetime.now().strftime('%Y%m%d')}.txt"
@@ -483,19 +577,23 @@ def main():
         except: pass
 
     # 2. Fetch Data
-    kite_pos = fetch_broker_positions(BASE_URL_KITE, api_key)
-    dhan_pos = fetch_broker_positions(BASE_URL_DHAN, api_key)
+    regime_mock_data = None
+    if args.mock:
+        kite_pos, dhan_pos, strategy_metrics, regime_mock_data = generate_mock_data()
+        kite_up, dhan_up = True, True
+    else:
+        kite_pos = fetch_broker_positions(BASE_URL_KITE, api_key)
+        dhan_pos = fetch_broker_positions(BASE_URL_DHAN, api_key)
+        kite_up = kite_pos is not None
+        dhan_up = dhan_pos is not None
 
-    kite_up = kite_pos is not None
-    dhan_up = dhan_pos is not None
-
-    # 3. Strategy Metrics
-    strategy_metrics = {}
-    for sid in configs.keys():
-        if sid == "capital": continue
-        log_file = find_strategy_log(sid)
-        if log_file:
-            strategy_metrics[sid] = parse_log_metrics(log_file)
+        # 3. Strategy Metrics (Real)
+        strategy_metrics = {}
+        for sid in configs.keys():
+            if sid == "capital": continue
+            log_file = find_strategy_log(sid)
+            if log_file:
+                strategy_metrics[sid] = parse_log_metrics(log_file)
 
     # 4. Risk Analysis
     risk = perform_risk_analysis(kite_pos, dhan_pos, capital)
@@ -506,6 +604,17 @@ def main():
     print(f"- Max Drawdown: {risk['max_drawdown']:.2f}% (Limit: 20%)")
     print(f"- Active Positions: {risk['active_positions_count']}")
     print(f"- Risk Status: {risk['status']}")
+
+    if risk.get('concentration_issues'):
+         print(f"- Concentration Risk: ⚠️ Found")
+         for issue in risk['concentration_issues']:
+             print(f"  • {issue}")
+
+    if risk.get('sector_overlap'):
+         print(f"- Sector Overlap: ⚠️ High")
+         for sec, val in risk['sector_overlap'].items():
+             print(f"  • {sec}: {val}")
+
     if risk['sector_exposure']:
         print("- Sector Distribution:")
         for sec, exp in risk['sector_exposure'].items():
@@ -544,7 +653,7 @@ def main():
     print("")
 
     # 7. Market Regime
-    regime = detect_market_regime()
+    regime = detect_market_regime(mock_data=regime_mock_data)
     print("📈 MARKET REGIME:")
     print(f"- Current Regime: {regime['regime']}")
     print(f"- VIX Level: {regime['vix']}")
@@ -610,7 +719,7 @@ def main():
     # P&L Attribution Table
     if strategy_metrics:
         print("- P&L Attribution by Strategy:")
-        headers = ["Strategy", "Entries", "Exits", "Errors", "PnL (₹)"]
+        headers = ["Strategy", "Entries", "Exits", "Errors", "PnL (₹)", "OrderIDs"]
         rows = []
         total_pnl = 0.0
         for sid, data in strategy_metrics.items():
@@ -621,22 +730,23 @@ def main():
                 data.get('entries', 0),
                 data.get('exits', 0),
                 data.get('errors', 0),
-                f"{pnl:,.2f}"
+                f"{pnl:,.2f}",
+                data.get('order_ids_count', 0)
             ])
 
         # Add Total Row
-        rows.append(["TOTAL", "", "", "", f"{total_pnl:,.2f}"])
+        rows.append(["TOTAL", "", "", "", f"{total_pnl:,.2f}", ""])
 
         try:
             from tabulate import tabulate
             print(tabulate(rows, headers=headers, tablefmt="simple"))
         except ImportError:
             # Fallback for no tabulate
-            print(f"  {'Strategy':<25} {'Ent':<5} {'Ext':<5} {'Err':<5} {'PnL (₹)':>10}")
-            print("  " + "-"*55)
+            print(f"  {'Strategy':<25} {'Ent':<5} {'Ext':<5} {'Err':<5} {'PnL (₹)':>10} {'OrdIDs':<6}")
+            print("  " + "-"*65)
             for row in rows:
-                if row[0] == "TOTAL": print("  " + "-"*55)
-                print(f"  {row[0]:<25} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:>10}")
+                if row[0] == "TOTAL": print("  " + "-"*65)
+                print(f"  {row[0]:<25} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:>10} {row[5]:<6}")
         print("")
 
     print(f"- Trade Logging: {comp['status']}")
@@ -644,6 +754,16 @@ def main():
         print(f"  • Missing logs for: {', '.join(comp['missing'])}")
     print("- Audit Trail: ✅ Intact")
     print(f"- Unauthorized Activity: {comp['unauthorized_activity']}")
+
+    # Check for missing Order IDs (Simple logic: Entries > Order IDs)
+    missing_ids_count = 0
+    for sid, data in strategy_metrics.items():
+        if data.get('entries', 0) > data.get('order_ids_count', 0):
+             missing_ids_count += 1
+
+    if missing_ids_count > 0:
+         print(f"  • ⚠️ Found {missing_ids_count} strategies with potential missing Order IDs")
+
     print("")
 
     # 11. Actions

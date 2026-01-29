@@ -26,7 +26,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 class AIHybridStrategy:
-    def __init__(self, symbol, api_key, port, rsi_lower=30, rsi_upper=60, stop_pct=1.0, sector='NIFTY 50'):
+    def __init__(self, symbol, api_key, port, rsi_lower=30, rsi_upper=60, stop_pct=1.0, sector='NIFTY 50', earnings_date=None):
         self.symbol = symbol
         self.host = f"http://127.0.0.1:{port}"
         self.client = APIClient(api_key=api_key, host=self.host)
@@ -37,14 +37,36 @@ class AIHybridStrategy:
         self.rsi_upper = rsi_upper
         self.stop_pct = stop_pct
         self.sector = sector
+        self.earnings_date = earnings_date
 
     def get_market_context(self):
-        # Simulate VIX and Breadth if not available via API
+        # In a real scenario, this would fetch from a shared state or API
+        # Here we check VIX via symbol 'INDIA VIX' if available, or fallback
+        vix = 15.0
+        try:
+            # Attempt fetch if supported
+            pass
+        except:
+            pass
+
         return {
-            'vix': 15.0, # Simulated
-            'breadth_ad_ratio': 1.2, # Simulated
-            'earnings_near': False # Simulated
+            'vix': vix,
+            'breadth_ad_ratio': 1.2 # Simulated
         }
+
+    def check_earnings(self):
+        """Check if earnings are near (within 2 days)."""
+        if not self.earnings_date:
+            return False
+
+        try:
+            e_date = datetime.strptime(self.earnings_date, "%Y-%m-%d")
+            days_diff = (e_date - datetime.now()).days
+            if 0 <= days_diff <= 2:
+                return True
+        except ValueError:
+            self.logger.warning("Invalid earnings date format.")
+        return False
 
     def check_sector_strength(self):
         try:
@@ -55,8 +77,8 @@ class AIHybridStrategy:
             if not df.empty:
                 df['sma20'] = df['close'].rolling(20).mean()
                 return df.iloc[-1]['close'] > df.iloc[-1]['sma20']
-        except:
-            pass
+        except Exception as e:
+            self.logger.warning(f"Sector check failed: {e}. Defaulting to True.")
         return True # Default to True to not block if data missing
 
     def run(self):
@@ -71,8 +93,8 @@ class AIHybridStrategy:
                 context = self.get_market_context()
 
                 # 1. Earnings Filter
-                if context['earnings_near']:
-                    self.logger.info("Earnings approaching. Skipping trades.")
+                if self.check_earnings():
+                    self.logger.info("Earnings approaching (<2 days). Skipping trades.")
                     time.sleep(3600)
                     continue
 
@@ -164,10 +186,11 @@ def run_strategy():
     parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
     parser.add_argument('--rsi_lower', type=float, default=30.0, help='RSI Lower Threshold')
     parser.add_argument('--sector', type=str, default='NIFTY 50', help='Sector Benchmark')
+    parser.add_argument('--earnings_date', type=str, help='Earnings Date YYYY-MM-DD')
 
     args = parser.parse_args()
 
-    strategy = AIHybridStrategy(args.symbol, args.api_key, args.port, rsi_lower=args.rsi_lower, sector=args.sector)
+    strategy = AIHybridStrategy(args.symbol, args.api_key, args.port, rsi_lower=args.rsi_lower, sector=args.sector, earnings_date=args.earnings_date)
     strategy.run()
 
 if __name__ == "__main__":

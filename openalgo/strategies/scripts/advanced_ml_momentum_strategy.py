@@ -26,7 +26,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 class MLMomentumStrategy:
-    def __init__(self, symbol, api_key, port, threshold=0.01, stop_pct=1.0):
+    def __init__(self, symbol, api_key, port, threshold=0.01, stop_pct=1.0, sector='NIFTY 50'):
         self.symbol = symbol
         self.host = f"http://127.0.0.1:{port}"
         self.client = APIClient(api_key=api_key, host=self.host)
@@ -35,12 +35,12 @@ class MLMomentumStrategy:
 
         self.roc_threshold = threshold
         self.stop_pct = stop_pct
+        self.sector = sector
 
     def calculate_relative_strength(self, df, index_df):
         if index_df.empty: return 1.0
 
         # Align timestamps (simplistic approach using last N periods)
-        # Assuming both DFs are same interval and roughly aligned
         try:
             stock_roc = df['close'].pct_change(10).iloc[-1]
             index_roc = index_df['close'].pct_change(10).iloc[-1]
@@ -52,13 +52,28 @@ class MLMomentumStrategy:
         # Simulated
         return 0.5 # Neutral to Positive
 
+    def check_time_filter(self):
+        """Avoid trading during low volume lunch hours (12:00 - 13:00)."""
+        now = datetime.now()
+        if 12 <= now.hour < 13:
+            return False
+        return True
+
     def run(self):
-        self.logger.info(f"Starting ML Momentum Strategy for {self.symbol}")
+        self.logger.info(f"Starting ML Momentum Strategy for {self.symbol} (Sector: {self.sector})")
 
         while True:
             if not is_market_open():
                 time.sleep(60)
                 continue
+
+            # Time Filter
+            if not self.check_time_filter():
+                # If we have a position, we might hold, but no new entries
+                if not (self.pm and self.pm.has_position()):
+                    self.logger.info("Lunch hour (12:00-13:00). Skipping new entries.")
+                    time.sleep(300)
+                    continue
 
             try:
                 # 1. Fetch Stock Data
@@ -72,9 +87,14 @@ class MLMomentumStrategy:
                     time.sleep(60)
                     continue
 
-                # 2. Fetch Index Data
-                index_df = self.client.history(symbol="NIFTY 50", interval="15m",
+                # 2. Fetch Index/Sector Data
+                # Fetch NIFTY 50 for broad market RS
+                nifty_df = self.client.history(symbol="NIFTY 50", interval="15m",
                                           start_date=start_date, end_date=end_date)
+
+                # Fetch Sector for Sector Momentum Overlay
+                sector_df = self.client.history(symbol=self.sector, interval="15m",
+                                           start_date=start_date, end_date=end_date)
 
                 # 3. Indicators
                 df['roc'] = df['close'].pct_change(periods=10)
@@ -92,8 +112,18 @@ class MLMomentumStrategy:
                 last = df.iloc[-1]
                 current_price = last['close']
 
-                # Relative Strength
-                rs_excess = self.calculate_relative_strength(df, index_df)
+                # Relative Strength vs NIFTY
+                rs_excess = self.calculate_relative_strength(df, nifty_df)
+
+                # Sector Momentum Overlay (Stock ROC vs Sector ROC)
+                sector_outperformance = 0.0
+                if not sector_df.empty:
+                    try:
+                         sector_roc = sector_df['close'].pct_change(10).iloc[-1]
+                         sector_outperformance = last['roc'] - sector_roc
+                    except: pass
+                else:
+                    sector_outperformance = 0.001 # Assume positive if missing to not block
 
                 # News Sentiment
                 sentiment = self.get_news_sentiment()
@@ -118,14 +148,15 @@ class MLMomentumStrategy:
                 # Entry Logic
                 # ROC > Threshold
                 # RSI > 55
-                # Relative Strength > 0 (Outperforming)
+                # Relative Strength > 0 (Outperforming NIFTY)
+                # Sector Outperformance > 0 (Outperforming Sector)
                 # Price > SMA50 (Uptrend)
                 # Sentiment > 0 (Not Negative)
-                # Volume > Avg (Not checked here explicitly but good to have)
 
                 if (last['roc'] > self.roc_threshold and
-                    last['rsi'] > 50 and
+                    last['rsi'] > 55 and
                     rs_excess > 0 and
+                    sector_outperformance > 0 and
                     current_price > last['sma50'] and
                     sentiment >= 0):
 
@@ -147,10 +178,11 @@ def run_strategy():
     parser.add_argument('--port', type=int, default=5001, help='API Port')
     parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
     parser.add_argument('--threshold', type=float, default=0.01, help='ROC Threshold')
+    parser.add_argument('--sector', type=str, default='NIFTY 50', help='Sector Benchmark')
 
     args = parser.parse_args()
 
-    strategy = MLMomentumStrategy(args.symbol, args.api_key, args.port, threshold=args.threshold)
+    strategy = MLMomentumStrategy(args.symbol, args.api_key, args.port, threshold=args.threshold, sector=args.sector)
     strategy.run()
 
 if __name__ == "__main__":
