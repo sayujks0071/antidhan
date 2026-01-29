@@ -69,8 +69,11 @@ class ORBStrategy:
     def fetch_daily_context(self):
         """Fetch Previous Close and Daily Trend (EMA50)"""
         try:
-            end = datetime.now().strftime("%Y-%m-%d")
-            start = (datetime.now() - timedelta(days=100)).strftime("%Y-%m-%d") # Need enough data for EMA50
+            # Look back enough days for EMA50 calculation and to handle weekends/holidays
+            today = datetime.now().date()
+            end = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+            start = (today - timedelta(days=100)).strftime("%Y-%m-%d")  # Need enough data for EMA50
+
             df = self.client.history(symbol=self.symbol, interval="day", start_date=start, end_date=end)
 
             if not df.empty and len(df) > 50:
@@ -79,18 +82,13 @@ class ORBStrategy:
                 last_ema = df.iloc[-1]['ema50']
 
                 self.trend_bullish = last_close > last_ema
-                prev_close = df.iloc[-1]['close'] # Assuming last row is closed or current day?
-                # If running intraday, last row might be today.
-                # If running before market, last row is yesterday.
-                # OpenAlgo history usually returns completed candles or updates.
-                # Assuming safe to take -1 as reference or -2 if today exists.
-                if df.iloc[-1].get('date', '') == datetime.now().strftime("%Y-%m-%d"):
-                     prev_close = df.iloc[-2]['close']
-                else:
-                     prev_close = df.iloc[-1]['close']
+                prev_close = df.iloc[-1]['close']  # Most recent completed trading day
 
                 self.atr = self.calculate_atr(df)
                 return prev_close
+            elif not df.empty:
+                # Not enough data for EMA50, but return previous close
+                return df.iloc[-1]['close']
         except Exception as e:
             self.logger.error(f"Error fetching context: {e}")
         return 0
@@ -265,8 +263,8 @@ def run_strategy():
     parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
     parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
     parser.add_argument("--quantity", type=int, default=10, help="Qty")
-    parser.add_argument("--api_key", type=str, default='demo_key', help="API Key")
-    parser.add_argument("--host", type=str, default='http://127.0.0.1:5001', help="Host")
+    parser.add_argument("--api_key", type=str, default=None, help="API Key (or set OPENALGO_APIKEY)")
+    parser.add_argument("--host", type=str, default=None, help="Host URL (or set OPENALGO_HOST)")
     parser.add_argument("--minutes", type=int, default=15, help="ORB Duration")
 
     args = parser.parse_args()
