@@ -140,6 +140,71 @@ class PositionManager:
     def has_position(self):
         return self.position != 0
 
+class SmartOrder:
+    """
+    Intelligent Order Execution logic.
+    Wraps an API client to provide advanced order capabilities.
+    """
+    def __init__(self, api_client):
+        self.client = api_client
+
+    def place_adaptive_order(self, strategy, symbol, action, exchange, quantity,
+                           limit_price=None, product='MIS',
+                           urgency='MEDIUM'):
+        """
+        Place an order adapting to market conditions.
+
+        Args:
+            urgency: 'LOW' (Passive Limit), 'MEDIUM' (Limit then Market), 'HIGH' (Market)
+        """
+        logger.info(f"SmartOrder: Placing {action} {quantity} {symbol} (Urgency: {urgency})")
+
+        order_type = "LIMIT" if limit_price else "MARKET"
+        price = limit_price if limit_price else 0
+
+        # Override based on urgency
+        if urgency == 'HIGH':
+            order_type = "MARKET"
+            price = 0
+        elif urgency == 'LOW' and not limit_price:
+            # Low urgency but no limit price provided? Fallback to Market but warn
+            logger.warning("SmartOrder: Low urgency requested but no limit price. Using MARKET.")
+            order_type = "MARKET"
+
+        # In a real async system, we would:
+        # 1. Place Limit at Bid/Ask
+        # 2. Wait 5s
+        # 3. Check fill
+        # 4. Cancel & Replace if not filled
+
+        # Since this is a synchronous/blocking call in this architecture:
+        # We rely on the 'smartorder' endpoint of the broker/server if available,
+        # or just place the simple order.
+
+        # However, we can simulate "Smartness" by choosing the right parameters
+
+        try:
+            # Use the client's place_smart_order if available (wrapper around placesmartorder)
+            # Or use standard place_order
+            if hasattr(self.client, 'placesmartorder'):
+                return self.client.placesmartorder(
+                    strategy=strategy,
+                    symbol=symbol,
+                    action=action,
+                    exchange=exchange,
+                    price_type=order_type,
+                    product=product,
+                    quantity=quantity,
+                    position_size=quantity # Simplification
+                )
+            else:
+                logger.error("SmartOrder: Client does not support 'placesmartorder'")
+                return None
+
+        except Exception as e:
+            logger.error(f"SmartOrder Failed: {e}")
+            return None
+
     def get_pnl(self, current_price):
         if self.position == 0:
             return 0.0

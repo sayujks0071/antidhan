@@ -17,29 +17,14 @@ from pathlib import Path
 
 # Try importing openalgo
 try:
-    from openalgo import api
+    from openalgo.strategies.utils.trading_utils import APIClient
 except ImportError:
     print("Warning: openalgo package not found. Running in simulation/mock mode.")
-    api = None
+    APIClient = None
 
 # Configuration
 API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
 API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
-SCRIPTS_DIR = Path(__file__).parent
-STRATEGY_TEMPLATES = {
-    'AI Hybrid': 'ai_hybrid_reversion_breakout.py',
-    'ML Momentum': 'advanced_ml_momentum_strategy.py',
-    'SuperTrend VWAP': 'supertrend_vwap_strategy.py',
-    'ORB': 'orb_strategy.py',
-    'Trend Pullback': 'trend_pullback_strategy.py',
-    'Sector Momentum': 'sector_momentum_strategy.py',
-    'Earnings Play': 'earnings_play_strategy.py',
-    'Gap Strategy': 'gap_strategy.py',
-    'VWAP Reversion': 'vwap_reversion_strategy.py',
-    'Relative Strength': 'relative_strength_strategy.py',
-    'Volume Breakout': 'volume_breakout_strategy.py',
-    'Swing Trading': 'swing_trading_strategy.py'
-}
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -47,8 +32,8 @@ logger = logging.getLogger(__name__)
 
 class AdvancedEquityStrategy:
     def __init__(self):
-        if api:
-            self.client = api(api_key=API_KEY, host=API_HOST)
+        if APIClient:
+            self.client = APIClient(api_key=API_KEY, host=API_HOST)
         else:
             self.client = None
 
@@ -70,17 +55,39 @@ class AdvancedEquityStrategy:
         """
         logger.info("Fetching market context...")
 
-        # Simulate NIFTY
+        # Default/Fallback values
         trend_opts = ['Up', 'Down', 'Sideways']
         self.market_context['nifty_trend'] = random.choice(trend_opts)
+        self.market_context['vix'] = 15.0
+        self.market_context['breadth_ad_ratio'] = 1.0
+        self.market_context['global_markets'] = {'US': 0.0, 'Asian': 0.0}
 
-        # Simulate VIX
-        self.market_context['vix'] = round(random.uniform(12.0, 26.0), 2)
+        if self.client:
+            try:
+                # 1. NIFTY Trend
+                end = datetime.now().strftime("%Y-%m-%d")
+                start = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+                nifty_df = self.client.history(symbol="NIFTY 50", interval="day", start_date=start, end_date=end)
+                if not nifty_df.empty:
+                    close = nifty_df.iloc[-1]['close']
+                    sma5 = nifty_df['close'].mean() # Simple proxy
+                    if close > sma5: self.market_context['nifty_trend'] = 'Up'
+                    elif close < sma5: self.market_context['nifty_trend'] = 'Down'
+                    else: self.market_context['nifty_trend'] = 'Sideways'
 
-        # Simulate Breadth
-        self.market_context['breadth_ad_ratio'] = round(random.uniform(0.6, 2.0), 2)
-        self.market_context['new_highs'] = random.randint(10, 200)
-        self.market_context['new_lows'] = random.randint(10, 100)
+                # 2. VIX (INDIA VIX) - If available, else mock
+                # API might not expose VIX directly via history easily without correct token
+                # We'll stick to a simulated range based on "market fear" if data missing
+                # For now, simulate VIX randomly between 12 and 20 unless high volatility detected
+                self.market_context['vix'] = round(random.uniform(12.0, 18.0), 2)
+
+                # 3. Market Breadth (Mocked as it requires scanning all stocks)
+                self.market_context['breadth_ad_ratio'] = round(random.uniform(0.8, 1.5), 2)
+                self.market_context['new_highs'] = random.randint(20, 100)
+                self.market_context['new_lows'] = random.randint(10, 50)
+
+            except Exception as e:
+                logger.error(f"Error fetching real context: {e}")
 
         # Simulate Sectors
         sectors = ['IT', 'PHARMA', 'BANK', 'AUTO', 'METAL', 'FMCG', 'REALTY', 'ENERGY']
@@ -90,8 +97,8 @@ class AdvancedEquityStrategy:
 
         # Simulate Global
         self.market_context['global_markets'] = {
-            'US': round(random.uniform(-1.5, 1.5), 2),
-            'Asian': round(random.uniform(-1.5, 1.5), 2)
+            'US': round(random.uniform(-1.0, 1.0), 2),
+            'Asian': round(random.uniform(-1.0, 1.0), 2)
         }
 
     def calculate_technical_indicators(self, df):
@@ -145,49 +152,52 @@ class AdvancedEquityStrategy:
             (Liquidity Score × 0.05)
         """
         last = stock_data.iloc[-1]
+        prev = stock_data.iloc[-2]
 
         # 1. Trend Strength Score (20%)
-        # ADX > 25 = strong trend, Alignment of MAs
+        # ADX > 25, Price > SMA50, SMA50 > SMA200
         trend_score = 0
         if last['adx'] > 25: trend_score += 40
         if last['close'] > last['sma50']: trend_score += 30
         if last['sma50'] > last['sma200']: trend_score += 30
 
         # 2. Momentum Score (20%)
-        # RSI 40-70, MACD > Signal
+        # RSI 50-70, MACD > Signal, ROC > 0
         momentum_score = 0
         if last['rsi'] > 50: momentum_score += 40
         if last['macd'] > last['signal']: momentum_score += 40
-        if last['close'] > stock_data.iloc[-5]['close']: momentum_score += 20 # Price acceleration
+        if last['close'] > stock_data.iloc[-5]['close']: momentum_score += 20
 
         # 3. Volume Score (15%)
-        # Vol > Avg, Volume-Price confirmation
+        # Vol > Avg, Delivery (Simulated as close > open on high vol)
         avg_vol = stock_data['volume'].rolling(20).mean().iloc[-1]
         volume_score = 0
-        if last['volume'] > avg_vol: volume_score += 100
-        else: volume_score += 40
+        if last['volume'] > avg_vol:
+            volume_score += 60
+            if last['close'] > last['open']: volume_score += 40 # Price confirmation
 
         # 4. Volatility Score (10%)
-        # Managed volatility preference
-        volatility_score = 50
-        if last['atr'] < last['close'] * 0.03: volatility_score += 50 # Not too volatile
+        # Prefer controlled volatility. If ATR is huge relative to price, reduce score.
+        volatility_score = 100
+        if last['atr'] > last['close'] * 0.05: volatility_score = 50 # High volatility
+        if market_data['vix'] > 20: volatility_score -= 20
 
         # 5. Sector Strength Score (10%)
-        # Stock performance vs sector
+        # Simulating sector match
         sector_score = 50
-        if random.random() > 0.5: sector_score = 90 # Simulated
+        if random.random() > 0.4: sector_score = 100
 
         # 6. Market Breadth Score (10%)
         breadth_score = 50
         if market_data['breadth_ad_ratio'] > 1.2: breadth_score = 100
-        elif market_data['breadth_ad_ratio'] < 0.8: breadth_score = 20
+        elif market_data['breadth_ad_ratio'] < 0.8: breadth_score = 0
 
         # 7. News Sentiment Score (10%)
-        news_score = 50 # Neutral default
+        news_score = 50 # Neutral
 
         # 8. Liquidity Score (5%)
         liquidity_score = 100
-        if avg_vol < 50000: liquidity_score = 20
+        if avg_vol < 100000: liquidity_score = 40 # Low liquidity penalty
 
         composite = (
             trend_score * 0.20 +

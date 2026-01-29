@@ -1,0 +1,33 @@
+{
+    "ORB_NIFTY": {
+        "strategy": "orb_strategy",
+        "underlying": "NIFTY",
+        "type": "EQUITY",
+        "exchange": "NSE",
+        "params": {
+            "quantity": 50,
+            "minutes": 15
+        }
+    },
+    "ATM_OPT_NIFTY": {
+        "strategy": "orb_strategy",
+        "underlying": "NIFTY",
+        "type": "OPT",
+        "option_type": "CE",
+        "strike_criteria": "ATM",
+        "expiry_preference": "WEEKLY",
+        "exchange": "NFO",
+        "params": {
+            "quantity": 50
+        }
+    },
+    "MCX_SILVER": {
+        "strategy": "mcx_commodity_momentum_strategy",
+        "underlying": "SILVER",
+        "type": "FUT",
+        "exchange": "MCX",
+        "params": {
+            "quantity": 1
+        }
+    }
+}

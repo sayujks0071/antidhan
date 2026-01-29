@@ -17,10 +17,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.
 
 try:
     from openalgo.strategies.utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
+    from openalgo.strategies.utils.symbol_resolver import SymbolResolver
 except ImportError:
     print("Warning: openalgo package not found or imports failed.")
     APIClient = None
     PositionManager = None
+    SymbolResolver = None
     is_market_open = lambda: True
     calculate_intraday_vwap = lambda x: x
 
@@ -105,6 +107,11 @@ class SuperTrendVWAPStrategy:
             self.logger.warning(f"Sector Check Failed: {e}")
             return True
 
+    def get_vix(self):
+        # Simulated VIX for dynamic deviation
+        # Ideally fetch 'INDIA VIX'
+        return 15.0 # Default
+
     def run(self):
         self.logger.info(f"Starting SuperTrend VWAP for {self.symbol}")
 
@@ -115,8 +122,9 @@ class SuperTrendVWAPStrategy:
                     continue
 
                 # Fetch history
+                # Look back 7 days to ensure sufficient data
                 df = self.client.history(symbol=self.symbol, interval="5m",
-                                    start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
+                                    start_date=(datetime.now()-timedelta(days=7)).strftime("%Y-%m-%d"),
                                     end_date=datetime.now().strftime("%Y-%m-%d"))
 
                 if df.empty or len(df) < 50:
@@ -130,6 +138,14 @@ class SuperTrendVWAPStrategy:
                 # Volume Profile
                 poc_price, poc_vol = self.analyze_volume_profile(df)
 
+                # Dynamic Deviation based on VIX
+                vix = self.get_vix()
+                dev_threshold = 0.02
+                if vix > 20:
+                    dev_threshold = 0.01 # Tighten in high volatility
+                elif vix < 12:
+                    dev_threshold = 0.03 # Loosen in low volatility
+
                 # Logic
                 is_above_vwap = last['close'] > last['vwap']
 
@@ -140,7 +156,7 @@ class SuperTrendVWAPStrategy:
                 is_volume_spike = last['volume'] > dynamic_threshold
 
                 is_above_poc = last['close'] > poc_price
-                is_not_overextended = abs(last['vwap_dev']) < 0.02
+                is_not_overextended = abs(last['vwap_dev']) < dev_threshold
 
                 if self.pm and self.pm.has_position():
                     # Manage Position (Trailing Stop)
@@ -164,7 +180,7 @@ class SuperTrendVWAPStrategy:
                     sector_bullish = self.check_sector_correlation()
 
                     if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
-                        self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, Vol: {last['volume']}, Sector: Bullish")
+                        self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}")
                         if self.pm:
                             self.pm.update_position(self.quantity, last['close'], 'BUY')
                             self.trailing_stop = last['close'] - (2 * self.atr)
@@ -176,7 +192,10 @@ class SuperTrendVWAPStrategy:
 
 def run_strategy():
     parser = argparse.ArgumentParser(description="SuperTrend VWAP Strategy")
-    parser.add_argument("--symbol", type=str, required=True, help="Trading Symbol")
+    parser.add_argument("--symbol", type=str, help="Trading Symbol")
+    parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
+    parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
+    parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
     parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
     parser.add_argument("--api_key", type=str, default='demo_key', help="API Key")
     parser.add_argument("--host", type=str, default='http://127.0.0.1:5001', help="Host")
@@ -185,8 +204,23 @@ def run_strategy():
 
     args = parser.parse_args()
 
+    symbol = args.symbol
+    if not symbol and args.underlying:
+        if SymbolResolver:
+            resolver = SymbolResolver()
+            res = resolver.resolve({'underlying': args.underlying, 'type': args.type, 'exchange': args.exchange})
+            if isinstance(res, dict):
+                symbol = res.get('sample_symbol')
+            else:
+                symbol = res
+            print(f"Resolved {args.underlying} -> {symbol}")
+
+    if not symbol:
+        print("Error: Must provide --symbol or --underlying")
+        return
+
     strategy = SuperTrendVWAPStrategy(
-        symbol=args.symbol,
+        symbol=symbol,
         quantity=args.quantity,
         api_key=args.api_key,
         host=args.host,
