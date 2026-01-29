@@ -428,4 +428,5 @@ def get_logger(name: str) -> logging.Logger:
 
 
 # Initialize logging on import
-setup_logging()
+if os.environ.get('OPENALGO_LOGGING_SETUP_DONE') != 'true':
+    setup_logging()

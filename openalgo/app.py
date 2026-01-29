@@ -6,6 +6,23 @@ load_and_check_env_variables()
 import mimetypes
 import re
 import sys
+import os
+
+# Initialize Observability Logging (Local Drain)
+# Ensure openalgo_observability is importable
+try:
+    import openalgo_observability.logging_setup
+    openalgo_observability.logging_setup.setup_logging()
+except ImportError:
+    # If running from inside openalgo/, try adding parent to path
+    parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if parent_dir not in sys.path:
+        sys.path.append(parent_dir)
+    try:
+        import openalgo_observability.logging_setup
+        openalgo_observability.logging_setup.setup_logging()
+    except ImportError:
+        print("Warning: Could not import openalgo_observability. logging_setup not run.", file=sys.stderr)
 
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")

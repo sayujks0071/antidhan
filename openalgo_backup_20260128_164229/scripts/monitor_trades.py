@@ -35,18 +35,77 @@ ENV_PATH = BASE_DIR / "strategies/strategy_env.json"
 LOG_DIR = BASE_DIR / "strategies/logs"
 ALT_LOG_DIR = BASE_DIR / "log/strategies"
 BASE_URL = "http://127.0.0.1:5001"
+ALERT_LOG = BASE_DIR / "log/alerts.log"
 
 # Strategy name mappings (from process command to strategy ID)
+# Automatically populated by find_running_strategy_processes if not here
 STRATEGY_NAME_MAP = {
     'mcx_commodity_momentum': 'mcx_commodity_momentum_strategy',
     'ai_hybrid_reversion_breakout': 'ai_hybrid_reversion_breakout',
-    'advanced_ml_momentum': 'advanced_ml_momentum_strategy_20260120112512',
-    'supertrend_vwap': 'supertrend_vwap_strategy_20260120112816',
-    'orb_strategy': 'orb_strategy',
-    'trend_pullback': 'trend_pullback_strategy',
-    'delta_neutral_iron_condor': 'delta_neutral_iron_condor_nifty',
-    'options_ranker': 'options_ranker_strategy',
+    # 'advanced_ml_momentum': 'advanced_ml_momentum_strategy_20260120112512', # Example of dynamic override
 }
+
+# -----------------------------------------------------------------------------
+# Notification Manager
+# -----------------------------------------------------------------------------
+
+class NotificationManager:
+    """
+    Manages real-time alerts and notifications across multiple channels.
+    """
+    def __init__(self):
+        self.alert_file = ALERT_LOG
+        self.alert_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load configuration for external notifiers if available
+        self.telegram_token = os.environ.get("TELEGRAM_TOKEN")
+        self.telegram_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+
+    def send_alert(self, message: str, level: str = "WARNING", category: str = "GENERAL"):
+        """
+        Dispatch alert to configured channels.
+
+        Args:
+            message: The alert message
+            level: INFO, WARNING, CRITICAL
+            category: TRADE, RISK, SYSTEM, DATA
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        formatted_msg = f"[{timestamp}] [{level}] [{category}] {message}"
+
+        # 1. Log to File
+        try:
+            with open(self.alert_file, "a") as f:
+                f.write(formatted_msg + "\n")
+        except Exception as e:
+            print(f"Failed to write to alert log: {e}")
+
+        # 2. Console Output (High visibility)
+        if level == "CRITICAL":
+            print(f"\033[91m{formatted_msg}\033[0m") # Red
+        elif level == "WARNING":
+            print(f"\033[93m{formatted_msg}\033[0m") # Yellow
+        else:
+            print(formatted_msg)
+
+        # 3. External Channels (Mock/Placeholder)
+        if level in ["CRITICAL", "WARNING"]:
+            self._send_telegram(formatted_msg)
+            self._send_email(formatted_msg)
+
+    def _send_telegram(self, message: str):
+        """Placeholder for Telegram integration"""
+        if self.telegram_token and self.telegram_chat_id:
+            # Implement actual API call here
+            # requests.post(f"https://api.telegram.org/bot{self.telegram_token}/sendMessage", ...)
+            pass
+
+    def _send_email(self, message: str):
+        """Placeholder for Email integration"""
+        pass
+
+# Initialize global manager
+notifier = NotificationManager()
 
 
 def get_ist_time():
@@ -87,10 +146,10 @@ def find_running_strategy_processes() -> Dict[str, Dict]:
                                 }
                                 matched = True
                                 break
-                        # Fallback to script basename
+                        # Dynamic Fallback: Use script filename as strategy_id
                         if not matched and script_path:
-                            fallback_id = Path(script_path).stem
-                            running[fallback_id] = {
+                            strategy_id = Path(script_path).stem
+                            running[strategy_id] = {
                                 'pid': int(pid),
                                 'name': 'python',
                                 'cmdline': parts[10:],
@@ -111,40 +170,33 @@ def find_running_strategy_processes() -> Dict[str, Dict]:
             # Check if it's a Python process running a strategy
             cmd_str = ' '.join(cmdline).lower()
             
-            # Match strategy scripts
-            for key, strategy_id in STRATEGY_NAME_MAP.items():
-                if key in cmd_str and 'strategy' in cmd_str:
-                    # Extract script path
-                    script_path = None
-                    for arg in cmdline:
-                        if 'strategy' in arg.lower() and arg.endswith('.py'):
-                            script_path = arg
-                            break
-                    
-                    running[strategy_id] = {
-                        'pid': proc.info['pid'],
-                        'name': proc.info['name'],
-                        'cmdline': cmdline,
-                        'script_path': script_path,
-                        'start_time': datetime.fromtimestamp(proc.create_time()).strftime('%Y-%m-%d %H:%M:%S')
-                    }
+            # Only consider python processes running scripts in strategies/scripts/
+            if 'strategies/scripts/' not in cmd_str and 'strategies\\scripts\\' not in cmd_str:
+                 continue
+
+            script_path = None
+            for arg in cmdline:
+                if arg.endswith('.py') and ('strategies/scripts/' in arg or 'strategies\\scripts\\' in arg):
+                    script_path = arg
                     break
-            else:
-                # Fallback: use script basename if a strategy script is found
-                script_path = None
-                for arg in cmdline:
-                    if 'strategies/scripts/' in arg and arg.endswith('.py'):
-                        script_path = arg
+
+            if script_path:
+                strategy_id = Path(script_path).stem
+
+                # Check explicit map override
+                for key, mapped_id in STRATEGY_NAME_MAP.items():
+                    if key in strategy_id:
+                        strategy_id = mapped_id
                         break
-                if script_path:
-                    fallback_id = Path(script_path).stem
-                    running[fallback_id] = {
-                        'pid': proc.info['pid'],
-                        'name': proc.info['name'],
-                        'cmdline': cmdline,
-                        'script_path': script_path,
-                        'start_time': datetime.fromtimestamp(proc.create_time()).strftime('%Y-%m-%d %H:%M:%S')
-                    }
+
+                running[strategy_id] = {
+                    'pid': proc.info['pid'],
+                    'name': proc.info['name'],
+                    'cmdline': cmdline,
+                    'script_path': script_path,
+                    'start_time': datetime.fromtimestamp(proc.create_time()).strftime('%Y-%m-%d %H:%M:%S')
+                }
+
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             continue
     
@@ -452,15 +504,6 @@ def fetch_positionbook(api_key: str) -> List[Dict]:
     return []
 
 
-def log_alert(message: str, level: str = "WARNING"):
-    """Log alert to alerts file."""
-    alert_file = BASE_DIR / "log/alerts.log"
-    alert_file.parent.mkdir(parents=True, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(alert_file, "a") as f:
-        f.write(f"[{timestamp}] [{level}] {message}\n")
-
 def generate_fine_tuning_recommendations(analysis: Dict) -> List[str]:
     """Generate fine-tuning recommendations based on analysis."""
     recommendations = []
@@ -491,7 +534,7 @@ def generate_fine_tuning_recommendations(analysis: Dict) -> List[str]:
         if errors > 5:
             msg = f"🔴 {strategy_id}: High error count ({errors}). Check logs for issues."
             recommendations.append(msg)
-            log_alert(msg, level="CRITICAL")
+            notifier.send_alert(msg, level="CRITICAL", category="SYSTEM")
         
         # Analyze rejected signals
         if rejected:

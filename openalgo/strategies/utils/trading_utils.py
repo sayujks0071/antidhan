@@ -3,6 +3,7 @@ import time
 import logging
 import pytz
 import json
+import time as time_module
 from pathlib import Path
 from datetime import datetime, time as dt_time
 import httpx
@@ -151,6 +152,71 @@ class PositionManager:
     def has_position(self):
         return self.position != 0
 
+class SmartOrder:
+    """
+    Intelligent Order Execution logic.
+    Wraps an API client to provide advanced order capabilities.
+    """
+    def __init__(self, api_client):
+        self.client = api_client
+
+    def place_adaptive_order(self, strategy, symbol, action, exchange, quantity,
+                           limit_price=None, product='MIS',
+                           urgency='MEDIUM'):
+        """
+        Place an order adapting to market conditions.
+
+        Args:
+            urgency: 'LOW' (Passive Limit), 'MEDIUM' (Limit then Market), 'HIGH' (Market)
+        """
+        logger.info(f"SmartOrder: Placing {action} {quantity} {symbol} (Urgency: {urgency})")
+
+        order_type = "LIMIT" if limit_price else "MARKET"
+        price = limit_price if limit_price else 0
+
+        # Override based on urgency
+        if urgency == 'HIGH':
+            order_type = "MARKET"
+            price = 0
+        elif urgency == 'LOW' and not limit_price:
+            # Low urgency but no limit price provided? Fallback to Market but warn
+            logger.warning("SmartOrder: Low urgency requested but no limit price. Using MARKET.")
+            order_type = "MARKET"
+
+        # In a real async system, we would:
+        # 1. Place Limit at Bid/Ask
+        # 2. Wait 5s
+        # 3. Check fill
+        # 4. Cancel & Replace if not filled
+
+        # Since this is a synchronous/blocking call in this architecture:
+        # We rely on the 'smartorder' endpoint of the broker/server if available,
+        # or just place the simple order.
+
+        # However, we can simulate "Smartness" by choosing the right parameters
+
+        try:
+            # Use the client's place_smart_order if available (wrapper around placesmartorder)
+            # Or use standard place_order
+            if hasattr(self.client, 'placesmartorder'):
+                return self.client.placesmartorder(
+                    strategy=strategy,
+                    symbol=symbol,
+                    action=action,
+                    exchange=exchange,
+                    price_type=order_type,
+                    product=product,
+                    quantity=quantity,
+                    position_size=quantity # Simplification
+                )
+            else:
+                logger.error("SmartOrder: Client does not support 'placesmartorder'")
+                return None
+
+        except Exception as e:
+            logger.error(f"SmartOrder Failed: {e}")
+            return None
+
     def get_pnl(self, current_price):
         if self.position == 0:
             return 0.0
@@ -179,18 +245,15 @@ class APIClient:
             "end_date": end_date,  # Fixed: was "to"
             "apikey": self.api_key
         }
-        
         for attempt in range(max_retries):
             try:
-                response = httpx.post(url, json=payload, timeout=30)  # Increased timeout from 10s to 30s
+                response = httpx.post(url, json=payload, timeout=30)
                 if response.status_code == 200:
                     data = response.json()
                     if data.get('status') == 'success' and 'data' in data:
                         df = pd.DataFrame(data['data'])
-                        # Convert timestamp to datetime if present (keep as column, not index)
                         if 'timestamp' in df.columns:
                             df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
-                        # Ensure required columns exist
                         required_cols = ['open', 'high', 'low', 'close', 'volume']
                         for col in required_cols:
                             if col not in df.columns:
@@ -200,9 +263,9 @@ class APIClient:
                     else:
                         error_msg = data.get('message', 'Unknown error')
                         if attempt < max_retries - 1:
-                            wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                            wait_time = 2 ** attempt
                             logger.warning(f"History fetch failed for {symbol} (attempt {attempt+1}/{max_retries}): {error_msg}. Retrying in {wait_time}s...")
-                            time.sleep(wait_time)
+                            time_module.sleep(wait_time)
                             continue
                         logger.error(f"History fetch failed after {max_retries} attempts: {error_msg}")
                 else:
@@ -210,25 +273,25 @@ class APIClient:
                     if attempt < max_retries - 1:
                         wait_time = 2 ** attempt
                         logger.warning(f"API call failed for {symbol} (HTTP {response.status_code}, attempt {attempt+1}/{max_retries}), retrying in {wait_time}s...")
-                        time.sleep(wait_time)
+                        time_module.sleep(wait_time)
                         continue
                     logger.error(f"History fetch failed after {max_retries} attempts (HTTP {response.status_code}): {error_text}")
             except httpx.TimeoutException:
                 if attempt < max_retries - 1:
                     wait_time = 2 ** attempt
                     logger.warning(f"API timeout for {symbol} (attempt {attempt+1}/{max_retries}), retrying in {wait_time}s...")
-                    time.sleep(wait_time)
+                    time_module.sleep(wait_time)
                     continue
                 logger.error(f"API timeout after {max_retries} attempts for {symbol}")
             except Exception as e:
                 if attempt < max_retries - 1:
                     wait_time = 2 ** attempt
                     logger.warning(f"API Error for {symbol} (attempt {attempt+1}/{max_retries}): {e}. Retrying in {wait_time}s...")
-                    time.sleep(wait_time)
+                    time_module.sleep(wait_time)
                     continue
                 logger.error(f"API Error after {max_retries} attempts for {symbol}: {e}")
         
-        return pd.DataFrame()  # Empty DF on failure
+        return pd.DataFrame()
 
     def get_quote(self, symbol, exchange="NSE", max_retries=3):
         """Fetch real-time quote from Kite API via OpenAlgo"""

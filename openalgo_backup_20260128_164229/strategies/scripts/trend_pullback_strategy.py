@@ -96,6 +96,15 @@ class TrendPullbackStrategy:
                 last = df.iloc[-1]
                 price = last['close']
 
+                # Pullback Depth Check
+                recent_high = df['high'].rolling(50).max().iloc[-1]
+                depth_pct = (recent_high - price) / recent_high * 100
+
+                if depth_pct > 10.0:
+                    self.logger.info(f"Pullback too deep ({depth_pct:.2f}%). Trend likely broken. Waiting.")
+                    time.sleep(300)
+                    continue
+
                 if self.pm and self.pm.has_position():
                     # Exit logic
                     entry = self.pm.entry_price
@@ -125,7 +134,7 @@ class TrendPullbackStrategy:
                     if reclaimed_sma20 or reclaimed_sma50:
                         # Reversal Confirmation: Green Candle
                         if last['close'] > last['open']:
-                            self.logger.info("Pullback Reversal Confirmed. BUY.")
+                            self.logger.info(f"Pullback Reversal Confirmed (Depth: {depth_pct:.2f}%). BUY.")
                             if self.pm: self.pm.update_position(self.quantity, price, 'BUY')
 
             except Exception as e:
