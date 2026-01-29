@@ -1,3 +1,4 @@
+# OpenAlgo Observability Stack
 version: "3"
 services:
   loki:
