@@ -13,15 +13,28 @@ import numpy as np
 from datetime import datetime, timedelta
 
 # Add project root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+strategies_dir = os.path.dirname(script_dir)
+utils_dir = os.path.join(strategies_dir, 'utils')
+
+# Add utils directory to path for imports
+sys.path.insert(0, utils_dir)
 
 try:
-    from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+    from trading_utils import APIClient, PositionManager, is_market_open
 except ImportError:
-    print("Warning: openalgo package not found or imports failed.")
-    APIClient = None
-    PositionManager = None
-    is_market_open = lambda: True
+    try:
+        # Try absolute import
+        sys.path.insert(0, strategies_dir)
+        from utils.trading_utils import APIClient, PositionManager, is_market_open
+    except ImportError:
+        try:
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+        except ImportError:
+            print("Warning: openalgo package not found or imports failed.")
+            APIClient = None
+            PositionManager = None
+            is_market_open = lambda: True
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -70,18 +83,48 @@ class AIHybridStrategy:
 
     def check_sector_strength(self):
         try:
-            # Check if Sector is in uptrend (Price > SMA20)
-            df = self.client.history(symbol=self.sector, interval="day",
-                                start_date=(datetime.now()-timedelta(days=30)).strftime("%Y-%m-%d"),
+            # Normalize sector symbol (NIFTY 50 -> NIFTY, NIFTY50 -> NIFTY)
+            sector_symbol = self.sector.replace(" ", "").replace("50", "").replace("BANK", "BANKNIFTY")
+            if "NIFTY" not in sector_symbol.upper():
+                sector_symbol = "NIFTY"  # Default to NIFTY
+            
+            # Use NSE_INDEX for index symbols
+            exchange = "NSE_INDEX" if "NIFTY" in sector_symbol.upper() else "NSE"
+            # Request 60 days to ensure we have at least 20 trading days (accounting for weekends/holidays)
+            df = self.client.history(symbol=sector_symbol, interval="D", exchange=exchange,
+                                start_date=(datetime.now()-timedelta(days=60)).strftime("%Y-%m-%d"),
                                 end_date=datetime.now().strftime("%Y-%m-%d"))
-            if not df.empty:
-                df['sma20'] = df['close'].rolling(20).mean()
-                return df.iloc[-1]['close'] > df.iloc[-1]['sma20']
+            if df.empty or len(df) < 20:
+                self.logger.warning(f"Insufficient data for sector strength check ({len(df)} rows). Defaulting to allow trades.")
+                return True
+            df['sma20'] = df['close'].rolling(20).mean()
+            last_close = df.iloc[-1]['close']
+            last_sma20 = df.iloc[-1]['sma20']
+            if pd.isna(last_sma20):
+                self.logger.warning(f"SMA20 is NaN for {sector_symbol}. Defaulting to allow trades.")
+                return True
+            is_strong = last_close > last_sma20
+            self.logger.debug(f"Sector {sector_symbol} strength: Close={last_close:.2f}, SMA20={last_sma20:.2f}, Strong={is_strong}")
+            return is_strong
         except Exception as e:
-            self.logger.warning(f"Sector check failed: {e}. Defaulting to True.")
-        return True # Default to True to not block if data missing
+            self.logger.warning(f"Error checking sector strength: {e}. Defaulting to allow trades.")
+            return True
 
     def run(self):
+        # Normalize symbol (NIFTY50 -> NIFTY, NIFTY 50 -> NIFTY, NIFTYBANK -> BANKNIFTY)
+        original_symbol = self.symbol
+        symbol_upper = self.symbol.upper().replace(" ", "")
+        if "BANK" in symbol_upper and "NIFTY" in symbol_upper:
+            self.symbol = "BANKNIFTY"
+        elif "NIFTY" in symbol_upper:
+            # Remove "50" suffix if present (NIFTY50 -> NIFTY)
+            self.symbol = "NIFTY" if symbol_upper.replace("50", "") == "NIFTY" else "NIFTY"
+        else:
+            self.symbol = original_symbol
+        
+        if original_symbol != self.symbol:
+            self.logger.info(f"Symbol normalized: {original_symbol} -> {self.symbol}")
+        
         self.logger.info(f"Starting AI Hybrid for {self.symbol} (Sector: {self.sector})")
 
         while True:
@@ -116,8 +159,9 @@ class AIHybridStrategy:
                     time.sleep(300)
                     continue
 
-                # Fetch Data
-                df = self.client.history(symbol=self.symbol, interval="5m",
+                # Fetch Data - Use NSE_INDEX for NIFTY index
+                exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
+                df = self.client.history(symbol=self.symbol, interval="5m", exchange=exchange,
                                     start_date=datetime.now().strftime("%Y-%m-%d"),
                                     end_date=datetime.now().strftime("%Y-%m-%d"))
 
@@ -174,7 +218,7 @@ class AIHybridStrategy:
                          self.pm.update_position(qty, current_price, 'BUY')
 
             except Exception as e:
-                self.logger.error(f"Error: {e}")
+                self.logger.error(f"Error in AI Hybrid strategy for {self.symbol}: {e}", exc_info=True)
                 time.sleep(60)
 
             time.sleep(60)

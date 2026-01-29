@@ -13,18 +13,45 @@ import numpy as np
 from datetime import datetime, timedelta
 
 # Add repo root to path to allow imports
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+strategies_dir = os.path.dirname(script_dir)
+utils_dir = os.path.join(strategies_dir, 'utils')
+
+# Add utils directory to path for imports
+sys.path.insert(0, utils_dir)
 
 try:
-    from openalgo.strategies.utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
-    from openalgo.strategies.utils.symbol_resolver import SymbolResolver
+    from trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
 except ImportError:
-    print("Warning: openalgo package not found or imports failed.")
-    APIClient = None
-    PositionManager = None
-    SymbolResolver = None
-    is_market_open = lambda: True
-    calculate_intraday_vwap = lambda x: x
+    try:
+        sys.path.insert(0, strategies_dir)
+        from utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
+    except ImportError:
+        try:
+            from openalgo.strategies.utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
+        except ImportError:
+            print("Warning: openalgo package not found or imports failed.")
+            APIClient = None
+            PositionManager = None
+            is_market_open = lambda: True
+            def calculate_intraday_vwap(df):
+                df = df.copy()
+                if 'datetime' not in df.columns:
+                    if isinstance(df.index, pd.DatetimeIndex):
+                        df['datetime'] = df.index
+                    elif 'timestamp' in df.columns:
+                        df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+                    else:
+                        df['datetime'] = pd.to_datetime(df.index)
+                df['datetime'] = pd.to_datetime(df['datetime'])
+                df['date'] = df['datetime'].dt.date
+                typical_price = (df['high'] + df['low'] + df['close']) / 3
+                df['pv'] = typical_price * df['volume']
+                df['cum_pv'] = df.groupby('date')['pv'].cumsum()
+                df['cum_vol'] = df.groupby('date')['volume'].cumsum()
+                df['vwap'] = df['cum_pv'] / df['cum_vol']
+                df['vwap_dev'] = (df['close'] - df['vwap']) / df['vwap']
+                return df
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -93,9 +120,17 @@ class SuperTrendVWAPStrategy:
     def check_sector_correlation(self):
         """Check if sector is correlated (RSI > 50)."""
         try:
+            sector_symbol = self.sector_benchmark.replace(" ", "").upper()
+            if "BANK" in sector_symbol and "NIFTY" in sector_symbol:
+                sector_symbol = "BANKNIFTY"
+            elif "NIFTY" in sector_symbol:
+                sector_symbol = "NIFTY"
+            else:
+                sector_symbol = "NIFTY"
             end = datetime.now().strftime("%Y-%m-%d")
-            start = (datetime.now() - timedelta(days=20)).strftime("%Y-%m-%d")
-            df = self.client.history(symbol=self.sector_benchmark, interval="day", start_date=start, end_date=end)
+            start = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+            exchange = "NSE_INDEX"
+            df = self.client.history(symbol=sector_symbol, interval="D", exchange=exchange, start_date=start, end_date=end)
 
             if not df.empty and len(df) > 15:
                 df['rsi'] = self.calculate_rsi(df['close'])
@@ -113,6 +148,20 @@ class SuperTrendVWAPStrategy:
         return 15.0 # Default
 
     def run(self):
+        # Normalize symbol (NIFTYBANK -> BANKNIFTY, NIFTY 50 -> NIFTY, NIFTY50 -> NIFTY)
+        original_symbol = self.symbol
+        symbol_upper = self.symbol.upper().replace(" ", "")
+        if "BANK" in symbol_upper and "NIFTY" in symbol_upper:
+            self.symbol = "BANKNIFTY"
+        elif "NIFTY" in symbol_upper:
+            # Remove "50" suffix if present (NIFTY50 -> NIFTY)
+            self.symbol = "NIFTY" if symbol_upper.replace("50", "") == "NIFTY" else "NIFTY"
+        else:
+            self.symbol = original_symbol
+        
+        if original_symbol != self.symbol:
+            self.logger.info(f"Symbol normalized: {original_symbol} -> {self.symbol}")
+        
         self.logger.info(f"Starting SuperTrend VWAP for {self.symbol}")
 
         while True:
@@ -121,17 +170,50 @@ class SuperTrendVWAPStrategy:
                     time.sleep(60)
                     continue
 
-                # Fetch history
-                # Look back 7 days to ensure sufficient data
-                df = self.client.history(symbol=self.symbol, interval="5m",
-                                    start_date=(datetime.now()-timedelta(days=7)).strftime("%Y-%m-%d"),
-                                    end_date=datetime.now().strftime("%Y-%m-%d"))
-
-                if df.empty or len(df) < 50:
-                    time.sleep(10)
+                exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
+                try:
+                    df = self.client.history(
+                        symbol=self.symbol,
+                        interval="5m",
+                        exchange=exchange,
+                        start_date=(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d"),
+                        end_date=datetime.now().strftime("%Y-%m-%d"),
+                    )
+                except Exception as e:
+                    self.logger.error(f"Failed to fetch history for {self.symbol} on {exchange}: {e}", exc_info=True)
+                    time.sleep(60)
                     continue
-
-                df = calculate_intraday_vwap(df)
+                if df.empty or len(df) < 50:
+                    self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows. Need at least 50.")
+                    time.sleep(60)
+                    continue
+                required_cols = ['open', 'high', 'low', 'close', 'volume']
+                missing_cols = [col for col in required_cols if col not in df.columns]
+                if missing_cols:
+                    self.logger.error(f"Missing required columns for {self.symbol}: {missing_cols}")
+                    time.sleep(60)
+                    continue
+                if "datetime" in df.columns:
+                    df["datetime"] = pd.to_datetime(df["datetime"])
+                elif "timestamp" in df.columns:
+                    df["datetime"] = pd.to_datetime(df["timestamp"])
+                else:
+                    df["datetime"] = pd.to_datetime(df.index)
+                df = df.sort_values("datetime")
+                try:
+                    if not callable(calculate_intraday_vwap):
+                        self.logger.error("calculate_intraday_vwap is not callable. Check imports.")
+                        time.sleep(60)
+                        continue
+                    df = calculate_intraday_vwap(df)
+                    if 'vwap' not in df.columns or 'vwap_dev' not in df.columns:
+                        self.logger.error("VWAP calculation failed - missing required columns")
+                        time.sleep(60)
+                        continue
+                except Exception as e:
+                    self.logger.error(f"VWAP calc failed: {e}", exc_info=True)
+                    time.sleep(60)
+                    continue
                 self.atr = self.calculate_atr(df)
                 last = df.iloc[-1]
 
@@ -186,7 +268,7 @@ class SuperTrendVWAPStrategy:
                             self.trailing_stop = last['close'] - (2 * self.atr)
 
             except Exception as e:
-                self.logger.error(f"Error: {e}")
+                self.logger.error(f"Error in SuperTrend VWAP strategy for {self.symbol}: {e}", exc_info=True)
 
             time.sleep(60)
 

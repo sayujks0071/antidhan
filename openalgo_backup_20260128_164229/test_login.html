@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>OpenAlgo Login Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>OpenAlgo Connection Test</h1>
+
+    <div id="results"></div>
+
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="openLogin()">Open Login Page</button>
+
+    <script>
+        const BASE_URL = 'http://127.0.0.1:5001';
+
+        function addResult(message, type) {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            document.getElementById('results').appendChild(div);
+        }
+
+        async function testConnection() {
+            document.getElementById('results').innerHTML = '';
+            addResult('Testing connection...', 'info');
+
+            try {
+                // Test 1: Root endpoint
+                const response1 = await fetch(`${BASE_URL}/`);
+                if (response1.ok) {
+                    addResult('✅ Root endpoint accessible', 'success');
+                } else {
+                    addResult(`❌ Root endpoint failed: ${response1.status}`, 'error');
+                }
+
+                // Test 2: Login page
+                const response2 = await fetch(`${BASE_URL}/auth/login`);
+                if (response2.ok) {
+                    addResult('✅ Login page accessible', 'success');
+                } else {
+                    addResult(`❌ Login page failed: ${response2.status}`, 'error');
+                }
+
+                // Test 3: API ping
+                const response3 = await fetch(`${BASE_URL}/api/v1/ping`);
+                if (response3.ok) {
+                    addResult('✅ API endpoint accessible', 'success');
+                } else {
+                    addResult(`❌ API endpoint failed: ${response3.status}`, 'error');
+                }
+
+            } catch (error) {
+                addResult(`❌ Connection error: ${error.message}`, 'error');
+                addResult('💡 Try: http://localhost:5001/auth/login', 'info');
+            }
+        }
+
+        function openLogin() {
+            window.open(`${BASE_URL}/auth/login`, '_blank');
+        }
+
+        // Auto-test on load
+        window.onload = testConnection;
+    </script>
+</body>
+
+</html>
