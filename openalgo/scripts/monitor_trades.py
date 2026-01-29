@@ -35,6 +35,7 @@ ENV_PATH = BASE_DIR / "strategies/strategy_env.json"
 LOG_DIR = BASE_DIR / "strategies/logs"
 ALT_LOG_DIR = BASE_DIR / "log/strategies"
 BASE_URL = "http://127.0.0.1:5001"
+ALERT_LOG = BASE_DIR / "log/alerts.log"
 
 # Strategy name mappings (from process command to strategy ID)
 STRATEGY_NAME_MAP = {
@@ -47,6 +48,68 @@ STRATEGY_NAME_MAP = {
     'delta_neutral_iron_condor': 'delta_neutral_iron_condor_nifty',
     'options_ranker': 'options_ranker_strategy',
 }
+
+# -----------------------------------------------------------------------------
+# Notification Manager
+# -----------------------------------------------------------------------------
+
+class NotificationManager:
+    """
+    Manages real-time alerts and notifications across multiple channels.
+    """
+    def __init__(self):
+        self.alert_file = ALERT_LOG
+        self.alert_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load configuration for external notifiers if available
+        self.telegram_token = os.environ.get("TELEGRAM_TOKEN")
+        self.telegram_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+
+    def send_alert(self, message: str, level: str = "WARNING", category: str = "GENERAL"):
+        """
+        Dispatch alert to configured channels.
+
+        Args:
+            message: The alert message
+            level: INFO, WARNING, CRITICAL
+            category: TRADE, RISK, SYSTEM, DATA
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        formatted_msg = f"[{timestamp}] [{level}] [{category}] {message}"
+
+        # 1. Log to File
+        try:
+            with open(self.alert_file, "a") as f:
+                f.write(formatted_msg + "\n")
+        except Exception as e:
+            print(f"Failed to write to alert log: {e}")
+
+        # 2. Console Output (High visibility)
+        if level == "CRITICAL":
+            print(f"\033[91m{formatted_msg}\033[0m") # Red
+        elif level == "WARNING":
+            print(f"\033[93m{formatted_msg}\033[0m") # Yellow
+        else:
+            print(formatted_msg)
+
+        # 3. External Channels (Mock/Placeholder)
+        if level in ["CRITICAL", "WARNING"]:
+            self._send_telegram(formatted_msg)
+            self._send_email(formatted_msg)
+
+    def _send_telegram(self, message: str):
+        """Placeholder for Telegram integration"""
+        if self.telegram_token and self.telegram_chat_id:
+            # Implement actual API call here
+            # requests.post(f"https://api.telegram.org/bot{self.telegram_token}/sendMessage", ...)
+            pass
+
+    def _send_email(self, message: str):
+        """Placeholder for Email integration"""
+        pass
+
+# Initialize global manager
+notifier = NotificationManager()
 
 
 def get_ist_time():
@@ -452,15 +515,6 @@ def fetch_positionbook(api_key: str) -> List[Dict]:
     return []
 
 
-def log_alert(message: str, level: str = "WARNING"):
-    """Log alert to alerts file."""
-    alert_file = BASE_DIR / "log/alerts.log"
-    alert_file.parent.mkdir(parents=True, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(alert_file, "a") as f:
-        f.write(f"[{timestamp}] [{level}] {message}\n")
-
 def generate_fine_tuning_recommendations(analysis: Dict) -> List[str]:
     """Generate fine-tuning recommendations based on analysis."""
     recommendations = []
@@ -491,7 +545,7 @@ def generate_fine_tuning_recommendations(analysis: Dict) -> List[str]:
         if errors > 5:
             msg = f"🔴 {strategy_id}: High error count ({errors}). Check logs for issues."
             recommendations.append(msg)
-            log_alert(msg, level="CRITICAL")
+            notifier.send_alert(msg, level="CRITICAL", category="SYSTEM")
         
         # Analyze rejected signals
         if rejected:
