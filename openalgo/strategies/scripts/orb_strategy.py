@@ -49,10 +49,12 @@ class ORBStrategy:
     def get_previous_close(self):
         try:
             end = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-            start = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+            # Increased lookback to 7 days to handle weekends/holidays
+            start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
             df = self.client.history(symbol=self.symbol, interval="day", start_date=start, end_date=end)
             if not df.empty: return df.iloc[-1]['close']
-        except: pass
+        except Exception as e:
+            self.logger.error(f"Error fetching previous close: {e}")
         return 0
 
     def calculate_signals(self, df):
