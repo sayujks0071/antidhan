@@ -73,12 +73,44 @@ class MCXMomentumStrategy:
         except Exception as e:
             logger.error(f"Error fetching data: {e}")
 
+    def generate_signal(self, df):
+        """
+        Generate signal for backtesting.
+        """
+        if df.empty: return 'HOLD', 0.0, {}
+
+        self.data = df
+        self.calculate_indicators()
+
+        # Check signals (Reusing existing logic but adapting return)
+        current = self.data.iloc[-1]
+        prev = self.data.iloc[-2]
+
+        # Global Filter Check (Mock)
+        global_alignment = True # self.params['use_global_filter']
+
+        action = 'HOLD'
+
+        if (current['adx'] > self.params['adx_threshold'] and
+            current['rsi'] > 50 and
+            current['close'] > prev['close'] and
+            global_alignment):
+            action = 'BUY'
+
+        elif (current['adx'] > self.params['adx_threshold'] and
+              current['rsi'] < 50 and
+              current['close'] < prev['close'] and
+              global_alignment):
+            action = 'SELL'
+
+        return action, 1.0, {'atr': current.get('atr', 0)}
+
     def calculate_indicators(self):
         """Calculate technical indicators."""
         if self.data.empty:
             return
 
-        df = self.data
+        df = self.data.copy()
 
         # RSI
         delta = df['close'].diff()
@@ -162,13 +194,30 @@ class MCXMomentumStrategy:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='MCX Commodity Momentum Strategy')
     parser.add_argument('--symbol', type=str, help='MCX Symbol (e.g., GOLDM05FEB26FUT)')
+    parser.add_argument('--underlying', type=str, help='Commodity Name (e.g., GOLD, SILVER, CRUDEOIL)')
     parser.add_argument('--port', type=int, help='API Port')
     parser.add_argument('--api_key', type=str, help='API Key')
     args = parser.parse_args()
+
+    SYMBOL = "REPLACE_ME"
+
     if args.symbol:
         SYMBOL = args.symbol
+    elif args.underlying:
+        if SymbolResolver:
+            resolver = SymbolResolver()
+            # MCX Futures resolution
+            res = resolver.resolve({'underlying': args.underlying, 'type': 'FUT', 'exchange': 'MCX'})
+            if res:
+                 SYMBOL = res
+                 logger.info(f"Resolved {args.underlying} -> {SYMBOL}")
+            else:
+                 logger.error(f"Could not resolve symbol for {args.underlying}")
+        else:
+            logger.error("SymbolResolver not available")
     elif os.getenv('SYMBOL'):
         SYMBOL = os.getenv('SYMBOL')
+
     if args.port:
         API_HOST = f"http://127.0.0.1:{args.port}"
     elif os.getenv('OPENALGO_PORT'):
@@ -177,9 +226,19 @@ if __name__ == "__main__":
         API_KEY = args.api_key
     else:
         API_KEY = os.getenv('OPENALGO_APIKEY', API_KEY)
-    if SYMBOL == "REPLACE_ME":
+
+    if SYMBOL == "REPLACE_ME" or not SYMBOL:
         logger.error(f"❌ Symbol not configured! SYMBOL={SYMBOL}")
-        logger.error("Please set SYMBOL environment variable or use --symbol argument")
+        logger.error("Please set SYMBOL environment variable or use --symbol or --underlying argument")
         exit(1)
     strategy = MCXMomentumStrategy(SYMBOL, PARAMS)
     strategy.run()
+
+def generate_signal(df, client=None, symbol=None, params=None):
+    # Merge default PARAMS with provided params
+    strat_params = PARAMS.copy()
+    if params:
+        strat_params.update(params)
+
+    strat = MCXMomentumStrategy(symbol or "TEST", strat_params)
+    return strat.generate_signal(df)
