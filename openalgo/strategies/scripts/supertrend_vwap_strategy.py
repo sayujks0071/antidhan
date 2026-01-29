@@ -70,15 +70,17 @@ class SuperTrendVWAPStrategy:
         try:
             # Fetch Sector Data
             end = datetime.now().strftime("%Y-%m-%d")
-            start = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+            # Look back 7 days to ensure 5 trading days are available
+            start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
             df = self.client.history(symbol=self.sector_benchmark, interval="day", start_date=start, end_date=end)
 
-            if not df.empty and len(df) >= 2:
+            if not df.empty and len(df) >= 5:
                 # Check 5 day trend
                 if df.iloc[-1]['close'] > df.iloc[-5]['close']:
                     return True # Uptrend
             return False # Neutral or Downtrend
-        except:
+        except Exception as e:
+            self.logger.error(f"Sector check failed: {e}")
             return True # Fail open if sector data missing
 
     def run(self):
@@ -91,8 +93,9 @@ class SuperTrendVWAPStrategy:
                     continue
 
                 # Fetch history
+                # Look back 7 days to ensure sufficient data
                 df = self.client.history(symbol=self.symbol, interval="5m",
-                                    start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
+                                    start_date=(datetime.now()-timedelta(days=7)).strftime("%Y-%m-%d"),
                                     end_date=datetime.now().strftime("%Y-%m-%d"))
 
                 if df.empty or len(df) < 50:
@@ -110,7 +113,9 @@ class SuperTrendVWAPStrategy:
 
                 # Logic
                 is_above_vwap = last['close'] > last['vwap']
-                is_volume_spike = last['volume'] > df['volume'].mean() * (self.threshold / 100.0)
+                # Exclude current candle from mean calculation to avoid bias
+                avg_volume = df['volume'].iloc[:-1].mean()
+                is_volume_spike = last['volume'] > avg_volume * (self.threshold / 100.0)
                 is_above_poc = last['close'] > poc_price
                 is_not_overextended = abs(last['vwap_dev']) < 0.02
 
