@@ -2,9 +2,9 @@
 import os
 import sys
 import subprocess
-import shutil
+import argparse
 
-REPO_URL = "https://github.com/dheerajw7/OpenAlgo.git" # Placeholder/Best Guess
+REPO_URL = "https://github.com/dheerajw7/OpenAlgo.git"
 TARGET_DIR = "openalgo"
 
 def check_and_clone():
@@ -17,46 +17,48 @@ def check_and_clone():
             print(f"Failed to clone repository: {e}")
             sys.exit(1)
     else:
-        print(f"Directory '{TARGET_DIR}' exists. Verifying it's a valid repo...")
-        # Optional: Check if it's a git repo
-        if not os.path.exists(os.path.join(TARGET_DIR, ".git")):
-            print("Warning: Directory exists but does not appear to be a git repository.")
+        print(f"Directory '{TARGET_DIR}' exists.")
 
-def run_daily_prep():
-    prep_script = os.path.join(TARGET_DIR, "scripts", "daily_prep.py")
-    if not os.path.exists(prep_script):
-        # Fallback: maybe it's in openalgo/openalgo/scripts if cloned? No, standard structure.
-        # Check if I need to use openalgo/scripts/daily_prep.py relative to root
-        prep_script = os.path.join(TARGET_DIR, "openalgo", "scripts", "daily_prep.py")
-        if not os.path.exists(prep_script):
-             prep_script = os.path.join(TARGET_DIR, "scripts", "daily_prep.py") # Try first one again
-
-    # Actually, in this env, 'openalgo/scripts/daily_prep.py' is where I put it.
-    prep_script = os.path.join("openalgo", "scripts", "daily_prep.py")
-
-    if not os.path.exists(prep_script):
-        print(f"Error: {prep_script} not found.")
+def run_script(script_path, description):
+    if not os.path.exists(script_path):
+        print(f"Error: {script_path} not found.")
         sys.exit(1)
 
-    print(f"Executing {prep_script}...")
+    print(f"Executing {description} ({script_path})...")
     try:
-        # Pass current environment + PYTHONPATH
         env = os.environ.copy()
         env['PYTHONPATH'] = os.getcwd() + ":" + env.get('PYTHONPATH', '')
 
-        # We need to run it with the venv python if available
+        # Use venv if exists, else system python
         venv_python = os.path.join("openalgo", "venv", "bin", "python3")
         python_exec = venv_python if os.path.exists(venv_python) else sys.executable
 
-        subprocess.check_call([python_exec, prep_script], env=env)
+        subprocess.check_call([python_exec, script_path], env=env)
+        print(f"✅ {description} Success.")
     except subprocess.CalledProcessError as e:
-        print(f"Daily Prep failed with exit code {e.returncode}")
+        print(f"❌ {description} Failed with exit code {e.returncode}")
         sys.exit(e.returncode)
 
 def main():
+    parser = argparse.ArgumentParser(description="OpenAlgo Daily Startup Routine")
+    parser.add_argument("--backtest", action="store_true", help="Run backtest and leaderboard generation after prep")
+    args = parser.parse_args()
+
     print("=== DAILY STARTUP ROUTINE ===")
+
+    # 1. Ensure Repo
     check_and_clone()
-    run_daily_prep()
+
+    # 2. Daily Prep
+    prep_script = os.path.join("openalgo", "scripts", "daily_prep.py")
+    run_script(prep_script, "Daily Prep")
+
+    # 3. Backtest (Optional)
+    if args.backtest:
+        backtest_script = os.path.join("openalgo", "scripts", "daily_backtest_leaderboard.py")
+        run_script(backtest_script, "Daily Backtest & Leaderboard")
+
+    print("=== DAILY ROUTINE COMPLETE ===")
 
 if __name__ == "__main__":
     main()
