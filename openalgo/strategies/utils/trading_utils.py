@@ -152,6 +152,16 @@ class PositionManager:
     def has_position(self):
         return self.position != 0
 
+    def get_pnl(self, current_price):
+        """Calculate Unrealized PnL."""
+        if self.position == 0:
+            return 0.0
+
+        if self.position > 0:
+            return (current_price - self.entry_price) * self.position
+        else:
+            return (self.entry_price - current_price) * abs(self.position)
+
 class SmartOrder:
     """
     Intelligent Order Execution logic.
@@ -371,15 +381,6 @@ class APIClient:
 
     def placesmartorder(self, strategy, symbol, action, exchange, price_type, product, quantity, position_size):
         """Place smart order"""
-        # #region agent log
-        debug_log_path = "/Users/mac/dyad-apps/probable-fiesta/.cursor/debug.log"
-        try:
-            import json as json_module
-            with open(debug_log_path, "a") as f:
-                f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"trading_utils.py:201","message":"placesmartorder() called","data":{"strategy":strategy,"symbol":symbol,"action":action,"exchange":exchange,"price_type":price_type,"product":product,"quantity":quantity,"position_size":position_size},"timestamp":int(time.time()*1000)}) + "\n")
-        except: pass
-        # #endregion
-        
         # Correct endpoint is /api/v1/placesmartorder (not /api/v1/smartorder)
         url = f"{self.host}/api/v1/placesmartorder"
 
@@ -398,64 +399,26 @@ class APIClient:
             "disclosed_quantity": "0"
         }
         
-        # #region agent log
-        try:
-            with open(debug_log_path, "a") as f:
-                f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"trading_utils.py:220","message":"Before API call","data":{"url":url,"payload_keys":list(payload.keys())},"timestamp":int(time.time()*1000)}) + "\n")
-        except: pass
-        # #endregion
-        
         try:
             response = httpx.post(url, json=payload, timeout=10)
-            
-            # #region agent log
-            try:
-                with open(debug_log_path, "a") as f:
-                    f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"trading_utils.py:225","message":"API response received","data":{"status_code":response.status_code,"content_length":len(response.content),"content_type":response.headers.get("content-type","unknown")},"timestamp":int(time.time()*1000)}) + "\n")
-            except: pass
-            # #endregion
             
             if response.status_code == 200:
                 # Handle response - may be JSON or empty
                 try:
                     response_data = response.json()
-                    # #region agent log
-                    try:
-                        with open(debug_log_path, "a") as f:
-                            f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"trading_utils.py:232","message":"Response parsed as JSON","data":{"has_orderid":"orderid" in response_data,"status":response_data.get("status")},"timestamp":int(time.time()*1000)}) + "\n")
-                    except: pass
-                    # #endregion
                     logger.info(f"[ENTRY] Order Placed: {response_data}")
                     return response_data
                 except ValueError:
                     # Response is not JSON - might be empty or HTML
                     response_text = response.text[:200] if response.text else "(empty)"
-                    # #region agent log
-                    try:
-                        with open(debug_log_path, "a") as f:
-                            f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"trading_utils.py:240","message":"Response not JSON","data":{"response_preview":response_text,"content_length":len(response.content)},"timestamp":int(time.time()*1000)}) + "\n")
-                    except: pass
-                    # #endregion
                     logger.warning(f"Order API returned non-JSON response (status 200): {response_text}")
                     # Return success indication even if response isn't JSON
                     return {"status": "success", "message": "Order placed (non-JSON response)"}
             else:
                 error_text = response.text[:500] if response.text else "(empty)"
-                # #region agent log
-                try:
-                    with open(debug_log_path, "a") as f:
-                        f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"trading_utils.py:248","message":"Order API error response","data":{"status_code":response.status_code,"error":error_text},"timestamp":int(time.time()*1000)}) + "\n")
-                except: pass
-                # #endregion
                 logger.error(f"Order Failed (HTTP {response.status_code}): {error_text}")
                 return {"status": "error", "message": f"HTTP {response.status_code}: {error_text}"}
         except Exception as e:
-            # #region agent log
-            try:
-                with open(debug_log_path, "a") as f:
-                    f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"trading_utils.py:254","message":"Order API exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)}) + "\n")
-            except: pass
-            # #endregion
             logger.error(f"Order API Error: {e}")
             import traceback
             logger.debug(traceback.format_exc())
