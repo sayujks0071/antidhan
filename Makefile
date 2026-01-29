@@ -18,7 +18,8 @@ obs-down:
 	docker compose -f observability/docker-compose.yml down
 
 obs-logs:
-	docker compose -f observability/docker-compose.yml logs -f
+	@echo "Tailing app logs (local) and stack logs (docker)... (Ctrl+C to stop)"
+	@bash -c "trap 'kill 0' SIGINT; docker compose -f observability/docker-compose.yml logs -f & tail -f logs/openalgo.log & wait"
 
 run:
 	@echo "Starting OpenAlgo..."
