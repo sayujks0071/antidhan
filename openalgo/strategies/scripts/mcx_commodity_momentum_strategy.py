@@ -1,13 +1,24 @@
 import os
+import sys
 import time
 import logging
+import argparse
 import pandas as pd
 import numpy as np
 import requests
 from datetime import datetime
 
+# Add repo root to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+
+try:
+    from openalgo.strategies.utils.trading_utils import APIClient
+    from openalgo.strategies.utils.symbol_resolver import SymbolResolver
+except ImportError:
+    APIClient = None
+    SymbolResolver = None
+
 # Configuration
-SYMBOL = "REPLACE_ME" # Replaced by manager
 API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
 API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
 
@@ -148,5 +159,24 @@ class MCXMomentumStrategy:
             time.sleep(900) # 15 minutes
 
 if __name__ == "__main__":
-    strategy = MCXMomentumStrategy(SYMBOL, PARAMS)
+    parser = argparse.ArgumentParser(description="MCX Momentum Strategy")
+    parser.add_argument("--symbol", type=str, help="Symbol")
+    parser.add_argument("--underlying", type=str, help="Underlying (e.g. SILVER)")
+    parser.add_argument("--exchange", type=str, default="MCX", help="Exchange")
+
+    args = parser.parse_args()
+
+    symbol = args.symbol
+    if not symbol and args.underlying:
+        if SymbolResolver:
+            resolver = SymbolResolver()
+            res = resolver.resolve({'underlying': args.underlying, 'type': 'FUT', 'exchange': args.exchange})
+            symbol = res
+            print(f"Resolved {args.underlying} -> {symbol}")
+
+    if not symbol:
+        print("Must provide --symbol or --underlying")
+        sys.exit(1)
+
+    strategy = MCXMomentumStrategy(symbol, PARAMS)
     strategy.run()

@@ -17,10 +17,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.
 
 try:
     from openalgo.strategies.utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
+    from openalgo.strategies.utils.symbol_resolver import SymbolResolver
 except ImportError:
     print("Warning: openalgo package not found or imports failed.")
     APIClient = None
     PositionManager = None
+    SymbolResolver = None
     is_market_open = lambda: True
     calculate_intraday_vwap = lambda x: x
 
@@ -129,7 +131,10 @@ class SuperTrendVWAPStrategy:
 
 def run_strategy():
     parser = argparse.ArgumentParser(description="SuperTrend VWAP Strategy")
-    parser.add_argument("--symbol", type=str, required=True, help="Trading Symbol")
+    parser.add_argument("--symbol", type=str, help="Trading Symbol")
+    parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
+    parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
+    parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
     parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
     parser.add_argument("--api_key", type=str, default='demo_key', help="API Key")
     parser.add_argument("--host", type=str, default='http://127.0.0.1:5001', help="Host")
@@ -138,8 +143,23 @@ def run_strategy():
 
     args = parser.parse_args()
 
+    symbol = args.symbol
+    if not symbol and args.underlying:
+        if SymbolResolver:
+            resolver = SymbolResolver()
+            res = resolver.resolve({'underlying': args.underlying, 'type': args.type, 'exchange': args.exchange})
+            if isinstance(res, dict):
+                symbol = res.get('sample_symbol')
+            else:
+                symbol = res
+            print(f"Resolved {args.underlying} -> {symbol}")
+
+    if not symbol:
+        print("Error: Must provide --symbol or --underlying")
+        return
+
     strategy = SuperTrendVWAPStrategy(
-        symbol=args.symbol,
+        symbol=symbol,
         quantity=args.quantity,
         api_key=args.api_key,
         host=args.host,
