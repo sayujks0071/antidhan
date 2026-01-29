@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ORB Strategy (Opening Range Breakout)
-Enhanced with Pre-Market Gap Analysis and Volume Confirmation.
+Enhanced with Pre-Market Gap Analysis, Volume Confirmation, Trend Filter (EMA50), and ATR Risk Management.
 """
 import os
 import sys
@@ -9,6 +9,7 @@ import time
 import logging
 import argparse
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 
 # Add repo root to path
@@ -45,22 +46,51 @@ class ORBStrategy:
         self.orb_low = 0
         self.orb_set = False
         self.orb_vol_avg = 0
+        self.trend_bullish = True  # Default to True
+        self.gap_pct = 0.0
+        self.atr = 0.0
         self.skip_trade = False
 
-    def get_previous_close(self):
+        # Risk State
+        self.sl = 0.0
+        self.tp = 0.0
+
+    def calculate_atr(self, df, period=14):
+        """Calculate ATR"""
+        high = df['high']
+        low = df['low']
+        close = df['close']
+        tr1 = high - low
+        tr2 = (high - close.shift(1)).abs()
+        tr3 = (low - close.shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        return tr.rolling(period).mean().iloc[-1]
+
+    def fetch_daily_context(self):
+        """Fetch Previous Close and Daily Trend (EMA50)"""
         try:
-            # Look back enough days to find the last completed trading day
-            # (7 days handles weekends/holidays)
+            # Look back enough days for EMA50 calculation and to handle weekends/holidays
             today = datetime.now().date()
             end = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-            start = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+            start = (today - timedelta(days=100)).strftime("%Y-%m-%d")  # Need enough data for EMA50
 
             df = self.client.history(symbol=self.symbol, interval="day", start_date=start, end_date=end)
-            if not df.empty:
-                # Return the close from the most recent trading day
+
+            if not df.empty and len(df) > 50:
+                df['ema50'] = df['close'].ewm(span=50, adjust=False).mean()
+                last_close = df.iloc[-1]['close']
+                last_ema = df.iloc[-1]['ema50']
+
+                self.trend_bullish = last_close > last_ema
+                prev_close = df.iloc[-1]['close']  # Most recent completed trading day
+
+                self.atr = self.calculate_atr(df)
+                return prev_close
+            elif not df.empty:
+                # Not enough data for EMA50, but return previous close
                 return df.iloc[-1]['close']
         except Exception as e:
-            self.logger.error(f"Error fetching previous close: {e}")
+            self.logger.error(f"Error fetching context: {e}")
         return 0
 
     def calculate_signals(self, df):
@@ -106,10 +136,12 @@ class ORBStrategy:
 
     def run(self):
         self.logger.info(f"Starting ORB Strategy for {self.symbol} ({self.range_mins} mins)")
-        prev_close = self.get_previous_close()
+        prev_close = self.fetch_daily_context()
+        self.logger.info(f"Context: Trend Bullish={self.trend_bullish}, Prev Close={prev_close}, ATR={self.atr:.2f}")
 
         while True:
             try:
+                # Basic market check
                 if not is_market_open():
                     time.sleep(60)
                     continue
@@ -128,9 +160,7 @@ class ORBStrategy:
                     continue
 
                 if not self.orb_set:
-                    # Fetch ORB data
                     today = now.strftime("%Y-%m-%d")
-                    # Using 1m candles
                     df = self.client.history(symbol=self.symbol, interval="1m", start_date=today, end_date=today)
 
                     if not df.empty and len(df) >= self.range_mins:
@@ -140,14 +170,13 @@ class ORBStrategy:
                         self.orb_vol_avg = orb_df['volume'].mean()
 
                         open_price = df.iloc[0]['open']
-                        gap_pct = 0
                         if prev_close > 0:
-                            gap_pct = (open_price - prev_close) / prev_close * 100
+                            self.gap_pct = (open_price - prev_close) / prev_close * 100
 
-                        self.logger.info(f"ORB Set: {self.orb_high}-{self.orb_low}. Gap: {gap_pct:.2f}%")
+                        self.logger.info(f"ORB Set: {self.orb_high}-{self.orb_low}. Gap: {self.gap_pct:.2f}%. Trend Bullish: {self.trend_bullish}")
 
-                        # Gap Analysis
-                        if abs(gap_pct) > 2.0:
+                        # Gap Analysis - skip if gap is too large
+                        if abs(self.gap_pct) > 2.0:
                             self.logger.info("Gap > 2%. Skipping ORB trades due to volatility risk.")
                             self.skip_trade = True
 
@@ -156,22 +185,70 @@ class ORBStrategy:
                         time.sleep(30)
                         continue
 
-                # Trading
-                if self.orb_set and not self.skip_trade and (not self.pm or not self.pm.has_position()):
-                     today = now.strftime("%Y-%m-%d")
-                     df = self.client.history(symbol=self.symbol, interval="1m", start_date=today, end_date=today)
-                     if df.empty: continue
-                     last = df.iloc[-1]
+                # Trading Logic
+                today = now.strftime("%Y-%m-%d")
+                df = self.client.history(symbol=self.symbol, interval="1m", start_date=today, end_date=today)
+                if df.empty:
+                    time.sleep(10)
+                    continue
+                last = df.iloc[-1]
 
-                     # Breakout Up
-                     if last['close'] > self.orb_high and last['volume'] > self.orb_vol_avg:
-                         self.logger.info("ORB Breakout UP. BUY.")
-                         if self.pm: self.pm.update_position(self.quantity, last['close'], 'BUY')
+                if self.pm and self.pm.has_position():
+                    # Check Exits
+                    if self.sl > 0 and self.tp > 0:
+                        pos_size = self.pm.position
 
-                     # Breakout Down
-                     elif last['close'] < self.orb_low and last['volume'] > self.orb_vol_avg:
-                         self.logger.info("ORB Breakout DOWN. SELL.")
-                         if self.pm: self.pm.update_position(self.quantity, last['close'], 'SELL')
+                        if pos_size > 0: # Long
+                            if last['close'] <= self.sl:
+                                self.logger.info(f"SL Hit: {last['close']}")
+                                self.pm.update_position(abs(pos_size), last['close'], 'SELL')
+                                self.sl = 0; self.tp = 0
+                            elif last['close'] >= self.tp:
+                                self.logger.info(f"TP Hit: {last['close']}")
+                                self.pm.update_position(abs(pos_size), last['close'], 'SELL')
+                                self.sl = 0; self.tp = 0
+                        elif pos_size < 0: # Short
+                            if last['close'] >= self.sl:
+                                self.logger.info(f"SL Hit: {last['close']}")
+                                self.pm.update_position(abs(pos_size), last['close'], 'BUY')
+                                self.sl = 0; self.tp = 0
+                            elif last['close'] <= self.tp:
+                                self.logger.info(f"TP Hit: {last['close']}")
+                                self.pm.update_position(abs(pos_size), last['close'], 'BUY')
+                                self.sl = 0; self.tp = 0
+
+                elif self.orb_set and not self.skip_trade:
+                     # Improved Logic:
+                     is_long = last['close'] > self.orb_high and last['volume'] > self.orb_vol_avg
+                     is_short = last['close'] < self.orb_low and last['volume'] > self.orb_vol_avg
+
+                     # Filters
+                     if is_long:
+                         if not self.trend_bullish:
+                             # self.logger.info("Skipping Long: Trend is Bearish")
+                             pass
+                         elif self.gap_pct > 0.5:
+                             # self.logger.info(f"Skipping Long: Large Gap Up ({self.gap_pct:.2f}%)")
+                             pass
+                         else:
+                             self.logger.info("ORB Breakout UP. BUY.")
+                             # SL/TP
+                             self.sl = last['close'] - (1.5 * self.atr)
+                             self.tp = last['close'] + (3.0 * self.atr)
+                             self.logger.info(f"SL: {self.sl:.2f}, TP: {self.tp:.2f}")
+                             if self.pm: self.pm.update_position(self.quantity, last['close'], 'BUY')
+
+                     elif is_short:
+                         if self.trend_bullish:
+                             pass
+                         elif self.gap_pct < -0.5:
+                             pass
+                         else:
+                             self.logger.info("ORB Breakout DOWN. SELL.")
+                             self.sl = last['close'] + (1.5 * self.atr)
+                             self.tp = last['close'] - (3.0 * self.atr)
+                             self.logger.info(f"SL: {self.sl:.2f}, TP: {self.tp:.2f}")
+                             if self.pm: self.pm.update_position(self.quantity, last['close'], 'SELL')
 
             except Exception as e:
                 self.logger.error(f"Error: {e}")
