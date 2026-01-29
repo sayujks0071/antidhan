@@ -45,6 +45,7 @@ class ORBStrategy:
         self.orb_low = 0
         self.orb_set = False
         self.orb_vol_avg = 0
+        self.skip_trade = False
 
     def get_previous_close(self):
         try:
@@ -139,13 +140,20 @@ class ORBStrategy:
                             gap_pct = (open_price - prev_close) / prev_close * 100
 
                         self.logger.info(f"ORB Set: {self.orb_high}-{self.orb_low}. Gap: {gap_pct:.2f}%")
+
+                        # Gap Analysis
+                        if abs(gap_pct) > 2.0:
+                            self.logger.info("Gap > 2%. Skipping ORB trades due to volatility risk.")
+                            self.skip_trade = True
+
                         self.orb_set = True
                     else:
                         time.sleep(30)
                         continue
 
                 # Trading
-                if self.orb_set and (not self.pm or not self.pm.has_position()):
+                if self.orb_set and not self.skip_trade and (not self.pm or not self.pm.has_position()):
+                     today = now.strftime("%Y-%m-%d")
                      df = self.client.history(symbol=self.symbol, interval="1m", start_date=today, end_date=today)
                      if df.empty: continue
                      last = df.iloc[-1]
