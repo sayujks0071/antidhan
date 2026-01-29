@@ -2,6 +2,7 @@ import os
 import logging
 import pytz
 import json
+import time as time_module
 from pathlib import Path
 from datetime import datetime, time
 import httpx
@@ -223,7 +224,7 @@ class APIClient:
         self.host = host.rstrip('/')
 
     def history(self, symbol, exchange="NSE", interval="5m", start_date=None, end_date=None):
-        """Fetch historical data"""
+        """Fetch historical data with retries"""
         url = f"{self.host}/api/v1/history"
         payload = {
             "symbol": symbol,
@@ -233,24 +234,26 @@ class APIClient:
             "to": end_date,
             "apikey": self.api_key
         }
-        try:
-            response = httpx.post(url, json=payload, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('status') == 'success' and 'data' in data:
-                    df = pd.DataFrame(data['data'])
-                    # Clean up if needed, ensure columns match
-                    return df
-            logger.error(f"History fetch failed: {response.text}")
-        except Exception as e:
-            logger.error(f"API Error: {e}")
+
+        for attempt in range(3):
+            try:
+                response = httpx.post(url, json=payload, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('status') == 'success' and 'data' in data:
+                        df = pd.DataFrame(data['data'])
+                        return df
+                logger.warning(f"History fetch attempt {attempt+1} failed: {response.text if response else 'No Response'}")
+            except Exception as e:
+                logger.warning(f"API Error attempt {attempt+1}: {e}")
+
+            time_module.sleep(1) # Backoff
+
+        logger.error(f"History fetch failed after 3 attempts for {symbol}")
         return pd.DataFrame() # Empty DF on failure
 
     def placesmartorder(self, strategy, symbol, action, exchange, price_type, product, quantity, position_size):
-        """Place order"""
-        url = f"{self.host}/api/v1/orders" # Assuming standard endpoint, might vary
-        # Note: 'placesmartorder' implies logic on server, but we'll map to simple order for fallback
-        # Or if the server supports smart orders:
+        """Place order with retries"""
         url = f"{self.host}/api/v1/smartorder"
 
         payload = {
@@ -263,12 +266,19 @@ class APIClient:
             "quantity": quantity,
             "apikey": self.api_key
         }
-        try:
-            response = httpx.post(url, json=payload, timeout=5)
-            if response.status_code == 200:
-                logger.info(f"Order Placed: {response.json()}")
-                return response.json()
-            else:
-                logger.error(f"Order Failed: {response.text}")
-        except Exception as e:
-            logger.error(f"Order API Error: {e}")
+
+        for attempt in range(3):
+            try:
+                response = httpx.post(url, json=payload, timeout=5)
+                if response.status_code == 200:
+                    logger.info(f"Order Placed: {response.json()}")
+                    return response.json()
+                else:
+                    logger.warning(f"Order attempt {attempt+1} failed: {response.text}")
+            except Exception as e:
+                logger.warning(f"Order API Error attempt {attempt+1}: {e}")
+
+            time_module.sleep(1)
+
+        logger.error(f"Order placement failed after 3 attempts for {symbol}")
+        return None
