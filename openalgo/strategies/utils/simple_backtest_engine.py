@@ -19,7 +19,21 @@ utils_path = Path(__file__).parent
 if str(utils_path) not in sys.path:
     sys.path.insert(0, str(utils_path))
 
+# Add project root to path for data validator
+project_root = utils_path.parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from trading_utils import APIClient
+try:
+    from openalgo.utils.data_validator import DataValidator
+except ImportError:
+    # Fallback if package import fails
+    sys.path.append(str(project_root / "openalgo" / "utils"))
+    try:
+        from data_validator import DataValidator
+    except ImportError:
+        DataValidator = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("BacktestEngine")
@@ -305,6 +319,18 @@ class SimpleBacktestEngine:
             logger.error(f"Missing required columns: {missing_cols}")
             return {'error': f'Missing columns: {missing_cols}'}
         
+        # Validate Data
+        if DataValidator:
+            val_res = DataValidator.validate_ohlcv(df, symbol=symbol)
+            if not val_res['is_valid']:
+                logger.warning(f"Data Validation Failed: {val_res['issues']}")
+                # We log warning but proceed, or return error?
+                # For now, just warn loudly
+            elif val_res['issues']:
+                logger.warning(f"Data Quality Issues: {val_res['issues']}")
+            else:
+                logger.info("Data Validation Passed ✅")
+
         # Run backtest
         logger.info(f"Processing {len(df)} bars...")
         

@@ -16,10 +16,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.
 
 try:
     from openalgo.strategies.utils.trading_utils import is_market_open, PositionManager, APIClient
+    from openalgo.strategies.utils.symbol_resolver import SymbolResolver
 except ImportError:
     print("Warning: openalgo package not found or imports failed.")
     APIClient = None
     PositionManager = None
+    SymbolResolver = None
     is_market_open = lambda: True
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -43,24 +45,64 @@ class ORBStrategy:
         self.orb_low = 0
         self.orb_set = False
         self.orb_vol_avg = 0
+        self.skip_trade = False
 
     def get_previous_close(self):
         try:
             # Look back enough days to find the last completed trading day
+            # (7 days handles weekends/holidays)
             today = datetime.now().date()
             end = (today - timedelta(days=1)).strftime("%Y-%m-%d")
             start = (today - timedelta(days=7)).strftime("%Y-%m-%d")
 
             df = self.client.history(symbol=self.symbol, interval="day", start_date=start, end_date=end)
             if not df.empty:
-                 # Ensure the data is not from today (in case feed includes it)
-                 last_row = df.iloc[-1]
-                 # If dataframe has 'date' or 'datetime' column, check it
-                 # Assuming API returns data up to 'end' date which is yesterday
-                 return last_row['close']
+                # Return the close from the most recent trading day
+                return df.iloc[-1]['close']
         except Exception as e:
             self.logger.error(f"Error fetching previous close: {e}")
         return 0
+
+    def calculate_signals(self, df):
+        """
+        Backtest logic: Process a DataFrame and return signals.
+        """
+        signals = []
+        if df.empty or len(df) < self.range_mins:
+            return signals
+
+        # Calculate ORB on the first 'range_mins' candles
+        orb_df = df.iloc[:self.range_mins]
+        orb_high = orb_df['high'].max()
+        orb_low = orb_df['low'].min()
+        orb_vol_avg = orb_df['volume'].mean()
+
+        position = 0
+
+        for i in range(self.range_mins, len(df)):
+            candle = df.iloc[i]
+            ts = candle['datetime'] if 'datetime' in candle else candle.name
+
+            # Entry Logic
+            if position == 0:
+                if candle['close'] > orb_high and candle['volume'] > orb_vol_avg:
+                    signals.append({'time': ts, 'side': 'BUY', 'price': candle['close']})
+                    position = 1
+                elif candle['close'] < orb_low and candle['volume'] > orb_vol_avg:
+                    signals.append({'time': ts, 'side': 'SELL', 'price': candle['close']})
+                    position = -1
+
+            # Exit Logic (Simple EOD or Reverse)
+            # For simplicity, if we are long and close < low, reverse?
+            # Keeping it simple: One trade per day logic or hold till end.
+            # Let's add a trailing stop or just exit at end.
+            # If this is the last candle, exit.
+            if i == len(df) - 1 and position != 0:
+                 side = 'SELL' if position == 1 else 'BUY'
+                 signals.append({'time': ts, 'side': side, 'price': candle['close'], 'reason': 'EOD'})
+                 position = 0
+
+        return signals
 
     def run(self):
         self.logger.info(f"Starting ORB Strategy for {self.symbol} ({self.range_mins} mins)")
@@ -103,13 +145,20 @@ class ORBStrategy:
                             gap_pct = (open_price - prev_close) / prev_close * 100
 
                         self.logger.info(f"ORB Set: {self.orb_high}-{self.orb_low}. Gap: {gap_pct:.2f}%")
+
+                        # Gap Analysis
+                        if abs(gap_pct) > 2.0:
+                            self.logger.info("Gap > 2%. Skipping ORB trades due to volatility risk.")
+                            self.skip_trade = True
+
                         self.orb_set = True
                     else:
                         time.sleep(30)
                         continue
 
                 # Trading
-                if self.orb_set and (not self.pm or not self.pm.has_position()):
+                if self.orb_set and not self.skip_trade and (not self.pm or not self.pm.has_position()):
+                     today = now.strftime("%Y-%m-%d")
                      df = self.client.history(symbol=self.symbol, interval="1m", start_date=today, end_date=today)
                      if df.empty: continue
                      last = df.iloc[-1]
@@ -132,14 +181,41 @@ class ORBStrategy:
 
 def run_strategy():
     parser = argparse.ArgumentParser(description="ORB Strategy")
-    parser.add_argument("--symbol", type=str, required=True, help="Symbol")
+    parser.add_argument("--symbol", type=str, help="Symbol (Direct)")
+    parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
+    parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
+    parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
     parser.add_argument("--quantity", type=int, default=10, help="Qty")
     parser.add_argument("--api_key", type=str, default=None, help="API Key (or set OPENALGO_APIKEY)")
     parser.add_argument("--host", type=str, default=None, help="Host URL (or set OPENALGO_HOST)")
     parser.add_argument("--minutes", type=int, default=15, help="ORB Duration")
 
     args = parser.parse_args()
-    strategy = ORBStrategy(args.symbol, args.quantity, args.api_key, args.host, range_mins=args.minutes)
+
+    symbol = args.symbol
+    if not symbol and args.underlying:
+        if SymbolResolver:
+            resolver = SymbolResolver()
+            config = {
+                'underlying': args.underlying,
+                'type': args.type,
+                'exchange': args.exchange
+            }
+            res = resolver.resolve(config)
+            if isinstance(res, dict): # Options return dict
+                symbol = res.get('sample_symbol')
+            else:
+                symbol = res
+            print(f"Resolved {args.underlying} -> {symbol}")
+        else:
+            print("SymbolResolver not available")
+            return
+
+    if not symbol:
+        print("Error: Must provide --symbol or --underlying")
+        return
+
+    strategy = ORBStrategy(symbol, args.quantity, args.api_key, args.host, range_mins=args.minutes)
     strategy.run()
 
 if __name__ == "__main__":
