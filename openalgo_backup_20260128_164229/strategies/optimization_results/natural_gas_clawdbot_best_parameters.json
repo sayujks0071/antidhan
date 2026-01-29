@@ -1,0 +1,10 @@
+{
+  "BASE_ENTRY_THRESHOLD": 55,
+  "MIN_ENTRY_THRESHOLD": 50,
+  "ATR_SL_MULTIPLIER": 3.0,
+  "ATR_TP_MULTIPLIER": 5.0,
+  "TIMEFRAME_15m": 0.5,
+  "ADX_ADAPTIVE_FACTOR": 0.3,
+  "optimization_method": "grid_search",
+  "composite_score": 15.0
+}

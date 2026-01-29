@@ -1,13 +1,14 @@
 import os
 import time
 import logging
+import argparse
 import pandas as pd
 import numpy as np
 import requests
 from datetime import datetime
 
 # Configuration
-SYMBOL = "REPLACE_ME" # Replaced by manager
+SYMBOL = os.getenv('SYMBOL', 'GOLDM05FEB26FUT')  # Default to Gold futures
 API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
 API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
 
@@ -148,5 +149,35 @@ class MCXMomentumStrategy:
             time.sleep(900) # 15 minutes
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='MCX Commodity Momentum Strategy')
+    parser.add_argument('--symbol', type=str, help='MCX Symbol (e.g., GOLDM05FEB26FUT)')
+    parser.add_argument('--port', type=int, help='API Port')
+    parser.add_argument('--api_key', type=str, help='API Key')
+
+    args = parser.parse_args()
+
+    # Use command-line args if provided, otherwise fall back to environment variables
+    if args.symbol:
+        SYMBOL = args.symbol
+    elif os.getenv('SYMBOL'):
+        SYMBOL = os.getenv('SYMBOL')
+    
+    if args.port:
+        API_HOST = f"http://127.0.0.1:{args.port}"
+    elif os.getenv('OPENALGO_PORT'):
+        API_HOST = f"http://127.0.0.1:{os.getenv('OPENALGO_PORT')}"
+    
+    if args.api_key:
+        API_KEY = args.api_key
+    else:
+        API_KEY = os.getenv('OPENALGO_APIKEY', API_KEY)
+
+    # Validate symbol is not REPLACE_ME
+    if SYMBOL == "REPLACE_ME":
+        logger.error(f"❌ Symbol not configured! SYMBOL={SYMBOL}")
+        logger.error("Please set SYMBOL environment variable or use --symbol argument")
+        logger.error("Example: --symbol GOLDM05FEB26FUT")
+        exit(1)
+
     strategy = MCXMomentumStrategy(SYMBOL, PARAMS)
     strategy.run()

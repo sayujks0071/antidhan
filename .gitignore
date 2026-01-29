@@ -6,3 +6,5 @@ openalgo/strategies/strategy_env.json
 .claude/
 .DS_Store
 **/.DS_Store
+logs/*.log
+logs/*.log.*

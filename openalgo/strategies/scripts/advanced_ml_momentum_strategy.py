@@ -13,15 +13,28 @@ import numpy as np
 from datetime import datetime, timedelta
 
 # Add project root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+strategies_dir = os.path.dirname(script_dir)
+utils_dir = os.path.join(strategies_dir, 'utils')
+
+# Add utils directory to path for imports
+sys.path.insert(0, utils_dir)
 
 try:
-    from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+    from trading_utils import APIClient, PositionManager, is_market_open
 except ImportError:
-    print("Warning: openalgo package not found or imports failed.")
-    APIClient = None
-    PositionManager = None
-    is_market_open = lambda: True
+    try:
+        # Try absolute import
+        sys.path.insert(0, strategies_dir)
+        from utils.trading_utils import APIClient, PositionManager, is_market_open
+    except ImportError:
+        try:
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+        except ImportError:
+            print("Warning: openalgo package not found or imports failed.")
+            APIClient = None
+            PositionManager = None
+            is_market_open = lambda: True
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -53,6 +66,20 @@ class MLMomentumStrategy:
         return 0.5 # Neutral to Positive
 
     def run(self):
+        # Normalize symbol (NIFTY50 -> NIFTY, NIFTY 50 -> NIFTY, NIFTYBANK -> BANKNIFTY)
+        original_symbol = self.symbol
+        symbol_upper = self.symbol.upper().replace(" ", "")
+        if "BANK" in symbol_upper and "NIFTY" in symbol_upper:
+            self.symbol = "BANKNIFTY"
+        elif "NIFTY" in symbol_upper:
+            # Remove "50" suffix if present (NIFTY50 -> NIFTY)
+            self.symbol = "NIFTY" if symbol_upper.replace("50", "") == "NIFTY" else "NIFTY"
+        else:
+            self.symbol = original_symbol
+        
+        if original_symbol != self.symbol:
+            self.logger.info(f"Symbol normalized: {original_symbol} -> {self.symbol}")
+        
         self.logger.info(f"Starting ML Momentum Strategy for {self.symbol}")
 
         while True:
@@ -65,15 +92,17 @@ class MLMomentumStrategy:
                 end_date = datetime.now().strftime("%Y-%m-%d")
                 start_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
 
-                df = self.client.history(symbol=self.symbol, interval="15m",
+                # Use NSE_INDEX for NIFTY index
+                exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
+                df = self.client.history(symbol=self.symbol, interval="15m", exchange=exchange,
                                     start_date=start_date, end_date=end_date)
 
                 if df.empty or len(df) < 50:
                     time.sleep(60)
                     continue
 
-                # 2. Fetch Index Data
-                index_df = self.client.history(symbol="NIFTY 50", interval="15m",
+                # 2. Fetch Index Data - Use NSE_INDEX for indices (use "NIFTY" not "NIFTY 50")
+                index_df = self.client.history(symbol="NIFTY", interval="15m", exchange="NSE_INDEX",
                                           start_date=start_date, end_date=end_date)
 
                 # 3. Indicators
@@ -136,21 +165,32 @@ class MLMomentumStrategy:
                         self.pm.update_position(100, current_price, 'BUY')
 
             except Exception as e:
-                self.logger.error(f"Error: {e}")
+                self.logger.error(f"Error in ML Momentum strategy for {self.symbol}: {e}", exc_info=True)
                 time.sleep(60)
 
             time.sleep(60)
 
 def run_strategy():
     parser = argparse.ArgumentParser(description='ML Momentum Strategy')
-    parser.add_argument('--symbol', type=str, required=True, help='Stock Symbol')
-    parser.add_argument('--port', type=int, default=5001, help='API Port')
-    parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
-    parser.add_argument('--threshold', type=float, default=0.01, help='ROC Threshold')
+    parser.add_argument('--symbol', type=str, help='Stock Symbol')
+    parser.add_argument('--port', type=int, help='API Port')
+    parser.add_argument('--api_key', type=str, help='API Key')
+    parser.add_argument('--threshold', type=float, help='ROC Threshold')
 
     args = parser.parse_args()
+    
+    # Use command-line args if provided, otherwise fall back to environment variables
+    symbol = args.symbol or os.getenv('SYMBOL')
+    if not symbol:
+        print("ERROR: --symbol argument or SYMBOL environment variable is required")
+        parser.print_help()
+        sys.exit(1)
+    
+    port = args.port or int(os.getenv('OPENALGO_PORT', '5001'))
+    api_key = args.api_key or os.getenv('OPENALGO_APIKEY', 'demo_key')
+    threshold = args.threshold or float(os.getenv('THRESHOLD', '0.01'))
 
-    strategy = MLMomentumStrategy(args.symbol, args.api_key, args.port, threshold=args.threshold)
+    strategy = MLMomentumStrategy(symbol, api_key, port, threshold=threshold)
     strategy.run()
 
 if __name__ == "__main__":

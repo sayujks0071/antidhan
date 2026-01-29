@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .success { color: green; padding: 10px; background: #e8f5e9; border-radius: 5px; margin: 10px 0; }
+        .error { color: red; padding: 10px; background: #ffebee; border-radius: 5px; margin: 10px 0; }
+        .info { color: blue; padding: 10px; background: #e3f2fd; border-radius: 5px; margin: 10px 0; }
+        input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { background: #2196F3; color: white; border: none; cursor: pointer; }
+        button:hover { background: #1976D2; }
+        #log { margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>OpenAlgo Login Test</h1>
+    
+    <div id="status"></div>
+    
+    <form id="loginForm">
+        <input type="text" id="username" placeholder="Username" value="sayujks0071" required>
+        <input type="password" id="password" placeholder="Password" value="Apollo@20417" required>
+        <button type="submit">Test Login</button>
+    </form>
+    
+    <div id="log"></div>
+    
+    <script>
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue';
+            logDiv.innerHTML += `<div style="color: ${color}">[${time}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+        
+        const setStatus = (message, type = 'info') => {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = type;
+            statusDiv.textContent = message;
+        };
+        
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            log('Starting login test...');
+            setStatus('Testing login...', 'info');
+            
+            try {
+                // Step 1: Get login page and CSRF token
+                log('Step 1: Fetching login page...');
+                const loginPageResponse = await fetch('http://127.0.0.1:5002/auth/login');
+                log(`Login page status: ${loginPageResponse.status}`);
+                
+                if (!loginPageResponse.ok) {
+                    throw new Error(`Failed to load login page: ${loginPageResponse.status}`);
+                }
+                
+                const loginPageHtml = await loginPageResponse.text();
+                log('Login page loaded successfully');
+                
+                // Extract CSRF token
+                log('Step 2: Extracting CSRF token...');
+                const csrfMatch = loginPageHtml.match(/name="csrf_token" value="([^"]+)"/);
+                if (!csrfMatch) {
+                    throw new Error('CSRF token not found in login page');
+                }
+                
+                const csrfToken = csrfMatch[1];
+                log(`CSRF token found: ${csrfToken.substring(0, 20)}...`);
+                
+                // Step 3: Submit login
+                log('Step 3: Submitting login form...');
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+                formData.append('csrf_token', csrfToken);
+                
+                const loginResponse = await fetch('http://127.0.0.1:5002/auth/login', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                log(`Login response status: ${loginResponse.status}`);
+                
+                const responseText = await loginResponse.text();
+                log(`Login response: ${responseText.substring(0, 200)}`);
+                
+                if (loginResponse.ok) {
+                    try {
+                        const data = JSON.parse(responseText);
+                        if (data.status === 'success') {
+                            log('✅ Login successful!', 'success');
+                            setStatus('✅ Login successful! Redirecting...', 'success');
+                            setTimeout(() => {
+                                window.location.href = 'http://127.0.0.1:5002/auth/broker';
+                            }, 1000);
+                        } else {
+                            log(`❌ Login failed: ${data.message || 'Unknown error'}`, 'error');
+                            setStatus(`❌ Login failed: ${data.message || 'Unknown error'}`, 'error');
+                        }
+                    } catch (e) {
+                        log(`❌ Failed to parse response: ${e.message}`, 'error');
+                        setStatus('❌ Invalid response from server', 'error');
+                    }
+                } else {
+                    log(`❌ Login failed with status ${loginResponse.status}`, 'error');
+                    setStatus(`❌ Login failed: HTTP ${loginResponse.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                setStatus(`❌ Error: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        });
+        
+        // Test on load
+        log('Page loaded. Ready to test login.');
+        log('Click "Test Login" button to start.');
+    </script>
+</body>
+</html>

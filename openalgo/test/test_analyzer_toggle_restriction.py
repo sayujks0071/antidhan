@@ -7,14 +7,14 @@ via API when in semi-auto mode, but clients can via UI.
 Run with: python test/test_analyzer_toggle_restriction.py
 """
 
-import os
-import requests
 import json
 from datetime import datetime
 
+import requests
+
 # Configuration
 BASE_URL = "http://127.0.0.1:5000"
-API_KEY = os.getenv("OPENALGO_APIKEY", "YOUR_OPENALGO_APIKEY")
+API_KEY = "bf1267a177b7ece1b10ca29b0ee8c4d62b153fe60caba3c566619e607cf9169f"
 
 
 def log(message, level="INFO"):
@@ -38,7 +38,7 @@ def test_analyzer_toggle_restriction():
     url = f"{BASE_URL}/api/v1/analyzer/toggle"
     payload = {
         "apikey": API_KEY,
-        "mode": True  # Try to enable analyzer mode
+        "mode": True,  # Try to enable analyzer mode
     }
 
     log(f"URL: {url}")

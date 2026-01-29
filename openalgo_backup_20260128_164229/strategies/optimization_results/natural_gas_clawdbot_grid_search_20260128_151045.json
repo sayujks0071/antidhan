@@ -1,0 +1,194 @@
+[
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 55,
+      "MIN_ENTRY_THRESHOLD": 50,
+      "ATR_SL_MULTIPLIER": 3.0,
+      "ATR_TP_MULTIPLIER": 5.0,
+      "TIMEFRAME_15m": 0.5,
+      "ADX_ADAPTIVE_FACTOR": 0.3
+    },
+    "metrics": {
+      "total_return_pct": 0.0,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown_pct": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": 0.0,
+      "largest_win": 0.0,
+      "largest_loss": 0.0,
+      "sharpe_ratio": 0.0
+    },
+    "composite_score": 15.0,
+    "total_trades": 0,
+    "final_capital": 1000000.0
+  },
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 70,
+      "MIN_ENTRY_THRESHOLD": 55,
+      "ATR_SL_MULTIPLIER": 2.5,
+      "ATR_TP_MULTIPLIER": 5.0,
+      "TIMEFRAME_15m": 0.7,
+      "ADX_ADAPTIVE_FACTOR": 0.5
+    },
+    "metrics": {
+      "total_return_pct": 0.0,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown_pct": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": 0.0,
+      "largest_win": 0.0,
+      "largest_loss": 0.0,
+      "sharpe_ratio": 0.0
+    },
+    "composite_score": 15.0,
+    "total_trades": 0,
+    "final_capital": 1000000.0
+  },
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 60,
+      "MIN_ENTRY_THRESHOLD": 55,
+      "ATR_SL_MULTIPLIER": 3.0,
+      "ATR_TP_MULTIPLIER": 5.0,
+      "TIMEFRAME_15m": 0.6,
+      "ADX_ADAPTIVE_FACTOR": 0.3
+    },
+    "metrics": {
+      "total_return_pct": 0.0,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown_pct": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": 0.0,
+      "largest_win": 0.0,
+      "largest_loss": 0.0,
+      "sharpe_ratio": 0.0
+    },
+    "composite_score": 15.0,
+    "total_trades": 0,
+    "final_capital": 1000000.0
+  },
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 65,
+      "MIN_ENTRY_THRESHOLD": 50,
+      "ATR_SL_MULTIPLIER": 2.0,
+      "ATR_TP_MULTIPLIER": 3.5,
+      "TIMEFRAME_15m": 0.7,
+      "ADX_ADAPTIVE_FACTOR": 0.5
+    },
+    "metrics": {
+      "total_return_pct": 0.0,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown_pct": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": 0.0,
+      "largest_win": 0.0,
+      "largest_loss": 0.0,
+      "sharpe_ratio": 0.0
+    },
+    "composite_score": 15.0,
+    "total_trades": 0,
+    "final_capital": 1000000.0
+  },
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 60,
+      "MIN_ENTRY_THRESHOLD": 55,
+      "ATR_SL_MULTIPLIER": 2.0,
+      "ATR_TP_MULTIPLIER": 4.5,
+      "TIMEFRAME_15m": 0.7,
+      "ADX_ADAPTIVE_FACTOR": 0.5
+    },
+    "metrics": {
+      "total_return_pct": 0.0,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown_pct": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": 0.0,
+      "largest_win": 0.0,
+      "largest_loss": 0.0,
+      "sharpe_ratio": 0.0
+    },
+    "composite_score": 15.0,
+    "total_trades": 0,
+    "final_capital": 1000000.0
+  },
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 65,
+      "MIN_ENTRY_THRESHOLD": 45,
+      "ATR_SL_MULTIPLIER": 3.0,
+      "ATR_TP_MULTIPLIER": 4.0,
+      "TIMEFRAME_15m": 0.4,
+      "ADX_ADAPTIVE_FACTOR": 0.5
+    },
+    "metrics": {
+      "total_return_pct": 0.0,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown_pct": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": 0.0,
+      "largest_win": 0.0,
+      "largest_loss": 0.0,
+      "sharpe_ratio": 0.0
+    },
+    "composite_score": 15.0,
+    "total_trades": 0,
+    "final_capital": 1000000.0
+  },
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 70,
+      "MIN_ENTRY_THRESHOLD": 55,
+      "ATR_SL_MULTIPLIER": 2.5,
+      "ATR_TP_MULTIPLIER": 5.0,
+      "TIMEFRAME_15m": 0.6,
+      "ADX_ADAPTIVE_FACTOR": 0.3
+    },
+    "error": "No data available",
+    "composite_score": 0.0
+  },
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 65,
+      "MIN_ENTRY_THRESHOLD": 45,
+      "ATR_SL_MULTIPLIER": 3.0,
+      "ATR_TP_MULTIPLIER": 5.0,
+      "TIMEFRAME_15m": 0.7,
+      "ADX_ADAPTIVE_FACTOR": 0.5
+    },
+    "error": "No data available",
+    "composite_score": 0.0
+  },
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 65,
+      "MIN_ENTRY_THRESHOLD": 50,
+      "ATR_SL_MULTIPLIER": 2.5,
+      "ATR_TP_MULTIPLIER": 4.5,
+      "TIMEFRAME_15m": 0.6,
+      "ADX_ADAPTIVE_FACTOR": 0.3
+    },
+    "error": "No data available",
+    "composite_score": 0.0
+  },
+  {
+    "parameters": {
+      "BASE_ENTRY_THRESHOLD": 60,
+      "MIN_ENTRY_THRESHOLD": 50,
+      "ATR_SL_MULTIPLIER": 3.0,
+      "ATR_TP_MULTIPLIER": 3.5,
+      "TIMEFRAME_15m": 0.5,
+      "ADX_ADAPTIVE_FACTOR": 0.4
+    },
+    "error": "No data available",
+    "composite_score": 0.0
+  }
+]
