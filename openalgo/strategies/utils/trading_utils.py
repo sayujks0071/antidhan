@@ -441,3 +441,72 @@ class APIClient:
             import traceback
             logger.debug(traceback.format_exc())
             return {"status": "error", "message": str(e)}
+
+    def get_option_chain(self, symbol, exchange="NFO", max_retries=3):
+        """Fetch option chain for a symbol"""
+        url = f"{self.host}/api/v1/optionchain"
+        payload = {
+            "symbol": symbol,
+            "exchange": exchange,
+            "apikey": self.api_key
+        }
+
+        for attempt in range(max_retries):
+            try:
+                response = httpx.post(url, json=payload, timeout=10)
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                        if data.get('status') == 'success' and 'data' in data:
+                            return data['data']
+                        else:
+                            logger.warning(f"Option Chain fetch failed: {data.get('message')}")
+                    except ValueError:
+                        logger.warning("Option Chain API returned non-JSON")
+                else:
+                    logger.warning(f"Option Chain API failed HTTP {response.status_code}")
+
+                if attempt < max_retries - 1:
+                    time_module.sleep(1)
+            except Exception as e:
+                logger.error(f"Option Chain API Error: {e}")
+                if attempt < max_retries - 1:
+                    time_module.sleep(1)
+        return {}
+
+    def get_option_greeks(self, symbol, expiry=None, max_retries=3):
+        """Fetch option greeks"""
+        url = f"{self.host}/api/v1/optiongreeks"
+        payload = {
+            "symbol": symbol,
+            "apikey": self.api_key
+        }
+        if expiry:
+            payload['expiry'] = expiry
+
+        for attempt in range(max_retries):
+            try:
+                response = httpx.post(url, json=payload, timeout=10)
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                        if data.get('status') == 'success' and 'data' in data:
+                            return data['data']
+                    except ValueError:
+                        pass
+                if attempt < max_retries - 1:
+                    time_module.sleep(1)
+            except Exception as e:
+                logger.error(f"Greeks API Error: {e}")
+                if attempt < max_retries - 1:
+                    time_module.sleep(1)
+        return {}
+
+    def get_vix(self):
+        """Fetch INDIA VIX"""
+        quote = self.get_quote("INDIA VIX", "NSE")
+        if quote and 'ltp' in quote:
+            return float(quote['ltp'])
+        # Fallback to a default or raise error?
+        # For safety, return None so caller handles it
+        return None
