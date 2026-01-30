@@ -1,0 +1,22 @@
+📊 DAILY AUDIT REPORT
+
+🔴 CRITICAL (Fix Immediately):
+- Mock Data in Production Strategy → openalgo/strategies/scripts/mcx_commodity_momentum_strategy.py → Replaced np.random with APIClient fetching real MCX data.
+- Hardcoded Debug Paths (User Specific) → openalgo/strategies/utils/trading_utils.py & mcx_global_arbitrage_strategy.py → Removed hardcoded paths ("/Users/mac/...") and cleanup logging.
+
+🟡 HIGH PRIORITY (This Week):
+- Hardcoded Credentials → supertrend_vwap_strategy.py & ai_hybrid_reversion_breakout.py → Removed default 'demo_key' and enforced env vars or args.
+- Earnings Date Parsing → ai_hybrid_reversion_breakout.py → Added robust date parsing for multiple formats.
+
+🟢 OPTIMIZATION (Nice to Have):
+- VIX Fetching → supertrend_vwap_strategy.py → Added dynamic fetching of 'INDIA VIX' instead of static fallback.
+- Sector Strength → ai_hybrid_reversion_breakout.py → Standardized logic.
+
+💡 NEW STRATEGY PROPOSAL:
+- Pairs Trading Strategy → Statistical Arbitrage (Mean Reversion of Ratio) → openalgo/strategies/scripts/pairs_trading_strategy.py
+  - Logic: Z-Score of Price Ratio (Close A / Close B).
+  - Implementation: Fully integrated with APIClient and PositionManager (Dual).
+
+📈 PERFORMANCE INSIGHTS:
+- No recent strategy logs found for performance analysis.
+- Action Item: Ensure strategies are running and logging to the correct directory (`openalgo/log/strategies/`).
