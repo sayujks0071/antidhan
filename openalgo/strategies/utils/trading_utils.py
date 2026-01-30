@@ -152,6 +152,16 @@ class PositionManager:
     def has_position(self):
         return self.position != 0
 
+    def get_pnl(self, current_price):
+        """Calculate Unrealized PnL."""
+        if self.position == 0:
+            return 0.0
+
+        if self.position > 0:
+            return (current_price - self.entry_price) * self.position
+        else:
+            return (self.entry_price - current_price) * abs(self.position)
+
 class SmartOrder:
     """
     Intelligent Order Execution logic.
@@ -389,7 +399,6 @@ class APIClient:
 
     def placesmartorder(self, strategy, symbol, action, exchange, price_type, product, quantity, position_size):
         """Place smart order"""
-        
         # Correct endpoint is /api/v1/placesmartorder (not /api/v1/smartorder)
         url = f"{self.host}/api/v1/placesmartorder"
 

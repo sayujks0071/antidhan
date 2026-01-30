@@ -57,10 +57,8 @@ except ImportError:
                 df['vwap_dev'] = (df['close'] - df['vwap']) / df['vwap']
                 return df
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
 class SuperTrendVWAPStrategy:
-    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False, sector_benchmark='NIFTY BANK'):
+    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False, sector_benchmark='NIFTY BANK', logfile=None):
         self.symbol = symbol
         self.quantity = quantity
         self.api_key = api_key or os.getenv('OPENALGO_APIKEY')
@@ -79,7 +77,21 @@ class SuperTrendVWAPStrategy:
         self.trailing_stop = 0.0
         self.atr = 0.0
 
+        # Setup Logger
         self.logger = logging.getLogger(f"VWAP_{symbol}")
+        self.logger.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+        # Console Handler
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+
+        # File Handler
+        if logfile:
+            fh = logging.FileHandler(logfile)
+            fh.setFormatter(formatter)
+            self.logger.addHandler(fh)
         self.client = APIClient(api_key=self.api_key, host=self.host)
         self.pm = PositionManager(symbol) if PositionManager else None
 
@@ -299,10 +311,11 @@ def run_strategy():
     parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
     parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
     parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
-    parser.add_argument("--api_key", type=str, help="API Key")
+    parser.add_argument("--api_key", type=str, help="API Key (or set OPENALGO_APIKEY env var)")
     parser.add_argument("--host", type=str, default='http://127.0.0.1:5001', help="Host")
     parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours")
     parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
+    parser.add_argument("--logfile", type=str, help="Log file path")
 
     args = parser.parse_args()
 
@@ -321,13 +334,21 @@ def run_strategy():
         print("Error: Must provide --symbol or --underlying")
         return
 
+    # Default logfile if not provided
+    logfile = args.logfile
+    if not logfile:
+        log_dir = os.path.join(strategies_dir, "..", "log", "strategies")
+        os.makedirs(log_dir, exist_ok=True)
+        logfile = os.path.join(log_dir, f"{symbol}_supertrend.log")
+
     strategy = SuperTrendVWAPStrategy(
         symbol=symbol,
         quantity=args.quantity,
         api_key=args.api_key,
         host=args.host,
         ignore_time=args.ignore_time,
-        sector_benchmark=args.sector
+        sector_benchmark=args.sector,
+        logfile=logfile
     )
     strategy.run()
 
