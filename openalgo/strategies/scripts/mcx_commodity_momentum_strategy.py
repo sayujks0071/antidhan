@@ -77,6 +77,38 @@ class MCXMomentumStrategy:
         except Exception as e:
             logger.error(f"Error fetching data: {e}", exc_info=True)
 
+    def generate_signal(self, df):
+        """
+        Generate signal for backtesting.
+        """
+        if df.empty: return 'HOLD', 0.0, {}
+
+        self.data = df
+        self.calculate_indicators()
+
+        # Check signals (Reusing existing logic but adapting return)
+        current = self.data.iloc[-1]
+        prev = self.data.iloc[-2]
+
+        # Global Filter Check (Mock)
+        global_alignment = True # self.params['use_global_filter']
+
+        action = 'HOLD'
+
+        if (current['adx'] > self.params['adx_threshold'] and
+            current['rsi'] > 50 and
+            current['close'] > prev['close'] and
+            global_alignment):
+            action = 'BUY'
+
+        elif (current['adx'] > self.params['adx_threshold'] and
+              current['rsi'] < 50 and
+              current['close'] < prev['close'] and
+              global_alignment):
+            action = 'SELL'
+
+        return action, 1.0, {'atr': current.get('atr', 0)}
+
     def calculate_indicators(self):
         """Calculate technical indicators."""
         if self.data.empty:
@@ -201,19 +233,11 @@ class MCXMomentumStrategy:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='MCX Commodity Momentum Strategy')
     parser.add_argument('--symbol', type=str, help='MCX Symbol (e.g., GOLDM05FEB26FUT)')
+    parser.add_argument('--underlying', type=str, help='Commodity Name (e.g., GOLD, SILVER, CRUDEOIL)')
     parser.add_argument('--port', type=int, default=5001, help='API Port')
     parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
 
     args = parser.parse_args()
-
-    symbol = args.symbol or os.getenv('SYMBOL')
-    if not symbol:
-        logger.error("Symbol not provided.")
-        sys.exit(1)
-
-    api_key = args.api_key or os.getenv('OPENALGO_APIKEY')
-    port = args.port or int(os.getenv('OPENALGO_PORT', 5001))
-    host = f"http://127.0.0.1:{port}"
 
     # Strategy Parameters
     PARAMS = {
@@ -224,5 +248,58 @@ if __name__ == "__main__":
         'risk_per_trade': 0.02,
     }
 
+    # Symbol Resolution
+    symbol = args.symbol or os.getenv('SYMBOL')
+
+    # Try to resolve from underlying using SymbolResolver
+    if not symbol and args.underlying:
+        try:
+            from symbol_resolver import SymbolResolver
+        except ImportError:
+            try:
+                from utils.symbol_resolver import SymbolResolver
+            except ImportError:
+                try:
+                    from openalgo.strategies.utils.symbol_resolver import SymbolResolver
+                except ImportError:
+                    SymbolResolver = None
+
+        if SymbolResolver:
+            resolver = SymbolResolver()
+            res = resolver.resolve({'underlying': args.underlying, 'type': 'FUT', 'exchange': 'MCX'})
+            if res:
+                symbol = res
+                logger.info(f"Resolved {args.underlying} -> {symbol}")
+            else:
+                logger.error(f"Could not resolve symbol for {args.underlying}")
+        else:
+            logger.error("SymbolResolver not available")
+
+    if not symbol:
+        logger.error("Symbol not provided. Use --symbol or --underlying argument, or set SYMBOL env var.")
+        sys.exit(1)
+
+    api_key = args.api_key or os.getenv('OPENALGO_APIKEY')
+    port = args.port or int(os.getenv('OPENALGO_PORT', 5001))
+    host = f"http://127.0.0.1:{port}"
+
     strategy = MCXMomentumStrategy(symbol, api_key, host, PARAMS)
     strategy.run()
+
+# Default Strategy Parameters (module level for generate_signal)
+DEFAULT_PARAMS = {
+    'period_adx': 14,
+    'period_rsi': 14,
+    'period_atr': 14,
+    'adx_threshold': 25,
+    'risk_per_trade': 0.02,
+}
+
+def generate_signal(df, client=None, symbol=None, params=None):
+    # Merge default params with provided params
+    strat_params = DEFAULT_PARAMS.copy()
+    if params:
+        strat_params.update(params)
+
+    strat = MCXMomentumStrategy(symbol or "TEST", "dummy_key", "http://localhost:5001", strat_params)
+    return strat.generate_signal(df)

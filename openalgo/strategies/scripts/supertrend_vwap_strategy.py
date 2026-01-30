@@ -95,6 +95,64 @@ class SuperTrendVWAPStrategy:
         self.client = APIClient(api_key=self.api_key, host=self.host)
         self.pm = PositionManager(symbol) if PositionManager else None
 
+    def generate_signal(self, df):
+        """
+        Generate signal for backtesting.
+        Returns: 'BUY', 'SELL', 'HOLD'
+        """
+        if df.empty: return 'HOLD', {}, {}
+
+        # Ensure datetime sorted
+        df = df.sort_index()
+
+        # Calculate Indicators
+        try:
+            df = calculate_intraday_vwap(df)
+        except:
+            return 'HOLD', {}, {}
+
+        self.atr = self.calculate_atr(df)
+        last = df.iloc[-1]
+
+        # Volume Profile
+        poc_price, poc_vol = self.analyze_volume_profile(df)
+
+        # Dynamic Deviation
+        vix = self.get_vix()
+        dev_threshold = 0.02
+        if vix > 20: dev_threshold = 0.01
+        elif vix < 12: dev_threshold = 0.03
+
+        # Logic
+        is_above_vwap = last['close'] > last['vwap']
+
+        vol_mean = df['volume'].rolling(20).mean().iloc[-1]
+        vol_std = df['volume'].rolling(20).std().iloc[-1]
+        dynamic_threshold = vol_mean + (1.5 * vol_std)
+        is_volume_spike = last['volume'] > dynamic_threshold
+
+        is_above_poc = last['close'] > poc_price
+        is_not_overextended = abs(last['vwap_dev']) < dev_threshold
+
+        # Sector check (Mocked for backtest usually, or passed via client)
+        sector_bullish = True
+
+        score = 0
+        details = {
+            'close': last['close'],
+            'vwap': last['vwap'],
+            'atr': self.atr,
+            'poc': poc_price
+        }
+
+        if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
+            return 'BUY', 1.0, details
+
+        # Sell Logic (Inverse for completeness?)
+        # For now, just Buy based on VWAP Breakout
+
+        return 'HOLD', 0.0, details
+
     def calculate_rsi(self, series, period=14):
         delta = series.diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
@@ -351,6 +409,19 @@ def run_strategy():
         logfile=logfile
     )
     strategy.run()
+
+# Module level wrapper for SimpleBacktestEngine
+def generate_signal(df, client=None, symbol=None, params=None):
+    # Instantiate strategy with dummy params
+    strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test")
+
+    # Apply params if provided
+    if params:
+        if 'threshold' in params: strat.threshold = params['threshold']
+        if 'stop_pct' in params: strat.stop_pct = params['stop_pct']
+
+    action, score, details = strat.generate_signal(df)
+    return action, score, details
 
 if __name__ == "__main__":
     run_strategy()
