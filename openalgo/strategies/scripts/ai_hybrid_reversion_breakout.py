@@ -53,18 +53,34 @@ class AIHybridStrategy:
         self.earnings_date = earnings_date
 
     def get_market_context(self):
-        # In a real scenario, this would fetch from a shared state or API
-        # Here we check VIX via symbol 'INDIA VIX' if available, or fallback
+        # Fetch VIX
         vix = 15.0
         try:
-            # Attempt fetch if supported
-            pass
+            vix_df = self.client.history("INDIA VIX", exchange="NSE_INDEX", interval="day",
+                                       start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
+                                       end_date=datetime.now().strftime("%Y-%m-%d"))
+            if not vix_df.empty:
+                vix = vix_df['close'].iloc[-1]
+        except Exception as e:
+            self.logger.warning(f"VIX fetch failed: {e}")
+
+        # Fetch Breadth (Placeholder for now, usually requires full market scan or index internals)
+        # We can use NIFTY Trend as a proxy for breadth health
+        breadth = 1.2
+        try:
+            nifty = self.client.history("NIFTY 50", exchange="NSE_INDEX", interval="day",
+                                      start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
+                                      end_date=datetime.now().strftime("%Y-%m-%d"))
+            if not nifty.empty and nifty['close'].iloc[-1] > nifty['open'].iloc[-1]:
+                breadth = 1.5 # Bullish proxy
+            elif not nifty.empty:
+                breadth = 0.8 # Bearish proxy
         except:
             pass
 
         return {
             'vix': vix,
-            'breadth_ad_ratio': 1.2 # Simulated
+            'breadth_ad_ratio': breadth
         }
 
     def check_earnings(self):
@@ -204,17 +220,19 @@ class AIHybridStrategy:
                 # Reversion Logic: RSI < 30 and Price < Lower BB (Oversold)
                 if last['rsi'] < self.rsi_lower and last['close'] < last['lower']:
                     avg_vol = df['volume'].rolling(20).mean().iloc[-1]
-                    if last['volume'] > avg_vol:
+                    # Enhanced Volume Confirmation (Stricter than average)
+                    if last['volume'] > avg_vol * 1.2:
                         qty = int(100 * size_multiplier)
-                        self.logger.info("Oversold Reversion Signal (RSI<30, <LowerBB). BUY.")
+                        self.logger.info("Oversold Reversion Signal (RSI<30, <LowerBB, Vol>1.2x). BUY.")
                         self.pm.update_position(qty, current_price, 'BUY')
 
                 # Breakout Logic: RSI > 60 and Price > Upper BB
                 elif last['rsi'] > self.rsi_upper and last['close'] > last['upper']:
                     avg_vol = df['volume'].rolling(20).mean().iloc[-1]
-                    if last['volume'] > avg_vol * 1.5:
+                    # Breakout needs significant volume (2x avg)
+                    if last['volume'] > avg_vol * 2.0:
                          qty = int(100 * size_multiplier)
-                         self.logger.info("Breakout Signal (RSI>60, >UpperBB). BUY.")
+                         self.logger.info("Breakout Signal (RSI>60, >UpperBB, Vol>2x). BUY.")
                          self.pm.update_position(qty, current_price, 'BUY')
 
             except Exception as e:

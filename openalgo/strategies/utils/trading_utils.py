@@ -369,6 +369,24 @@ class APIClient:
         
         return None  # Failed to fetch quote
 
+    def get_instruments(self, exchange="NSE", max_retries=3):
+        """Fetch instruments list"""
+        url = f"{self.host}/instruments/{exchange}"
+        for attempt in range(max_retries):
+            try:
+                response = httpx.get(url, timeout=30)
+                if response.status_code == 200:
+                    # Usually returns CSV text
+                    from io import StringIO
+                    return pd.read_csv(StringIO(response.text))
+                else:
+                    logger.warning(f"Instruments fetch failed (HTTP {response.status_code})")
+                    time_module.sleep(1)
+            except Exception as e:
+                logger.error(f"Instruments fetch error: {e}")
+                time_module.sleep(1)
+        return pd.DataFrame()
+
     def placesmartorder(self, strategy, symbol, action, exchange, price_type, product, quantity, position_size):
         """Place smart order"""
         # #region agent log
