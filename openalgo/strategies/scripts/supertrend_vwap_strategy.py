@@ -57,10 +57,8 @@ except ImportError:
                 df['vwap_dev'] = (df['close'] - df['vwap']) / df['vwap']
                 return df
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
 class SuperTrendVWAPStrategy:
-    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False, sector_benchmark='NIFTY BANK'):
+    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False, sector_benchmark='NIFTY BANK', logfile=None):
         self.symbol = symbol
         self.quantity = quantity
         self.api_key = api_key or os.getenv('OPENALGO_APIKEY')
@@ -79,7 +77,21 @@ class SuperTrendVWAPStrategy:
         self.trailing_stop = 0.0
         self.atr = 0.0
 
+        # Setup Logger
         self.logger = logging.getLogger(f"VWAP_{symbol}")
+        self.logger.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+        # Console Handler
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+
+        # File Handler
+        if logfile:
+            fh = logging.FileHandler(logfile)
+            fh.setFormatter(formatter)
+            self.logger.addHandler(fh)
         self.client = APIClient(api_key=self.api_key, host=self.host)
         self.pm = PositionManager(symbol) if PositionManager else None
 
@@ -205,25 +217,41 @@ class SuperTrendVWAPStrategy:
             return True
 
     def get_vix(self):
-        # Simulated VIX for dynamic deviation
-        # Ideally fetch 'INDIA VIX'
+        """Fetch real VIX or default to 15.0."""
+        try:
+            vix_df = self.client.history(
+                symbol="INDIA VIX",
+                exchange="NSE_INDEX",
+                interval="1d",
+                start_date=(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d"),
+                end_date=datetime.now().strftime("%Y-%m-%d")
+            )
+            if not vix_df.empty:
+                vix = vix_df.iloc[-1]['close']
+                self.logger.debug(f"Fetched VIX: {vix}")
+                return vix
+        except Exception as e:
+            self.logger.warning(f"Could not fetch VIX: {e}")
         return 15.0 # Default
 
-    def run(self):
-        # Normalize symbol (NIFTYBANK -> BANKNIFTY, NIFTY 50 -> NIFTY, NIFTY50 -> NIFTY)
+    def _normalize_symbol(self):
+        """Normalize NIFTY/BANKNIFTY symbols."""
         original_symbol = self.symbol
         symbol_upper = self.symbol.upper().replace(" ", "")
+
         if "BANK" in symbol_upper and "NIFTY" in symbol_upper:
             self.symbol = "BANKNIFTY"
         elif "NIFTY" in symbol_upper:
             # Remove "50" suffix if present (NIFTY50 -> NIFTY)
-            self.symbol = "NIFTY" if symbol_upper.replace("50", "") == "NIFTY" else "NIFTY"
+            self.symbol = "NIFTY"
         else:
             self.symbol = original_symbol
-        
+
         if original_symbol != self.symbol:
             self.logger.info(f"Symbol normalized: {original_symbol} -> {self.symbol}")
-        
+
+    def run(self):
+        self._normalize_symbol()
         self.logger.info(f"Starting SuperTrend VWAP for {self.symbol}")
 
         while True:
@@ -232,7 +260,7 @@ class SuperTrendVWAPStrategy:
                     time.sleep(60)
                     continue
 
-                exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
+                exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper() else "NSE"
                 try:
                     df = self.client.history(
                         symbol=self.symbol,
@@ -341,10 +369,11 @@ def run_strategy():
     parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
     parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
     parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
-    parser.add_argument("--api_key", type=str, default='demo_key', help="API Key")
+    parser.add_argument("--api_key", type=str, help="API Key (or set OPENALGO_APIKEY env var)")
     parser.add_argument("--host", type=str, default='http://127.0.0.1:5001', help="Host")
     parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours")
     parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
+    parser.add_argument("--logfile", type=str, help="Log file path")
 
     args = parser.parse_args()
 
@@ -363,13 +392,21 @@ def run_strategy():
         print("Error: Must provide --symbol or --underlying")
         return
 
+    # Default logfile if not provided
+    logfile = args.logfile
+    if not logfile:
+        log_dir = os.path.join(strategies_dir, "..", "log", "strategies")
+        os.makedirs(log_dir, exist_ok=True)
+        logfile = os.path.join(log_dir, f"{symbol}_supertrend.log")
+
     strategy = SuperTrendVWAPStrategy(
         symbol=symbol,
         quantity=args.quantity,
         api_key=args.api_key,
         host=args.host,
         ignore_time=args.ignore_time,
-        sector_benchmark=args.sector
+        sector_benchmark=args.sector,
+        logfile=logfile
     )
     strategy.run()
 

@@ -16,10 +16,13 @@ load_dotenv(REPO_ROOT / ".env")
 
 # Config
 OPENALGO_PORT = int(os.getenv('FLASK_PORT', 5000))
+KITE_PORT = 5001
+DHAN_PORT = 5002
 LOKI_PORT = 3100
 GRAFANA_PORT = 3000
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LOG_FILE = REPO_ROOT / "logs" / "openalgo.log"
+STRATEGY_LOG_DIR = REPO_ROOT / "openalgo" / "log" / "strategies"
 HEALTH_LOG_FILE = REPO_ROOT / "logs" / "healthcheck.log"
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
@@ -110,31 +113,57 @@ def send_telegram(message):
     except Exception as e:
         logger.error(f"Failed to send Telegram alert: {e}")
 
+def check_strategy_logs(minutes=5):
+    """Check if any strategy log has been updated recently."""
+    if not STRATEGY_LOG_DIR.exists():
+        return False, "Log Dir Missing"
+
+    recent_activity = False
+    cutoff = datetime.now() - timedelta(minutes=minutes)
+
+    active_strategies = []
+    for log_file in STRATEGY_LOG_DIR.glob("*.log"):
+        mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
+        if mtime > cutoff:
+            recent_activity = True
+            active_strategies.append(log_file.name)
+
+    return recent_activity, active_strategies
+
 def main():
     logger.info("Starting health check...")
 
     # 1. Check Services
     oa_up = check_port(OPENALGO_PORT)
+    kite_up = check_port(KITE_PORT)
+    dhan_up = check_port(DHAN_PORT)
     loki_up = check_url(f"http://localhost:{LOKI_PORT}/ready")
     grafana_up = check_port(GRAFANA_PORT)
 
     status_msg = []
     alert_needed = False
 
-    if oa_up:
-        status_msg.append("✅ OpenAlgo: UP")
-    else:
-        status_msg.append("🔴 OpenAlgo: DOWN")
+    if oa_up: status_msg.append(f"✅ OpenAlgo ({OPENALGO_PORT}): UP")
+    else: status_msg.append(f"🔴 OpenAlgo ({OPENALGO_PORT}): DOWN")
 
-    if loki_up:
-        status_msg.append("✅ Loki: UP")
-    else:
-        status_msg.append("🔴 Loki: DOWN")
+    if kite_up: status_msg.append(f"✅ Kite ({KITE_PORT}): UP")
+    else: status_msg.append(f"🔴 Kite ({KITE_PORT}): DOWN")
 
-    if grafana_up:
-        status_msg.append("✅ Grafana: UP")
+    if dhan_up: status_msg.append(f"✅ Dhan ({DHAN_PORT}): UP")
+    else: status_msg.append(f"🔴 Dhan ({DHAN_PORT}): DOWN")
+
+    if loki_up: status_msg.append("✅ Loki: UP")
+    else: status_msg.append("🔴 Loki: DOWN")
+
+    if grafana_up: status_msg.append("✅ Grafana: UP")
+    else: status_msg.append("🔴 Grafana: DOWN")
+
+    # Check Strategy Logs
+    strat_active, strat_list = check_strategy_logs()
+    if strat_active:
+        status_msg.append(f"✅ Strategies Active: {len(strat_list)}")
     else:
-        status_msg.append("🔴 Grafana: DOWN")
+        status_msg.append("⚠️ No Strategy Log Activity (5m)")
 
     logger.info(", ".join(status_msg))
 
