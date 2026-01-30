@@ -89,12 +89,23 @@ class AIHybridStrategy:
             return False
 
         try:
-            e_date = datetime.strptime(self.earnings_date, "%Y-%m-%d")
+            e_date = None
+            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                try:
+                    e_date = datetime.strptime(self.earnings_date, fmt)
+                    break
+                except ValueError:
+                    continue
+
+            if not e_date:
+                self.logger.warning(f"Invalid earnings date format: {self.earnings_date}")
+                return False
+
             days_diff = (e_date - datetime.now()).days
             if 0 <= days_diff <= 2:
                 return True
-        except ValueError:
-            self.logger.warning("Invalid earnings date format.")
+        except Exception as e:
+            self.logger.warning(f"Error checking earnings: {e}")
         return False
 
     def check_sector_strength(self):
@@ -245,14 +256,19 @@ def run_strategy():
     parser = argparse.ArgumentParser(description='AI Hybrid Strategy')
     parser.add_argument('--symbol', type=str, required=True, help='Stock Symbol')
     parser.add_argument('--port', type=int, default=5001, help='API Port')
-    parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
+    parser.add_argument('--api_key', type=str, help='API Key')
     parser.add_argument('--rsi_lower', type=float, default=30.0, help='RSI Lower Threshold')
     parser.add_argument('--sector', type=str, default='NIFTY 50', help='Sector Benchmark')
     parser.add_argument('--earnings_date', type=str, help='Earnings Date YYYY-MM-DD')
 
     args = parser.parse_args()
 
-    strategy = AIHybridStrategy(args.symbol, args.api_key, args.port, rsi_lower=args.rsi_lower, sector=args.sector, earnings_date=args.earnings_date)
+    api_key = args.api_key or os.getenv('OPENALGO_APIKEY')
+    if not api_key:
+        print("Error: API Key required via --api_key or OPENALGO_APIKEY")
+        return
+
+    strategy = AIHybridStrategy(args.symbol, api_key, args.port, rsi_lower=args.rsi_lower, sector=args.sector, earnings_date=args.earnings_date)
     strategy.run()
 
 if __name__ == "__main__":
