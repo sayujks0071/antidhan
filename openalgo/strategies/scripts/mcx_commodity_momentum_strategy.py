@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+"""
+MCX Commodity Momentum Strategy
+Momentum strategy using ADX and RSI with proper API integration.
+"""
 import os
 import sys
 import time
@@ -5,80 +10,79 @@ import logging
 import argparse
 import pandas as pd
 import numpy as np
-import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Add repo root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+strategies_dir = os.path.dirname(script_dir)
+utils_dir = os.path.join(strategies_dir, 'utils')
+sys.path.insert(0, utils_dir)
 
 try:
-    from openalgo.strategies.utils.trading_utils import APIClient
-    from openalgo.strategies.utils.symbol_resolver import SymbolResolver
+    from trading_utils import APIClient, PositionManager, is_market_open
 except ImportError:
-    APIClient = None
-    SymbolResolver = None
-
-# Configuration
-SYMBOL = os.getenv('SYMBOL', 'GOLDM05FEB26FUT')
-API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
-API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
-
-# Strategy Parameters (Can be injected or default)
-PARAMS = {
-    'period_adx': 14,
-    'period_rsi': 14,
-    'period_atr': 14,
-    'adx_threshold': 25,
-    'rsi_overbought': 70,
-    'rsi_oversold': 30,
-    'use_global_filter': False,
-    'use_seasonality': False,
-    'risk_per_trade': 0.02, # 2% of capital
-}
+    try:
+        sys.path.insert(0, strategies_dir)
+        from utils.trading_utils import APIClient, PositionManager, is_market_open
+    except ImportError:
+        try:
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+        except ImportError:
+            print("Warning: openalgo package not found or imports failed.")
+            APIClient = None
+            PositionManager = None
+            is_market_open = lambda: True
 
 # Setup Logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(f"MCX_Momentum_{SYMBOL}")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("MCX_Momentum")
 
 class MCXMomentumStrategy:
-    def __init__(self, symbol, params):
+    def __init__(self, symbol, api_key, host, params):
         self.symbol = symbol
+        self.api_key = api_key
+        self.host = host
         self.params = params
-        self.position = 0
+
+        self.client = APIClient(api_key=self.api_key, host=self.host) if APIClient else None
+        self.pm = PositionManager(symbol) if PositionManager else None
         self.data = pd.DataFrame()
 
     def fetch_data(self):
         """Fetch live or historical data from OpenAlgo."""
+        if not self.client:
+            logger.error("API Client not initialized.")
+            return
+
         try:
-            # Simulated data fetching
-            # response = requests.get(f"{API_HOST}/api/history?symbol={self.symbol}&interval=15m")
-            # if response.status_code == 200:
-            #     self.data = pd.DataFrame(response.json())
-
-            # Mocking data for structure
             logger.info(f"Fetching data for {self.symbol}...")
-            dates = pd.date_range(end=datetime.now(), periods=100, freq='15min')
-            self.data = pd.DataFrame({
-                'open': np.random.uniform(100, 200, 100),
-                'high': np.random.uniform(100, 200, 100),
-                'low': np.random.uniform(100, 200, 100),
-                'close': np.random.uniform(100, 200, 100),
-                'volume': np.random.randint(1000, 10000, 100)
-            }, index=dates)
+            # Fetch last 5 days
+            end_date = datetime.now().strftime("%Y-%m-%d")
+            start_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
 
-            # Ensure high/low consistency
-            self.data['high'] = self.data[['open', 'close', 'high']].max(axis=1)
-            self.data['low'] = self.data[['open', 'close', 'low']].min(axis=1)
+            df = self.client.history(
+                symbol=self.symbol,
+                interval="15m",
+                exchange="MCX",
+                start_date=start_date,
+                end_date=end_date
+            )
+
+            if not df.empty and len(df) > 50:
+                self.data = df
+                logger.info(f"Fetched {len(df)} candles.")
+            else:
+                logger.warning(f"Insufficient data for {self.symbol}.")
 
         except Exception as e:
-            logger.error(f"Error fetching data: {e}")
+            logger.error(f"Error fetching data: {e}", exc_info=True)
 
     def calculate_indicators(self):
         """Calculate technical indicators."""
         if self.data.empty:
             return
 
-        df = self.data
+        df = self.data.copy()
 
         # RSI
         delta = df['close'].diff()
@@ -89,71 +93,106 @@ class MCXMomentumStrategy:
 
         # ATR
         high_low = df['high'] - df['low']
-        high_close = np.abs(df['high'] - df['close'].shift())
-        low_close = np.abs(df['low'] - df['close'].shift())
+        high_close = (df['high'] - df['close'].shift()).abs()
+        low_close = (df['low'] - df['close'].shift()).abs()
         ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        true_range = np.max(ranges, axis=1)
+        true_range = ranges.max(axis=1)
         df['atr'] = true_range.rolling(window=self.params['period_atr']).mean()
 
-        # ADX (Simplified)
-        df['adx'] = np.random.uniform(10, 50, len(df)) # Placeholder for complex ADX calc
+        # ADX Calculation
+        up = df['high'] - df['high'].shift(1)
+        down = df['low'].shift(1) - df['low']
+
+        # +DM: if up > down and up > 0
+        plus_dm = np.where((up > down) & (up > 0), up, 0.0)
+        # -DM: if down > up and down > 0
+        minus_dm = np.where((down > up) & (down > 0), down, 0.0)
+
+        df['plus_dm'] = plus_dm
+        df['minus_dm'] = minus_dm
+
+        # Smooth (using simple moving average for simplicity as originally intended in simple mock)
+        tr_smooth = true_range.rolling(window=self.params['period_adx']).mean()
+        plus_dm_smooth = df['plus_dm'].rolling(window=self.params['period_adx']).mean()
+        minus_dm_smooth = df['minus_dm'].rolling(window=self.params['period_adx']).mean()
+
+        # Avoid division by zero
+        tr_smooth = tr_smooth.replace(0, np.nan)
+
+        plus_di = 100 * (plus_dm_smooth / tr_smooth)
+        minus_di = 100 * (minus_dm_smooth / tr_smooth)
+
+        dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
+        df['adx'] = dx.rolling(window=self.params['period_adx']).mean()
 
         self.data = df
 
     def check_signals(self):
         """Check entry and exit conditions."""
-        if self.data.empty:
+        if self.data.empty or 'adx' not in self.data.columns:
+            return
+
+        # Ensure we have enough data
+        if len(self.data) < 50:
             return
 
         current = self.data.iloc[-1]
         prev = self.data.iloc[-2]
 
-        # Global Filter Check (Mock)
-        global_alignment = True
-        if self.params['use_global_filter']:
-            # Fetch global trend and compare
-            # if global_trend != current_trend: global_alignment = False
-            pass
+        # Log current state
+        # logger.info(f"Price: {current['close']:.2f}, RSI: {current['rsi']:.2f}, ADX: {current['adx']:.2f}")
+
+        # Check Position
+        has_position = False
+        if self.pm:
+            has_position = self.pm.has_position()
 
         # Entry Logic
-        if self.position == 0:
+        if not has_position:
+            # BUY Signal: ADX > 25 (Trend Strength), RSI > 50 (Bullish), Price > Prev Close
             if (current['adx'] > self.params['adx_threshold'] and
-                current['rsi'] > 50 and
-                current['close'] > prev['close'] and
-                global_alignment):
+                current['rsi'] > 55 and
+                current['close'] > prev['close']):
 
-                self.entry("BUY", current['close'])
+                logger.info(f"BUY SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
+                if self.pm:
+                    self.pm.update_position(1, current['close'], 'BUY')
 
+            # SELL Signal: ADX > 25, RSI < 45, Price < Prev Close
             elif (current['adx'] > self.params['adx_threshold'] and
-                  current['rsi'] < 50 and
-                  current['close'] < prev['close'] and
-                  global_alignment):
+                  current['rsi'] < 45 and
+                  current['close'] < prev['close']):
 
-                self.entry("SELL", current['close'])
+                logger.info(f"SELL SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
+                if self.pm:
+                    self.pm.update_position(1, current['close'], 'SELL')
 
         # Exit Logic
-        elif self.position > 0: # Long
-            if current['close'] < prev['low']: # Simple trailing stop
-                self.exit("SELL", current['close'])
+        elif has_position:
+            # Retrieve position details
+            pos_qty = self.pm.position
+            entry_price = self.pm.entry_price
 
-        elif self.position < 0: # Short
-            if current['close'] > prev['high']:
-                self.exit("BUY", current['close'])
+            # Stop Loss / Take Profit Logic could be added here
+            # Simple Exit: Trend Fades (ADX < 20) or RSI Reversal
 
-    def entry(self, side, price):
-        logger.info(f"SIGNAL: {side} {self.symbol} at {price:.2f}")
-        # Execute trade via API
-        # requests.post(f"{API_HOST}/api/orders", json={...})
-        self.position = 1 if side == "BUY" else -1
-
-    def exit(self, side, price):
-        logger.info(f"SIGNAL: {side} {self.symbol} at {price:.2f}")
-        # Execute trade via API
-        self.position = 0
+            if pos_qty > 0: # Long
+                if current['rsi'] < 45 or current['adx'] < 20:
+                     logger.info(f"EXIT LONG: Trend Faded. RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
+                     self.pm.update_position(abs(pos_qty), current['close'], 'SELL')
+            elif pos_qty < 0: # Short
+                if current['rsi'] > 55 or current['adx'] < 20:
+                     logger.info(f"EXIT SHORT: Trend Faded. RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
+                     self.pm.update_position(abs(pos_qty), current['close'], 'BUY')
 
     def run(self):
         logger.info(f"Starting MCX Momentum Strategy for {self.symbol}")
         while True:
+            if not is_market_open():
+                logger.info("Market is closed. Sleeping...")
+                time.sleep(300)
+                continue
+
             self.fetch_data()
             self.calculate_indicators()
             self.check_signals()
@@ -162,24 +201,28 @@ class MCXMomentumStrategy:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='MCX Commodity Momentum Strategy')
     parser.add_argument('--symbol', type=str, help='MCX Symbol (e.g., GOLDM05FEB26FUT)')
-    parser.add_argument('--port', type=int, help='API Port')
-    parser.add_argument('--api_key', type=str, help='API Key')
+    parser.add_argument('--port', type=int, default=5001, help='API Port')
+    parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
+
     args = parser.parse_args()
-    if args.symbol:
-        SYMBOL = args.symbol
-    elif os.getenv('SYMBOL'):
-        SYMBOL = os.getenv('SYMBOL')
-    if args.port:
-        API_HOST = f"http://127.0.0.1:{args.port}"
-    elif os.getenv('OPENALGO_PORT'):
-        API_HOST = f"http://127.0.0.1:{os.getenv('OPENALGO_PORT')}"
-    if args.api_key:
-        API_KEY = args.api_key
-    else:
-        API_KEY = os.getenv('OPENALGO_APIKEY', API_KEY)
-    if SYMBOL == "REPLACE_ME":
-        logger.error(f"❌ Symbol not configured! SYMBOL={SYMBOL}")
-        logger.error("Please set SYMBOL environment variable or use --symbol argument")
-        exit(1)
-    strategy = MCXMomentumStrategy(SYMBOL, PARAMS)
+
+    symbol = args.symbol or os.getenv('SYMBOL')
+    if not symbol:
+        logger.error("Symbol not provided.")
+        sys.exit(1)
+
+    api_key = args.api_key or os.getenv('OPENALGO_APIKEY')
+    port = args.port or int(os.getenv('OPENALGO_PORT', 5001))
+    host = f"http://127.0.0.1:{port}"
+
+    # Strategy Parameters
+    PARAMS = {
+        'period_adx': 14,
+        'period_rsi': 14,
+        'period_atr': 14,
+        'adx_threshold': 25,
+        'risk_per_trade': 0.02,
+    }
+
+    strategy = MCXMomentumStrategy(symbol, api_key, host, PARAMS)
     strategy.run()
