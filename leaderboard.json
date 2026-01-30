@@ -1,57 +1,66 @@
 [
     {
-        "total_return_pct": -1.6043267729793154,
+        "total_return_pct": -0.2598612708630972,
         "win_rate": 0.0,
         "profit_factor": 0.0,
         "max_drawdown_pct": 0,
         "avg_win": 0,
-        "avg_loss": -1604.3267729793222,
+        "avg_loss": -259.86127086310233,
         "largest_win": 0,
-        "largest_loss": -1604.3267729793222,
+        "largest_loss": -259.86127086310233,
         "sharpe_ratio": 0,
         "total_profit": 0,
-        "total_loss": -1604.3267729793222,
+        "total_loss": -259.86127086310233,
         "strategy": "ORB_NIFTY",
         "symbol": "NIFTY",
         "params": {
             "quantity": 50,
             "minutes": 15
-        }
+        },
+        "data_source": "mock",
+        "data_valid": true,
+        "data_issues": 0
     },
     {
-        "total_return_pct": 1.6057903666847562,
+        "total_return_pct": 0.3939966199971532,
         "win_rate": 100.0,
-        "profit_factor": 1605.7903666847628,
+        "profit_factor": 393.9966199971593,
         "max_drawdown_pct": 0,
-        "avg_win": 1605.7903666847628,
+        "avg_win": 393.9966199971593,
         "avg_loss": 0,
-        "largest_win": 1605.7903666847628,
+        "largest_win": 393.9966199971593,
         "largest_loss": 0,
         "sharpe_ratio": 0,
-        "total_profit": 1605.7903666847628,
+        "total_profit": 393.9966199971593,
         "total_loss": -1,
         "strategy": "ATM_OPT_NIFTY",
-        "symbol": "NIFTY23OCT19500CE",
+        "symbol": "NIFTYOPT",
         "params": {
             "quantity": 50
-        }
+        },
+        "data_source": "mock",
+        "data_valid": true,
+        "data_issues": 0
     },
     {
-        "total_return_pct": -0.007720495071276673,
-        "win_rate": 46.666666666666664,
-        "profit_factor": 0.7935563445273679,
-        "max_drawdown_pct": 0.017567378562249193,
-        "avg_win": 1.413194970267337,
-        "avg_loss": -1.5582328936206675,
-        "largest_win": 4.709311374725388,
-        "largest_loss": -3.1346473250383298,
-        "sharpe_ratio": -1.3203323408848182,
-        "total_profit": 29.677094375614075,
-        "total_loss": -37.39758944689602,
+        "total_return_pct": 0.0009894014707097086,
+        "win_rate": 100.0,
+        "profit_factor": 0.9894014707097938,
+        "max_drawdown_pct": 0,
+        "avg_win": 0.9894014707097938,
+        "avg_loss": 0,
+        "largest_win": 0.9894014707097938,
+        "largest_loss": 0,
+        "sharpe_ratio": 0,
+        "total_profit": 0.9894014707097938,
+        "total_loss": -1,
         "strategy": "MCX_SILVER",
-        "symbol": "SILVERMIC23NOVFUT",
+        "symbol": "SILVERFUT",
         "params": {
             "quantity": 1
-        }
+        },
+        "data_source": "mock",
+        "data_valid": true,
+        "data_issues": 0
     }
 ]

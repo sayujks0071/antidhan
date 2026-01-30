@@ -67,18 +67,34 @@ class AIHybridStrategy:
         self.earnings_date = earnings_date
 
     def get_market_context(self):
-        # In a real scenario, this would fetch from a shared state or API
-        # Here we check VIX via symbol 'INDIA VIX' if available, or fallback
+        # Fetch VIX
         vix = 15.0
         try:
-            # Attempt fetch if supported
-            pass
+            vix_df = self.client.history("INDIA VIX", exchange="NSE_INDEX", interval="day",
+                                       start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
+                                       end_date=datetime.now().strftime("%Y-%m-%d"))
+            if not vix_df.empty:
+                vix = vix_df['close'].iloc[-1]
+        except Exception as e:
+            self.logger.warning(f"VIX fetch failed: {e}")
+
+        # Fetch Breadth (Placeholder for now, usually requires full market scan or index internals)
+        # We can use NIFTY Trend as a proxy for breadth health
+        breadth = 1.2
+        try:
+            nifty = self.client.history("NIFTY 50", exchange="NSE_INDEX", interval="day",
+                                      start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
+                                      end_date=datetime.now().strftime("%Y-%m-%d"))
+            if not nifty.empty and nifty['close'].iloc[-1] > nifty['open'].iloc[-1]:
+                breadth = 1.5 # Bullish proxy
+            elif not nifty.empty:
+                breadth = 0.8 # Bearish proxy
         except:
             pass
 
         return {
             'vix': vix,
-            'breadth_ad_ratio': 1.2 # Simulated
+            'breadth_ad_ratio': breadth
         }
 
     def check_earnings(self):
@@ -87,12 +103,23 @@ class AIHybridStrategy:
             return False
 
         try:
-            e_date = datetime.strptime(self.earnings_date, "%Y-%m-%d")
+            e_date = None
+            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                try:
+                    e_date = datetime.strptime(self.earnings_date, fmt)
+                    break
+                except ValueError:
+                    continue
+
+            if not e_date:
+                self.logger.warning(f"Invalid earnings date format: {self.earnings_date}")
+                return False
+
             days_diff = (e_date - datetime.now()).days
             if 0 <= days_diff <= 2:
                 return True
-        except ValueError:
-            self.logger.warning("Invalid earnings date format.")
+        except Exception as e:
+            self.logger.warning(f"Error checking earnings: {e}")
         return False
 
     def check_sector_strength(self):
@@ -218,17 +245,19 @@ class AIHybridStrategy:
                 # Reversion Logic: RSI < 30 and Price < Lower BB (Oversold)
                 if last['rsi'] < self.rsi_lower and last['close'] < last['lower']:
                     avg_vol = df['volume'].rolling(20).mean().iloc[-1]
-                    if last['volume'] > avg_vol:
+                    # Enhanced Volume Confirmation (Stricter than average)
+                    if last['volume'] > avg_vol * 1.2:
                         qty = int(100 * size_multiplier)
-                        self.logger.info("Oversold Reversion Signal (RSI<30, <LowerBB). BUY.")
+                        self.logger.info("Oversold Reversion Signal (RSI<30, <LowerBB, Vol>1.2x). BUY.")
                         self.pm.update_position(qty, current_price, 'BUY')
 
                 # Breakout Logic: RSI > 60 and Price > Upper BB
                 elif last['rsi'] > self.rsi_upper and last['close'] > last['upper']:
                     avg_vol = df['volume'].rolling(20).mean().iloc[-1]
-                    if last['volume'] > avg_vol * 1.5:
+                    # Breakout needs significant volume (2x avg)
+                    if last['volume'] > avg_vol * 2.0:
                          qty = int(100 * size_multiplier)
-                         self.logger.info("Breakout Signal (RSI>60, >UpperBB). BUY.")
+                         self.logger.info("Breakout Signal (RSI>60, >UpperBB, Vol>2x). BUY.")
                          self.pm.update_position(qty, current_price, 'BUY')
 
             except Exception as e:
@@ -241,13 +270,19 @@ def run_strategy():
     parser = argparse.ArgumentParser(description='AI Hybrid Strategy')
     parser.add_argument('--symbol', type=str, required=True, help='Stock Symbol')
     parser.add_argument('--port', type=int, default=5001, help='API Port')
-    parser.add_argument('--api_key', type=str, required=True, help='API Key')
+    parser.add_argument('--api_key', type=str, help='API Key (or set OPENALGO_APIKEY env var)')
     parser.add_argument('--rsi_lower', type=float, default=30.0, help='RSI Lower Threshold')
     parser.add_argument('--sector', type=str, default='NIFTY 50', help='Sector Benchmark')
     parser.add_argument('--earnings_date', type=str, help='Earnings Date YYYY-MM-DD')
     parser.add_argument("--logfile", type=str, help="Log file path")
 
     args = parser.parse_args()
+
+    # Support env var fallback for API key
+    api_key = args.api_key or os.getenv('OPENALGO_APIKEY')
+    if not api_key:
+        print("Error: API Key required via --api_key or OPENALGO_APIKEY")
+        return
 
     # Default logfile if not provided
     logfile = args.logfile
@@ -258,7 +293,7 @@ def run_strategy():
 
     strategy = AIHybridStrategy(
         args.symbol,
-        args.api_key,
+        api_key,
         args.port,
         rsi_lower=args.rsi_lower,
         sector=args.sector,

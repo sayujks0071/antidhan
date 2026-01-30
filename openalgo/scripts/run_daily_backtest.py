@@ -4,6 +4,7 @@ import sys
 import json
 import logging
 import random
+import argparse
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -13,7 +14,8 @@ sys.path.append(repo_root)
 
 from openalgo.strategies.utils.simple_backtest_engine import SimpleBacktestEngine
 from openalgo.strategies.utils.symbol_resolver import SymbolResolver
-from openalgo.strategies.scripts.orb_strategy import ORBStrategy
+from openalgo.strategies.utils.trading_utils import APIClient
+from openalgo.utils.data_validator import DataValidator
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("DailyBacktest")
@@ -21,10 +23,81 @@ logger = logging.getLogger("DailyBacktest")
 CONFIG_FILE = os.path.join(repo_root, 'openalgo/strategies/active_strategies.json')
 DATA_DIR = os.path.join(repo_root, 'openalgo/data')
 
+class ORBStrategy:
+    """
+    Simple ORB Strategy implementation for backtesting.
+    """
+    def __init__(self, symbol, quantity, range_mins=15, api_key=None):
+        self.symbol = symbol
+        self.quantity = quantity
+        self.range_mins = range_mins
+
+    def calculate_signals(self, df):
+        """
+        Backtest logic: Process a DataFrame and return signals.
+        """
+        signals = []
+        if df.empty:
+            return signals
+
+        # Ensure datetime
+        if 'datetime' not in df.columns:
+            df['datetime'] = df.index
+
+        # Work on copy
+        df = df.copy()
+        df['date'] = df['datetime'].dt.date
+
+        # Process each day independently
+        for date, day_df in df.groupby('date'):
+            if len(day_df) < self.range_mins:
+                continue
+
+            # Calculate ORB for this day
+            orb_df = day_df.iloc[:self.range_mins]
+            orb_high = orb_df['high'].max()
+            orb_low = orb_df['low'].min()
+            orb_vol_avg = orb_df['volume'].mean()
+
+            position = 0
+
+            # Trading Session (after ORB)
+            # Use iloc relative to day_df
+            trading_df = day_df.iloc[self.range_mins:]
+
+            for i in range(len(trading_df)):
+                candle = trading_df.iloc[i]
+                ts = candle['datetime']
+
+                # Entry Logic
+                if position == 0:
+                    if candle['close'] > orb_high and candle['volume'] > orb_vol_avg:
+                        signals.append({'time': ts, 'side': 'BUY', 'price': candle['close']})
+                        position = 1
+                    elif candle['close'] < orb_low and candle['volume'] > orb_vol_avg:
+                        signals.append({'time': ts, 'side': 'SELL', 'price': candle['close']})
+                        position = -1
+
+                # Exit Logic (Simple EOD)
+                if i == len(trading_df) - 1 and position != 0:
+                     side = 'SELL' if position == 1 else 'BUY'
+                     signals.append({'time': ts, 'side': side, 'price': candle['close'], 'reason': 'EOD'})
+                     position = 0
+
+        return signals
+
 class DailyBacktester:
-    def __init__(self):
+    def __init__(self, source='mock', days=30, api_key=None, host="http://127.0.0.1:5001"):
         self.resolver = SymbolResolver()
         self.results = []
+        self.source = source
+        self.days = days
+        self.api_key = api_key or "dummy_key"
+        self.host = host
+        self.api_client = None
+
+        if self.source == 'api':
+            self.api_client = APIClient(self.api_key, self.host)
 
     def load_configs(self):
         if not os.path.exists(CONFIG_FILE):
@@ -53,11 +126,54 @@ class DailyBacktester:
         df['low'] = df[['open', 'close']].min(axis=1) - 0.2
         return df
 
+    def fetch_real_data(self, symbol, days=30):
+        """Fetch real data from API and validate it."""
+        if not self.api_client:
+            logger.error("API Client not initialized.")
+            return pd.DataFrame()
+
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+
+        logger.info(f"Fetching data for {symbol} from {start_date.date()} to {end_date.date()}")
+
+        df = self.api_client.history(
+            symbol=symbol,
+            exchange="NSE", # Defaulting to NSE, logic can be enhanced
+            interval="5m",
+            start_date=start_date.strftime("%Y-%m-%d %H:%M:%S"),
+            end_date=end_date.strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+        if df.empty:
+            logger.warning(f"No data returned for {symbol}")
+            return df
+
+        # Validate Data
+        validation = DataValidator.validate_ohlcv(df, symbol=symbol, interval_minutes=5)
+        if not validation['is_valid']:
+            logger.warning(f"Data Validation Issues for {symbol}: {validation['issues']}")
+        else:
+            logger.info(f"Data Validation Passed for {symbol}")
+
+        # Store validation stats for report
+        self.current_validation_stats = validation
+
+        return df
+
     def run_strategy_simulation(self, name, config, symbol, override_params=None):
         logger.info(f"Backtesting {name} ({symbol})...")
         engine = SimpleBacktestEngine(initial_capital=100000)
 
-        df = self.generate_mock_data(symbol)
+        if self.source == 'api':
+            df = self.fetch_real_data(symbol, self.days)
+            if df.empty:
+                logger.error(f"Skipping {name}: No data.")
+                return {'strategy': name, 'symbol': symbol, 'error': 'No Data'}
+        else:
+            df = self.generate_mock_data(symbol, self.days)
+            self.current_validation_stats = {'is_valid': True, 'note': 'Mock Data'}
+
         signals = []
 
         params = config.get('params', {}).copy()
@@ -85,6 +201,9 @@ class DailyBacktester:
         metrics['strategy'] = name
         metrics['symbol'] = symbol
         metrics['params'] = params
+        metrics['data_source'] = self.source
+        metrics['data_valid'] = self.current_validation_stats.get('is_valid', False)
+        metrics['data_issues'] = len(self.current_validation_stats.get('issues', []))
         return metrics
 
     def _simulate_fallback_signals(self, df, config):
@@ -117,8 +236,6 @@ class DailyBacktester:
                     pnl = (entry_price - price) * quantity
                     self._add_trade(engine, pnl, entry_price, quantity)
                     position = 0
-                    # If reversal intended, add new position logic here.
-                    # ORB usually keeps position until reverse.
             elif side == 'SELL':
                 if position == 0:
                     position = -quantity
@@ -169,17 +286,20 @@ class DailyBacktester:
     def run(self):
         configs = self.load_configs()
 
-        print("\n🚀 STARTING DAILY BACKTESTS")
+        print(f"\n🚀 STARTING DAILY BACKTESTS (Source: {self.source})")
 
         for name, config in configs.items():
             resolved = self.resolver.resolve(config)
             symbol = resolved if isinstance(resolved, str) else resolved.get('sample_symbol', 'UNKNOWN')
 
             metrics = self.run_strategy_simulation(name, config, symbol)
+            if 'error' in metrics:
+                continue
+
             self.results.append(metrics)
 
-            # Optimization Loop for ORB
-            if config.get('strategy') == 'orb_strategy':
+            # Optimization Loop for ORB (Only on mock or valid data)
+            if config.get('strategy') == 'orb_strategy' and self.source == 'mock':
                 self.optimize_strategy(name, config, symbol)
 
         self.generate_report()
@@ -191,7 +311,7 @@ class DailyBacktester:
              print("No results.")
              return
 
-        cols = ['strategy', 'symbol', 'total_return_pct', 'win_rate', 'profit_factor', 'sharpe_ratio', 'max_drawdown_pct']
+        cols = ['strategy', 'symbol', 'total_return_pct', 'win_rate', 'profit_factor', 'sharpe_ratio', 'max_drawdown_pct', 'data_valid']
         print("\n📊 BACKTEST LEADERBOARD")
         print(df[cols].sort_values('sharpe_ratio', ascending=False).to_markdown(index=False))
 
@@ -203,5 +323,13 @@ class DailyBacktester:
         logger.info(f"Leaderboard saved to {output_file}")
 
 if __name__ == "__main__":
-    runner = DailyBacktester()
+    parser = argparse.ArgumentParser(description="Run daily backtests")
+    parser.add_argument("--source", choices=['mock', 'api'], default='mock', help="Data source: 'mock' or 'api'")
+    parser.add_argument("--days", type=int, default=30, help="Number of days to backtest")
+    parser.add_argument("--api-key", type=str, default=None, help="API Key for real data")
+    parser.add_argument("--host", type=str, default="http://127.0.0.1:5001", help="Broker API Host")
+
+    args = parser.parse_args()
+
+    runner = DailyBacktester(source=args.source, days=args.days, api_key=args.api_key, host=args.host)
     runner.run()
