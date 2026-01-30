@@ -147,25 +147,41 @@ class SuperTrendVWAPStrategy:
             return True
 
     def get_vix(self):
-        # Simulated VIX for dynamic deviation
-        # Ideally fetch 'INDIA VIX'
+        """Fetch real VIX or default to 15.0."""
+        try:
+            vix_df = self.client.history(
+                symbol="INDIA VIX",
+                exchange="NSE_INDEX",
+                interval="1d",
+                start_date=(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d"),
+                end_date=datetime.now().strftime("%Y-%m-%d")
+            )
+            if not vix_df.empty:
+                vix = vix_df.iloc[-1]['close']
+                self.logger.debug(f"Fetched VIX: {vix}")
+                return vix
+        except Exception as e:
+            self.logger.warning(f"Could not fetch VIX: {e}")
         return 15.0 # Default
 
-    def run(self):
-        # Normalize symbol (NIFTYBANK -> BANKNIFTY, NIFTY 50 -> NIFTY, NIFTY50 -> NIFTY)
+    def _normalize_symbol(self):
+        """Normalize NIFTY/BANKNIFTY symbols."""
         original_symbol = self.symbol
         symbol_upper = self.symbol.upper().replace(" ", "")
+
         if "BANK" in symbol_upper and "NIFTY" in symbol_upper:
             self.symbol = "BANKNIFTY"
         elif "NIFTY" in symbol_upper:
             # Remove "50" suffix if present (NIFTY50 -> NIFTY)
-            self.symbol = "NIFTY" if symbol_upper.replace("50", "") == "NIFTY" else "NIFTY"
+            self.symbol = "NIFTY"
         else:
             self.symbol = original_symbol
-        
+
         if original_symbol != self.symbol:
             self.logger.info(f"Symbol normalized: {original_symbol} -> {self.symbol}")
-        
+
+    def run(self):
+        self._normalize_symbol()
         self.logger.info(f"Starting SuperTrend VWAP for {self.symbol}")
 
         while True:
@@ -174,7 +190,7 @@ class SuperTrendVWAPStrategy:
                     time.sleep(60)
                     continue
 
-                exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
+                exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper() else "NSE"
                 try:
                     df = self.client.history(
                         symbol=self.symbol,
@@ -283,7 +299,7 @@ def run_strategy():
     parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
     parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
     parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
-    parser.add_argument("--api_key", type=str, default='demo_key', help="API Key")
+    parser.add_argument("--api_key", type=str, help="API Key")
     parser.add_argument("--host", type=str, default='http://127.0.0.1:5001', help="Host")
     parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours")
     parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
