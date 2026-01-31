@@ -59,11 +59,11 @@ except ImportError:
                 return df
 
 class SuperTrendVWAPStrategy:
-    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False, sector_benchmark='NIFTY BANK', logfile=None):
+    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False, sector_benchmark='NIFTY BANK', logfile=None, client=None):
         self.symbol = symbol
         self.quantity = quantity
         self.api_key = api_key or os.getenv('OPENALGO_APIKEY')
-        if not self.api_key:
+        if not self.api_key and not client:
             raise ValueError("API Key must be provided via --api_key or OPENALGO_APIKEY env var")
 
         self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
@@ -95,7 +95,12 @@ class SuperTrendVWAPStrategy:
             fh = logging.FileHandler(logfile)
             fh.setFormatter(formatter)
             self.logger.addHandler(fh)
-        self.client = APIClient(api_key=self.api_key, host=self.host)
+
+        if client:
+            self.client = client
+        else:
+            self.client = APIClient(api_key=self.api_key, host=self.host)
+
         self.pm = PositionManager(symbol) if PositionManager else None
 
     def generate_signal(self, df):
@@ -438,7 +443,7 @@ def run_strategy():
 # Module level wrapper for SimpleBacktestEngine
 def generate_signal(df, client=None, symbol=None, params=None):
     # Instantiate strategy with dummy params
-    strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test")
+    strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test", client=client)
 
     # Silence logger for backtest to avoid handler explosion
     strat.logger.handlers = []
