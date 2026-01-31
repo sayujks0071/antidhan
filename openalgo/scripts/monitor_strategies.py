@@ -29,6 +29,11 @@ def get_running_strategies():
             pid = parts[0]
             cmdline = " ".join(parts[1:])
 
+            # Redact API Keys and Secrets
+            cmdline = re.sub(r'--api_key\s+[^\s]+', '--api_key [REDACTED]', cmdline)
+            cmdline = re.sub(r'api_key=[^\s]+', 'api_key=[REDACTED]', cmdline)
+            cmdline = re.sub(r'--secret\s+[^\s]+', '--secret [REDACTED]', cmdline)
+
             # Extract script name
             script_match = re.search(r'([\w_]+\.py)', cmdline)
             script_name = script_match.group(1) if script_match else "unknown"

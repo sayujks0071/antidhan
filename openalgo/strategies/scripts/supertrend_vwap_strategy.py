@@ -245,10 +245,10 @@ class SuperTrendVWAPStrategy:
                 last_rsi = df.iloc[-1]['rsi']
                 self.logger.info(f"Sector {self.sector_benchmark} RSI: {last_rsi:.2f}")
                 return last_rsi > 50
-            return True # Default to True if not enough data
+            return False # Default to False if not enough data (Fail-Safe)
         except Exception as e:
             self.logger.warning(f"Sector Check Failed: {e}")
-            return True
+            return False # Fail-Safe
 
     def get_vix(self):
         """Fetch real VIX or default to 15.0."""
