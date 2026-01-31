@@ -39,7 +39,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 class MLMomentumStrategy:
-    def __init__(self, symbol, api_key, port, threshold=0.01, stop_pct=1.0, sector='NIFTY 50'):
+    def __init__(self, symbol, api_key, port, threshold=0.01, stop_pct=1.0, sector='NIFTY 50', vol_multiplier=0.5):
         self.symbol = symbol
         self.host = f"http://127.0.0.1:{port}"
         self.client = APIClient(api_key=api_key, host=self.host)
@@ -49,6 +49,52 @@ class MLMomentumStrategy:
         self.roc_threshold = threshold
         self.stop_pct = stop_pct
         self.sector = sector
+        self.vol_multiplier = vol_multiplier
+
+    def calculate_signal(self, df):
+        """Calculate signal for backtesting."""
+        if df.empty or len(df) < 50:
+            return 'HOLD', 0.0, {}
+
+        # Indicators
+        df['roc'] = df['close'].pct_change(periods=10)
+
+        # RSI
+        delta = df['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs_val = gain / loss
+        df['rsi'] = 100 - (100 / (1 + rs_val))
+
+        # SMA for Trend
+        df['sma50'] = df['close'].rolling(50).mean()
+
+        last = df.iloc[-1]
+        current_price = last['close']
+
+        # Simplifications for Backtest (Missing Index/Sector Data)
+        # We assume RS and Sector conditions are met if data missing, or strict if we want.
+        # Let's assume 'rs_excess > 0' and 'sector_outperformance > 0' are TRUE for baseline logic
+        # unless we pass index data in 'df' (which we don't usually).
+
+        rs_excess = 0.01 # Mock positive
+        sector_outperformance = 0.01 # Mock positive
+        sentiment = 0.5 # Mock positive
+
+        # Entry Logic
+        if (last['roc'] > self.roc_threshold and
+            last['rsi'] > 55 and
+            rs_excess > 0 and
+            sector_outperformance > 0 and
+            current_price > last['sma50'] and
+            sentiment >= 0):
+
+            # Volume check
+            avg_vol = df['volume'].rolling(20).mean().iloc[-1]
+            if last['volume'] > avg_vol * self.vol_multiplier: # Stricter volume
+                return 'BUY', 1.0, {'roc': last['roc'], 'rsi': last['rsi']}
+
+        return 'HOLD', 0.0, {}
 
     def calculate_relative_strength(self, df, index_df):
         if index_df.empty: return 1.0
@@ -220,6 +266,33 @@ def run_strategy():
 
     strategy = MLMomentumStrategy(symbol, api_key, port, threshold=threshold, sector=args.sector)
     strategy.run()
+
+# Module level wrapper for SimpleBacktestEngine
+def generate_signal(df, client=None, symbol=None, params=None):
+    strat_params = {
+        'threshold': 0.01,
+        'stop_pct': 1.0,
+        'sector': 'NIFTY 50',
+        'vol_multiplier': 0.5
+    }
+    if params:
+        strat_params.update(params)
+
+    strat = MLMomentumStrategy(
+        symbol=symbol or "TEST",
+        api_key="dummy",
+        port=5001,
+        threshold=float(strat_params.get('threshold', 0.01)),
+        stop_pct=float(strat_params.get('stop_pct', 1.0)),
+        sector=strat_params.get('sector', 'NIFTY 50'),
+        vol_multiplier=float(strat_params.get('vol_multiplier', 0.5))
+    )
+
+    # Silence logger
+    strat.logger.handlers = []
+    strat.logger.addHandler(logging.NullHandler())
+
+    return strat.calculate_signal(df)
 
 if __name__ == "__main__":
     run_strategy()
