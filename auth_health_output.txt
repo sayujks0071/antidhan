@@ -1,0 +1,51 @@
+2026-01-31 00:08:18,159 - AuthCheck - ERROR - Environment check failed (SystemExit). Proceeding with limited functionality.
+[2026-01-31 00:08:18,554] ERROR in authentication_health_check: DB Error: CRITICAL: API_KEY_PEPPER environment variable is not set. This is required for secure password and API key hashing. Generate one using: python -c "import secrets; print(secrets.token_hex(32))"
+
+Error: .env file not found.
+Solution: Copy .sample.env to .env and configure your settings
+🔐 DAILY LOGIN HEALTH CHECK - [2026-01-31] [00:08:18]
+
+✅ KITE CONNECT (Port 5001):
+- Server Status: 🔴 Down
+- Auth Token: Unknown (DB Error)
+- Token Expiry: Unknown
+- API Test: 🔴 Failed
+- Last Refresh: Unknown
+
+✅ DHAN API (Port 5002):
+- Server Status: 🔴 Down
+- Access Token: Unknown (DB Error)
+- Client ID: ✅ Configured
+- API Test: 🔴 Failed
+- Last Refresh: Unknown
+
+✅ OPENALGO AUTH:
+- Login Status: 🔴 DB Unavailable
+- API Keys: 3/3 strategies configured
+- CSRF Handling: ✅ Working
+
+⚠️ ISSUES DETECTED:
+1. Kite Port 5001 is closed -> Server not started -> Check service status
+2. Dhan Port 5002 is closed -> Server not started -> Check service status
+3. Kite Token Invalid -> Expired/Missing -> Login via OpenAlgo UI
+4. Dhan Token Invalid -> Expired/Missing -> Login via OpenAlgo UI
+5. Kite Auth Check Failed -> DB Error -> Check Database/Env
+6. Dhan Auth Check Failed -> DB Error -> Check Database/Env
+
+🔧 AUTOMATED ACTIONS TAKEN:
+- DB Check -> Completed
+- Env Validation -> Completed
+- Token Auto-Refresh -> Skipped (Requires manual auth flow)
+
+📋 MANUAL ACTIONS REQUIRED:
+- Please address the issues listed above.
+- If tokens are expired, visit OpenAlgo Dashboard to re-authenticate.
+
+🔄 TOKEN STATUS:
+- Kite: Unknown (DB Error) - Unknown
+- Dhan: Unknown (DB Error) - Unknown
+- Next Refresh Check: 00:38:18
+
+✅ STRATEGY AUTH CHECK:
+- Strategies with valid API keys: 3/3
+- Actions: Ready
