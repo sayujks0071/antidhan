@@ -43,6 +43,9 @@ class SymbolResolver:
         """
         itype = config.get('type', 'EQUITY').upper()
         underlying = config.get('underlying')
+        if not underlying:
+            underlying = config.get('symbol')
+
         exchange = config.get('exchange', 'NSE')
 
         if itype == 'EQUITY':
@@ -118,7 +121,8 @@ class SymbolResolver:
             # 2. Symbol matches Name + 'M' + Date (e.g., SILVERM...) vs SILVER...
 
             # Check for explicitly 'MINI' or 'M' suffix on underlying name
-            mini_pattern = r'({}M|{}MINI)'.format(underlying, underlying)
+            # Use non-capturing group to avoid pandas UserWarning
+            mini_pattern = r'(?:{}M|{}MINI)'.format(underlying, underlying)
 
             mini_matches = matches[matches['symbol'].str.contains(mini_pattern, regex=True, flags=re.IGNORECASE)]
 
