@@ -230,40 +230,75 @@ class SimpleBacktestEngine:
             # Receive less when selling
             return price * (1 - cost_factor)
     
-    def check_exits(self, current_bar: pd.Series, position: Position) -> Tuple[bool, Optional[str], Optional[float]]:
+    def check_exits(self, current_bar: pd.Series, position: Position, current_time: datetime, strategy_module=None, interval="15m") -> Tuple[bool, Optional[str], Optional[float]]:
         """
-        Check if position should be exited based on SL/TP.
-        
-        Args:
-            current_bar: Current bar data
-            position: Open position
-        
-        Returns:
-            (should_exit, exit_reason, exit_price)
+        Check if position should be exited based on SL/TP, Time Stop, or Breakeven.
         """
         current_price = current_bar['close']
         high = current_bar['high']
         low = current_bar['low']
         
+        # 1. Time Stop
+        if strategy_module and hasattr(strategy_module, 'TIME_STOP_BARS'):
+            # Calculate duration limit based on interval
+            try:
+                # Convert interval string (e.g. '15m') to timedelta
+                # pandas usually handles '15m' as 15 minutes in to_timedelta if we strictly parse,
+                # but standard aliases might vary. '15min' is safe.
+                # Simplistic mapping for common intervals
+                if interval.endswith('m') and not interval.endswith('min'):
+                    # Treat 'm' as minutes for backtest context
+                    delta_str = interval.replace('m', 'min')
+                else:
+                    delta_str = interval
+
+                bar_duration = pd.to_timedelta(delta_str)
+            except:
+                # Fallback to 15m default
+                bar_duration = timedelta(minutes=15)
+
+            time_diff = current_time - position.entry_time
+            # Check if duration exceeds allowed bars
+            if time_diff > (bar_duration * strategy_module.TIME_STOP_BARS):
+                return True, 'TIME_STOP', current_price
+
+        # 2. Breakeven Trigger
+        if strategy_module and hasattr(strategy_module, 'BREAKEVEN_TRIGGER_R'):
+            r_multiple = strategy_module.BREAKEVEN_TRIGGER_R
+            risk = abs(position.entry_price - position.stop_loss)
+            if risk > 0:
+                if position.side == 'BUY':
+                    if high >= position.entry_price + (r_multiple * risk):
+                        # Move SL to Entry (plus cost buffer?)
+                        position.stop_loss = max(position.stop_loss, position.entry_price * 1.0005)
+                else:
+                    if low <= position.entry_price - (r_multiple * risk):
+                        position.stop_loss = min(position.stop_loss, position.entry_price * 0.9995)
+
         if position.side == 'BUY':
             # Long position
             # Check stop loss
             if low <= position.stop_loss:
-                return True, 'STOP_LOSS', position.stop_loss
+                # Execution price is SL or Open if Gap
+                exec_price = position.stop_loss if current_bar['open'] > position.stop_loss else current_bar['open']
+                return True, 'STOP_LOSS', exec_price
             
             # Check take profit
             if high >= position.take_profit:
-                return True, 'TAKE_PROFIT', position.take_profit
+                exec_price = position.take_profit if current_bar['open'] < position.take_profit else current_bar['open']
+                return True, 'TAKE_PROFIT', exec_price
         
         else:
             # Short position
             # Check stop loss
             if high >= position.stop_loss:
-                return True, 'STOP_LOSS', position.stop_loss
+                exec_price = position.stop_loss if current_bar['open'] < position.stop_loss else current_bar['open']
+                return True, 'STOP_LOSS', exec_price
             
             # Check take profit
             if low <= position.take_profit:
-                return True, 'TAKE_PROFIT', position.take_profit
+                exec_price = position.take_profit if current_bar['open'] > position.take_profit else current_bar['open']
+                return True, 'TAKE_PROFIT', exec_price
         
         return False, None, None
     
@@ -346,7 +381,7 @@ class SimpleBacktestEngine:
             
             # Check for exits first
             for pos in self.positions[:]:  # Copy list to avoid modification during iteration
-                should_exit, exit_reason, exit_price = self.check_exits(current_bar, pos)
+                should_exit, exit_reason, exit_price = self.check_exits(current_bar, pos, current_time, strategy_module, interval=interval)
                 
                 if should_exit:
                     # Close position
@@ -393,9 +428,18 @@ class SimpleBacktestEngine:
                     )
                     
                     if action in ['BUY', 'SELL']:
-                        # Calculate position size (simplified - 1 lot)
-                        quantity = 1
+                        # Calculate position size
+                        # Support strategy returning size (as float or int)
+                        if isinstance(score, (int, float)) and score > 0 and score != 1.0:
+                             # Interpretation: score is size multiplier?
+                             # In existing strategies, score is 1.0 usually.
+                             # AI_Hybrid might set score based on logic?
+                             pass
                         
+                        # Check if strategy returned a specific quantity in details
+                        quantity = details.get('quantity', 1)
+                        if quantity <= 0: quantity = 1
+
                         # Calculate SL/TP based on ATR
                         atr = details.get('atr', 0)
                         current_price = current_bar['close']

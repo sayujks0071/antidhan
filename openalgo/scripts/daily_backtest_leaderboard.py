@@ -36,17 +36,36 @@ STRATEGIES = [
                                # Engine loads data. We can use a proxy symbol like 'SILVER' if using mock data,
                                # but usually specific symbol needed.
         "exchange": "MCX"
+    },
+    {
+        "name": "AI_Hybrid",
+        "file": "openalgo/strategies/scripts/ai_hybrid_reversion_breakout.py",
+        "symbol": "NIFTY",
+        "exchange": "NSE_INDEX"
+    },
+    {
+        "name": "ML_Momentum",
+        "file": "openalgo/strategies/scripts/advanced_ml_momentum_strategy.py",
+        "symbol": "NIFTY",
+        "exchange": "NSE_INDEX"
     }
 ]
 
 TUNING_CONFIG = {
     "SuperTrend_VWAP": {
-        "stop_pct": [1.5, 1.8, 2.0],
-        "threshold": [150, 155, 160]
+        "stop_pct": [1.5, 2.0],
+        "threshold": [150, 160]
     },
     "MCX_Momentum": {
-        "adx_threshold": [20, 25, 30],
-        "period_rsi": [10, 14, 18]
+        "adx_threshold": [20, 30],
+        "period_rsi": [10, 14]
+    },
+    "AI_Hybrid": {
+        "rsi_lower": [25, 35],
+        "rsi_upper": [60, 70]
+    },
+    "ML_Momentum": {
+        "threshold": [0.01, 0.02]
     }
 }
 
@@ -82,7 +101,7 @@ def load_strategy_module(filepath):
 def run_leaderboard():
     engine = SimpleBacktestEngine(initial_capital=100000.0)
 
-    start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    start_date = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
     end_date = datetime.now().strftime("%Y-%m-%d")
 
     results = []

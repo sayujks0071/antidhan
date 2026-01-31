@@ -72,6 +72,8 @@ class SuperTrendVWAPStrategy:
         # Optimization Parameters
         self.threshold = 155
         self.stop_pct = 1.8
+        self.adx_threshold = 20  # Added ADX Filter
+        self.adx_period = 14
 
         # State
         self.trailing_stop = 0.0
@@ -134,6 +136,10 @@ class SuperTrendVWAPStrategy:
         is_above_poc = last['close'] > poc_price
         is_not_overextended = abs(last['vwap_dev']) < dev_threshold
 
+        # ADX Filter
+        adx = self.calculate_adx(df, period=self.adx_period)
+        is_strong_trend = adx > self.adx_threshold
+
         # Sector check (Mocked for backtest usually, or passed via client)
         sector_bullish = True
 
@@ -142,10 +148,11 @@ class SuperTrendVWAPStrategy:
             'close': last['close'],
             'vwap': last['vwap'],
             'atr': self.atr,
-            'poc': poc_price
+            'poc': poc_price,
+            'adx': adx
         }
 
-        if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
+        if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish and is_strong_trend:
             return 'BUY', 1.0, details
 
         # Sell Logic (Inverse for completeness?)
@@ -169,6 +176,27 @@ class SuperTrendVWAPStrategy:
         tr3 = (low - close.shift(1)).abs()
         tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
         return tr.rolling(period).mean().iloc[-1]
+
+    def calculate_adx(self, df, period=14):
+        try:
+            plus_dm = df['high'].diff()
+            minus_dm = df['low'].diff()
+            plus_dm[plus_dm < 0] = 0
+            minus_dm[minus_dm > 0] = 0
+
+            tr1 = df['high'] - df['low']
+            tr2 = (df['high'] - df['close'].shift(1)).abs()
+            tr3 = (df['low'] - df['close'].shift(1)).abs()
+            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+            atr = tr.rolling(period).mean()
+            plus_di = 100 * (plus_dm.ewm(alpha=1/period).mean() / atr)
+            minus_di = 100 * (minus_dm.abs().ewm(alpha=1/period).mean() / atr)
+            dx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
+            adx = dx.rolling(period).mean().iloc[-1]
+            return 0 if np.isnan(adx) else adx
+        except:
+            return 0
 
     def analyze_volume_profile(self, df, n_bins=20):
         """Find Point of Control (POC)."""
@@ -423,10 +451,18 @@ def generate_signal(df, client=None, symbol=None, params=None):
     # Instantiate strategy with dummy params
     strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test")
 
+    # Silence logger for backtest to avoid handler explosion
+    strat.logger.handlers = []
+    strat.logger.addHandler(logging.NullHandler())
+
     # Apply params if provided
     if params:
         if 'threshold' in params: strat.threshold = params['threshold']
         if 'stop_pct' in params: strat.stop_pct = params['stop_pct']
+        if 'adx_threshold' in params: strat.adx_threshold = params['adx_threshold']
+
+    # Set Breakeven Trigger
+    setattr(strat, 'BREAKEVEN_TRIGGER_R', 1.5)
 
     action, score, details = strat.generate_signal(df)
     return action, score, details
