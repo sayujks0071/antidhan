@@ -313,8 +313,13 @@ class SuperTrendVWAPStrategy:
                 # Dynamic Deviation based on VIX
                 vix = self.get_vix()
                 dev_threshold = 0.02
-                if vix > 20:
-                    dev_threshold = 0.01 # Tighten in high volatility
+                size_multiplier = 1.0
+
+                if vix > 25:
+                    dev_threshold = 0.008 # Very tight in extreme volatility
+                    size_multiplier = 0.5 # Reduce position size
+                elif vix > 20:
+                    dev_threshold = 0.015 # Tighten in high volatility
                 elif vix < 12:
                     dev_threshold = 0.03 # Loosen in low volatility
 
@@ -327,6 +332,7 @@ class SuperTrendVWAPStrategy:
                 dynamic_threshold = vol_mean + (1.5 * vol_std)
                 is_volume_spike = last['volume'] > dynamic_threshold
 
+                # Volume Profile Logic: Price must be above Point of Control to confirm value migration up
                 is_above_poc = last['close'] > poc_price
                 is_not_overextended = abs(last['vwap_dev']) < dev_threshold
 
@@ -352,9 +358,11 @@ class SuperTrendVWAPStrategy:
                     sector_bullish = self.check_sector_correlation()
 
                     if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
-                        self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}")
+                        adj_qty = int(self.quantity * size_multiplier)
+                        if adj_qty < 1: adj_qty = 1 # Minimum 1
+                        self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}, Qty: {adj_qty} (VIX: {vix})")
                         if self.pm:
-                            self.pm.update_position(self.quantity, last['close'], 'BUY')
+                            self.pm.update_position(adj_qty, last['close'], 'BUY')
                             self.trailing_stop = last['close'] - (2 * self.atr)
 
             except Exception as e:
