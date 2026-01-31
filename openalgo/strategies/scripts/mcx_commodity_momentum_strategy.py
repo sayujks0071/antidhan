@@ -114,6 +114,8 @@ class MCXMomentumStrategy:
         if self.data.empty:
             return
 
+        # Optimization: If columns already exist and length matches, skip?
+        # But for now, we assume data is fresh.
         df = self.data.copy()
 
         # RSI
@@ -235,7 +237,7 @@ if __name__ == "__main__":
     parser.add_argument('--symbol', type=str, help='MCX Symbol (e.g., GOLDM05FEB26FUT)')
     parser.add_argument('--underlying', type=str, help='Commodity Name (e.g., GOLD, SILVER, CRUDEOIL)')
     parser.add_argument('--port', type=int, default=5001, help='API Port')
-    parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
+    parser.add_argument('--api_key', type=str, help='API Key')
 
     args = parser.parse_args()
 
@@ -301,5 +303,8 @@ def generate_signal(df, client=None, symbol=None, params=None):
     if params:
         strat_params.update(params)
 
-    strat = MCXMomentumStrategy(symbol or "TEST", "dummy_key", "http://localhost:5001", strat_params)
+    api_key = client.api_key if client and hasattr(client, 'api_key') else "BACKTEST"
+    host = client.host if client and hasattr(client, 'host') else "http://127.0.0.1:5001"
+
+    strat = MCXMomentumStrategy(symbol or "TEST", api_key, host, strat_params)
     return strat.generate_signal(df)

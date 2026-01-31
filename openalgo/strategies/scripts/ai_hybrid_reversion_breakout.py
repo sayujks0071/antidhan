@@ -21,19 +21,20 @@ utils_dir = os.path.join(strategies_dir, 'utils')
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open
+    from trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol
 except ImportError:
     try:
         # Try absolute import
         sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open
+        from utils.trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
             APIClient = None
             PositionManager = None
+            normalize_symbol = lambda s: s
             is_market_open = lambda: True
 
 class AIHybridStrategy:
@@ -183,10 +184,7 @@ class AIHybridStrategy:
 
     def check_sector_strength(self):
         try:
-            # Normalize sector symbol (NIFTY 50 -> NIFTY, NIFTY50 -> NIFTY)
-            sector_symbol = self.sector.replace(" ", "").replace("50", "").replace("BANK", "BANKNIFTY")
-            if "NIFTY" not in sector_symbol.upper():
-                sector_symbol = "NIFTY"  # Default to NIFTY
+            sector_symbol = normalize_symbol(self.sector)
             
             # Use NSE_INDEX for index symbols
             exchange = "NSE_INDEX" if "NIFTY" in sector_symbol.upper() else "NSE"
@@ -211,20 +209,7 @@ class AIHybridStrategy:
             return True
 
     def run(self):
-        # Normalize symbol (NIFTY50 -> NIFTY, NIFTY 50 -> NIFTY, NIFTYBANK -> BANKNIFTY)
-        original_symbol = self.symbol
-        symbol_upper = self.symbol.upper().replace(" ", "")
-        if "BANK" in symbol_upper and "NIFTY" in symbol_upper:
-            self.symbol = "BANKNIFTY"
-        elif "NIFTY" in symbol_upper:
-            # Remove "50" suffix if present (NIFTY50 -> NIFTY)
-            self.symbol = "NIFTY" if symbol_upper.replace("50", "") == "NIFTY" else "NIFTY"
-        else:
-            self.symbol = original_symbol
-        
-        if original_symbol != self.symbol:
-            self.logger.info(f"Symbol normalized: {original_symbol} -> {self.symbol}")
-        
+        self.symbol = normalize_symbol(self.symbol)
         self.logger.info(f"Starting AI Hybrid for {self.symbol} (Sector: {self.sector})")
 
         while True:

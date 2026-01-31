@@ -14,6 +14,24 @@ import numpy as np
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("TradingUtils")
 
+def normalize_symbol(symbol):
+    """
+    Normalize symbol for indices (NIFTY/BANKNIFTY).
+    Example: 'NIFTY 50' -> 'NIFTY', 'BANK NIFTY' -> 'BANKNIFTY'
+    """
+    if not symbol:
+        return symbol
+
+    s = symbol.upper().replace(" ", "")
+
+    if "BANK" in s and "NIFTY" in s:
+        return "BANKNIFTY"
+
+    if s == "NIFTY" or s == "NIFTY50":
+        return "NIFTY"
+
+    return symbol
+
 def is_market_open():
     """
     Check if NSE market is open (09:15 - 15:30 IST) on weekdays.

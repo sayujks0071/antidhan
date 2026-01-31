@@ -21,22 +21,23 @@ utils_dir = os.path.join(strategies_dir, 'utils')
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
+    from trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient, normalize_symbol
     from symbol_resolver import SymbolResolver
 except ImportError:
     try:
         sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
+        from utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient, normalize_symbol
         from utils.symbol_resolver import SymbolResolver
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient
+            from openalgo.strategies.utils.trading_utils import is_market_open, calculate_intraday_vwap, PositionManager, APIClient, normalize_symbol
             from openalgo.strategies.utils.symbol_resolver import SymbolResolver
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
             APIClient = None
             PositionManager = None
             SymbolResolver = None
+            normalize_symbol = lambda s: s
             is_market_open = lambda: True
             def calculate_intraday_vwap(df):
                 df = df.copy()
@@ -259,27 +260,11 @@ class SuperTrendVWAPStrategy:
                 self.logger.debug(f"Fetched VIX: {vix}")
                 return vix
         except Exception as e:
-            self.logger.warning(f"Could not fetch VIX: {e}")
+            self.logger.warning(f"Could not fetch VIX: {e}. Defaulting to 15.0.")
         return 15.0 # Default
 
-    def _normalize_symbol(self):
-        """Normalize NIFTY/BANKNIFTY symbols."""
-        original_symbol = self.symbol
-        symbol_upper = self.symbol.upper().replace(" ", "")
-
-        if "BANK" in symbol_upper and "NIFTY" in symbol_upper:
-            self.symbol = "BANKNIFTY"
-        elif "NIFTY" in symbol_upper:
-            # Remove "50" suffix if present (NIFTY50 -> NIFTY)
-            self.symbol = "NIFTY"
-        else:
-            self.symbol = original_symbol
-
-        if original_symbol != self.symbol:
-            self.logger.info(f"Symbol normalized: {original_symbol} -> {self.symbol}")
-
     def run(self):
-        self._normalize_symbol()
+        self.symbol = normalize_symbol(self.symbol)
         self.logger.info(f"Starting SuperTrend VWAP for {self.symbol}")
 
         while True:
@@ -378,6 +363,10 @@ class SuperTrendVWAPStrategy:
                     # Check Exit
                     if last['close'] < self.trailing_stop:
                         self.logger.info(f"Trailing Stop Hit at {last['close']:.2f}")
+                        self.pm.update_position(self.quantity, last['close'], 'SELL')
+                        self.trailing_stop = 0.0
+                    elif last['close'] < last['vwap']:
+                        self.logger.info(f"Price crossed below VWAP at {last['close']:.2f}. Exiting.")
                         self.pm.update_position(self.quantity, last['close'], 'SELL')
                         self.trailing_stop = 0.0
 
