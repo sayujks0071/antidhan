@@ -16,15 +16,18 @@ if str(utils_path) not in sys.path:
 
 try:
     from trading_utils import APIClient
+    from symbol_resolver import SymbolResolver
 except ImportError:
     try:
         from openalgo.strategies.utils.trading_utils import APIClient
+        from openalgo.strategies.utils.symbol_resolver import SymbolResolver
     except ImportError:
         APIClient = None
+        SymbolResolver = None
 
 # Configuration
-SYMBOL = os.getenv('SYMBOL', 'GOLDM05FEB26FUT')  # Default to Gold futures
-GLOBAL_SYMBOL = os.getenv('GLOBAL_SYMBOL', 'GOLD_GLOBAL')  # Default global symbol
+SYMBOL = os.getenv('SYMBOL', None)
+GLOBAL_SYMBOL = os.getenv('GLOBAL_SYMBOL', 'GOLD_GLOBAL')
 API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
 API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
 
@@ -254,7 +257,23 @@ if __name__ == "__main__":
         # Use environment variable (set by OpenAlgo)
         API_KEY = os.getenv('OPENALGO_APIKEY', API_KEY)
 
-    # Validate symbol is not REPLACE_ME
+    # Validate symbol or resolve default
+    if not SYMBOL:
+        if SymbolResolver:
+            logger.info("Resolving default MCX Gold symbol...")
+            resolver = SymbolResolver()
+            # Try to resolve generic Gold Mini Future
+            SYMBOL = resolver.resolve({'underlying': 'GOLD', 'type': 'FUT', 'exchange': 'MCX'})
+            if not SYMBOL:
+                 # Fallback
+                 SYMBOL = "GOLDM05FEB26FUT"
+                 logger.warning(f"Could not resolve symbol, using fallback: {SYMBOL}")
+            else:
+                 logger.info(f"Resolved to: {SYMBOL}")
+        else:
+             SYMBOL = "GOLDM05FEB26FUT"
+             logger.warning("SymbolResolver not available, using hardcoded fallback.")
+
     if SYMBOL == "REPLACE_ME" or GLOBAL_SYMBOL == "REPLACE_ME_GLOBAL":
         logger.error(f"❌ Symbol not configured! SYMBOL={SYMBOL}, GLOBAL_SYMBOL={GLOBAL_SYMBOL}")
         logger.error("Please set SYMBOL environment variable or use --symbol argument")
