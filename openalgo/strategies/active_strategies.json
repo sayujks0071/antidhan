@@ -6,19 +6,26 @@
         "exchange": "NSE",
         "params": {
             "quantity": 50,
-            "minutes": 15
+            "timeframe": 15
         }
     },
-    "ATM_OPT_NIFTY": {
-        "strategy": "orb_strategy",
+    "SuperTrend_NIFTY": {
+        "strategy": "supertrend_vwap_strategy",
         "underlying": "NIFTY",
-        "type": "OPT",
-        "option_type": "CE",
-        "strike_criteria": "ATM",
-        "expiry_preference": "WEEKLY",
-        "exchange": "NFO",
+        "type": "EQUITY",
+        "exchange": "NSE",
         "params": {
-            "quantity": 50
+            "quantity": 25,
+            "sector": "NIFTY BANK"
+        }
+    },
+    "AI_Hybrid_RELIANCE": {
+        "strategy": "ai_hybrid_reversion_breakout",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "params": {
+            "rsi_lower": 30,
+            "sector": "NIFTY 50"
         }
     },
     "MCX_SILVER": {
