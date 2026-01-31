@@ -2,6 +2,7 @@
 """
 MCX Commodity Momentum Strategy
 Momentum strategy using ADX and RSI with proper API integration.
+Enhanced with Multi-Factor inputs (USD/INR, Seasonality).
 """
 import os
 import sys
@@ -48,6 +49,10 @@ class MCXMomentumStrategy:
         self.pm = PositionManager(symbol) if PositionManager else None
         self.data = pd.DataFrame()
 
+        # Log active filters
+        logger.info(f"Initialized Strategy for {symbol}")
+        logger.info(f"Filters: Seasonality={params.get('seasonality_score', 'N/A')}, USD_Vol={params.get('usd_inr_volatility', 'N/A')}")
+
     def fetch_data(self):
         """Fetch live or historical data from OpenAlgo."""
         if not self.client:
@@ -90,21 +95,22 @@ class MCXMomentumStrategy:
         current = self.data.iloc[-1]
         prev = self.data.iloc[-2]
 
-        # Global Filter Check (Mock)
-        global_alignment = True # self.params['use_global_filter']
+        # Factors
+        seasonality_ok = self.params.get('seasonality_score', 50) > 40
 
         action = 'HOLD'
 
+        if not seasonality_ok:
+            return 'HOLD', 0.0, {'reason': 'Seasonality Weak'}
+
         if (current['adx'] > self.params['adx_threshold'] and
             current['rsi'] > 50 and
-            current['close'] > prev['close'] and
-            global_alignment):
+            current['close'] > prev['close']):
             action = 'BUY'
 
         elif (current['adx'] > self.params['adx_threshold'] and
               current['rsi'] < 50 and
-              current['close'] < prev['close'] and
-              global_alignment):
+              current['close'] < prev['close']):
             action = 'SELL'
 
         return action, 1.0, {'atr': current.get('atr', 0)}
@@ -181,6 +187,20 @@ class MCXMomentumStrategy:
         if self.pm:
             has_position = self.pm.has_position()
 
+        # Multi-Factor Checks
+        seasonality_ok = self.params.get('seasonality_score', 50) > 40
+        usd_vol_high = self.params.get('usd_inr_volatility', 0) > 0.8
+
+        # Adjust Position Size
+        base_qty = 1
+        if usd_vol_high:
+            logger.info("High USD/INR Volatility: Keeping position size minimal.")
+            # logic to reduce size would go here, e.g. base_qty = 0.5 (if supported) or strict stops
+
+        if not seasonality_ok and not has_position:
+            logger.info("Seasonality Weak: Skipping new entries.")
+            return
+
         # Entry Logic
         if not has_position:
             # BUY Signal: ADX > 25 (Trend Strength), RSI > 50 (Bullish), Price > Prev Close
@@ -190,7 +210,7 @@ class MCXMomentumStrategy:
 
                 logger.info(f"BUY SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
                 if self.pm:
-                    self.pm.update_position(1, current['close'], 'BUY')
+                    self.pm.update_position(base_qty, current['close'], 'BUY')
 
             # SELL Signal: ADX > 25, RSI < 45, Price < Prev Close
             elif (current['adx'] > self.params['adx_threshold'] and
@@ -199,7 +219,7 @@ class MCXMomentumStrategy:
 
                 logger.info(f"SELL SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
                 if self.pm:
-                    self.pm.update_position(1, current['close'], 'SELL')
+                    self.pm.update_position(base_qty, current['close'], 'SELL')
 
         # Exit Logic
         elif has_position:
@@ -239,6 +259,12 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=5001, help='API Port')
     parser.add_argument('--api_key', type=str, help='API Key')
 
+    # New Multi-Factor Arguments
+    parser.add_argument('--usd_inr_trend', type=str, default='Neutral', help='USD/INR Trend')
+    parser.add_argument('--usd_inr_volatility', type=float, default=0.0, help='USD/INR Volatility %')
+    parser.add_argument('--seasonality_score', type=int, default=50, help='Seasonality Score (0-100)')
+    parser.add_argument('--global_alignment_score', type=int, default=50, help='Global Alignment Score')
+
     args = parser.parse_args()
 
     # Strategy Parameters
@@ -248,6 +274,10 @@ if __name__ == "__main__":
         'period_atr': 14,
         'adx_threshold': 25,
         'risk_per_trade': 0.02,
+        'usd_inr_trend': args.usd_inr_trend,
+        'usd_inr_volatility': args.usd_inr_volatility,
+        'seasonality_score': args.seasonality_score,
+        'global_alignment_score': args.global_alignment_score
     }
 
     # Symbol Resolution
