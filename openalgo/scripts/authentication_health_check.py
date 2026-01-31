@@ -57,6 +57,22 @@ def check_url(url, timeout=2):
     except:
         return False
 
+def generate_auth_url(broker, api_key=None):
+    """Generate authentication URL for manual login"""
+    if not api_key:
+        api_key = os.getenv("BROKER_API_KEY", "YOUR_API_KEY")
+        # Handle 5paisa/Dhan format 'client_id:::api_key'
+        if ":::" in api_key:
+             api_key = api_key.split(":::")[1]
+
+    if broker == 'zerodha':
+        return f"https://kite.zerodha.com/connect/login?v=3&api_key={api_key}"
+    elif broker == 'dhan':
+        # Dhan usually uses a client ID based login or web flow
+        client_id = os.getenv("BROKER_API_KEY", "").split(":::")[0] if ":::" in os.getenv("BROKER_API_KEY", "") else "YOUR_CLIENT_ID"
+        return f"https://auth.dhan.co/login"  # Generic login page as specific OAuth requires client setup
+    return "https://openalgo.in/brokers" # Fallback
+
 def get_db_token_status(broker_name):
     if not DB_AVAILABLE:
         return "Unknown (DB Error)", "Unknown"
@@ -179,12 +195,29 @@ def main():
 
     # ISSUES
     issues = []
-    if not kite_port_up: issues.append("Kite Port 5001 is closed -> Server not started -> Check service status")
-    if not dhan_port_up: issues.append("Dhan Port 5002 is closed -> Server not started -> Check service status")
-    if "Valid" not in kite_token_status: issues.append("Kite Token Invalid -> Expired/Missing -> Login via OpenAlgo UI")
-    if "Valid" not in dhan_token_status: issues.append("Dhan Token Invalid -> Expired/Missing -> Login via OpenAlgo UI")
-    if "Unknown (DB Error)" in kite_token_status: issues.append("Kite Auth Check Failed -> DB Error -> Check Database/Env")
-    if "Unknown (DB Error)" in dhan_token_status: issues.append("Dhan Auth Check Failed -> DB Error -> Check Database/Env")
+    actions_taken = []
+    manual_actions = []
+
+    if not kite_port_up:
+        issues.append("Kite Port 5001 is closed -> Server not started")
+        actions_taken.append("Checked Kite Port -> Failed")
+    if not dhan_port_up:
+        issues.append("Dhan Port 5002 is closed -> Server not started")
+        actions_taken.append("Checked Dhan Port -> Failed")
+
+    if "Valid" not in kite_token_status:
+        issues.append("Kite Token Invalid -> Expired/Missing")
+        actions_taken.append(f"Generated Kite Auth URL")
+        manual_actions.append(f"Kite token expired. Visit: {generate_auth_url('zerodha')} to re-authenticate")
+
+    if "Valid" not in dhan_token_status:
+        issues.append("Dhan Token Invalid -> Expired/Missing")
+        actions_taken.append(f"Generated Dhan Auth URL")
+        manual_actions.append(f"Dhan token expired. Visit: {generate_auth_url('dhan')} to re-authenticate")
+
+    if "Unknown (DB Error)" in kite_token_status or "Unknown (DB Error)" in dhan_token_status:
+         issues.append("DB Connectivity Error")
+         manual_actions.append("Check Database configuration in .env")
 
     print(f"⚠️ ISSUES DETECTED:")
     if issues:
@@ -197,13 +230,16 @@ def main():
     print("🔧 AUTOMATED ACTIONS TAKEN:")
     print("- DB Check -> Completed")
     print("- Env Validation -> Completed")
-    print("- Token Auto-Refresh -> Skipped (Requires manual auth flow)")
+    for action in actions_taken:
+        print(f"- {action}")
+    if not actions_taken:
+        print("- Routine Checks -> Passed")
     print("")
 
     print("📋 MANUAL ACTIONS REQUIRED:")
-    if issues:
-        print("- Please address the issues listed above.")
-        print("- If tokens are expired, visit OpenAlgo Dashboard to re-authenticate.")
+    if manual_actions:
+        for action in manual_actions:
+            print(f"- {action}")
     else:
         print("- None. System Ready.")
     print("")
