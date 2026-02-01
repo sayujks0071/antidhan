@@ -36,10 +36,32 @@ def normalize_symbol(symbol):
 
     return symbol
 
-def is_market_open():
+def is_mcx_market_open():
     """
-    Check if NSE market is open (09:15 - 15:30 IST) on weekdays.
+    Check if MCX market is open (09:00 - 23:30 IST) on weekdays.
     """
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.now(ist)
+
+    # Check weekend
+    if now.weekday() >= 5: # 5=Sat, 6=Sun
+        return False
+
+    market_start = dt_time(9, 0)
+    market_end = dt_time(23, 30)
+    current_time = now.time()
+
+    return market_start <= current_time <= market_end
+
+def is_market_open(exchange="NSE"):
+    """
+    Check if market is open based on exchange.
+    NSE: 09:15 - 15:30 IST
+    MCX: 09:00 - 23:30 IST
+    """
+    if exchange == "MCX":
+        return is_mcx_market_open()
+
     ist = pytz.timezone('Asia/Kolkata')
     now = datetime.now(ist)
 
