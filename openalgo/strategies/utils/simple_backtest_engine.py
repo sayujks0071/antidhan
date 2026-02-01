@@ -230,13 +230,22 @@ class SimpleBacktestEngine:
             # Receive less when selling
             return price * (1 - cost_factor)
     
-    def check_exits(self, current_bar: pd.Series, position: Position, current_time: datetime, strategy_module=None, interval="15m") -> Tuple[bool, Optional[str], Optional[float]]:
+    def check_exits(self, current_bar: pd.Series, position: Position, current_time: datetime, strategy_module=None, interval="15m", historical_df=None) -> Tuple[bool, Optional[str], Optional[float]]:
         """
-        Check if position should be exited based on SL/TP, Time Stop, or Breakeven.
+        Check if position should be exited based on SL/TP, Time Stop, Breakeven, or Custom Strategy Exit.
         """
         current_price = current_bar['close']
         high = current_bar['high']
         low = current_bar['low']
+
+        # 0. Custom Strategy Exit
+        if strategy_module and hasattr(strategy_module, 'check_exit'):
+            try:
+                should_exit, reason, price = strategy_module.check_exit(historical_df, position)
+                if should_exit:
+                    return True, reason, (price if price else current_price)
+            except Exception as e:
+                logger.error(f"Error in strategy check_exit: {e}")
         
         # 1. Time Stop
         if strategy_module and hasattr(strategy_module, 'TIME_STOP_BARS'):
@@ -381,7 +390,7 @@ class SimpleBacktestEngine:
             
             # Check for exits first
             for pos in self.positions[:]:  # Copy list to avoid modification during iteration
-                should_exit, exit_reason, exit_price = self.check_exits(current_bar, pos, current_time, strategy_module, interval=interval)
+                should_exit, exit_reason, exit_price = self.check_exits(current_bar, pos, current_time, strategy_module, interval=interval, historical_df=historical_df)
                 
                 if should_exit:
                     # Close position
