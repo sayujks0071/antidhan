@@ -86,7 +86,9 @@ def get_session_based_cache_ttl():
         now_ist = now_utc.astimezone(pytz.timezone("Asia/Kolkata"))
 
         # Today's expiry time
-        today_expiry = now_ist.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        today_expiry = now_ist.replace(
+            hour=hour, minute=minute, second=0, microsecond=0
+        )
 
         # If we've passed today's expiry, use tomorrow's expiry
         if now_ist >= today_expiry:
@@ -107,7 +109,9 @@ def get_session_based_cache_ttl():
         return int(ttl_seconds)
 
     except Exception as e:
-        logger.warning(f"Could not calculate session-based cache TTL, using 5-minute default: {e}")
+        logger.warning(
+            f"Could not calculate session-based cache TTL, using 5-minute default: {e}"
+        )
         return 300  # Fallback to 5 minutes
 
 
@@ -133,9 +137,13 @@ if DATABASE_URL and "sqlite" in DATABASE_URL:
     )
 else:
     # For other databases like PostgreSQL, use connection pooling
-    engine = create_engine(DATABASE_URL, pool_size=50, max_overflow=100, pool_timeout=10)
+    engine = create_engine(
+        DATABASE_URL, pool_size=50, max_overflow=100, pool_timeout=10
+    )
 
-db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+db_session = scoped_session(
+    sessionmaker(autocommit=False, autoflush=False, bind=engine)
+)
 Base = declarative_base()
 Base.query = db_session.query_property()
 
@@ -171,7 +179,9 @@ class ApiKeys(Base):
 
     # Performance indexes
     __table_args__ = (
-        Index("idx_api_keys_order_mode", "order_mode"),  # Speeds up filtering by order mode
+        Index(
+            "idx_api_keys_order_mode", "order_mode"
+        ),  # Speeds up filtering by order mode
         Index("idx_api_keys_created_at", "created_at"),  # Speeds up time-based queries
     )
 
@@ -251,6 +261,7 @@ def upsert_auth(name, auth_token, broker, feed_token=None, user_id=None, revoke=
     # This notifies WebSocket proxy and other processes to clear their stale caches
     try:
         from database.cache_invalidation import publish_all_cache_invalidation
+
         publish_all_cache_invalidation(name)
         logger.debug(f"Published cache invalidation for user: {name}")
     except Exception as e:
@@ -527,12 +538,16 @@ def verify_api_key(provided_api_key):
         # Try to verify against each stored hash
         for api_key_obj in api_keys:
             try:
+                logger.debug(f"Verifying against hash for user: {api_key_obj.user_id}")
                 ph.verify(api_key_obj.api_key_hash, peppered_key)
                 # Valid key found - cache it
                 verified_api_key_cache[cache_key] = api_key_obj.user_id
-                logger.debug(f"API key verified and cached for user_id: {api_key_obj.user_id}")
+                logger.debug(
+                    f"API key verified and cached for user_id: {api_key_obj.user_id}"
+                )
                 return api_key_obj.user_id
             except VerifyMismatchError:
+                logger.debug(f"Mismatch for user: {api_key_obj.user_id}")
                 continue
 
         # If we reach here, the API key is invalid
@@ -605,7 +620,9 @@ def get_auth_token_broker(provided_api_key, include_feed_token=False):
     import hashlib
 
     # Generate cache key
-    cache_key = f"{hashlib.sha256(provided_api_key.encode()).hexdigest()}_{include_feed_token}"
+    cache_key = (
+        f"{hashlib.sha256(provided_api_key.encode()).hexdigest()}_{include_feed_token}"
+    )
 
     # Check cache first (but still verify revocation status)
     if cache_key in auth_cache:
@@ -618,7 +635,9 @@ def get_auth_token_broker(provided_api_key, include_feed_token=False):
                 if auth_obj and auth_obj.is_revoked:
                     # Token was revoked, remove from cache
                     del auth_cache[cache_key]
-                    logger.warning(f"Cached auth token was revoked for user_id '{user_id}'.")
+                    logger.warning(
+                        f"Cached auth token was revoked for user_id '{user_id}'."
+                    )
                     return (None, None, None) if include_feed_token else (None, None)
                 # Not revoked, return cached result
                 logger.debug(f"Auth token retrieved from cache for user_id: {user_id}")
@@ -638,7 +657,9 @@ def get_auth_token_broker(provided_api_key, include_feed_token=False):
                 decrypted_token = decrypt_token(auth_obj.auth)
                 if include_feed_token:
                     decrypted_feed_token = (
-                        decrypt_token(auth_obj.feed_token) if auth_obj.feed_token else None
+                        decrypt_token(auth_obj.feed_token)
+                        if auth_obj.feed_token
+                        else None
                     )
                     result = (decrypted_token, decrypted_feed_token, auth_obj.broker)
                 else:
@@ -649,10 +670,14 @@ def get_auth_token_broker(provided_api_key, include_feed_token=False):
                 logger.debug(f"Auth token cached for user_id: {user_id}")
                 return result
             else:
-                logger.warning(f"No valid auth token or broker found for user_id '{user_id}'.")
+                logger.warning(
+                    f"No valid auth token or broker found for user_id '{user_id}'."
+                )
                 return (None, None, None) if include_feed_token else (None, None)
         except Exception as e:
-            logger.exception(f"Error while querying the database for auth token and broker: {e}")
+            logger.exception(
+                f"Error while querying the database for auth token and broker: {e}"
+            )
             return (None, None, None) if include_feed_token else (None, None)
     else:
         return (None, None, None) if include_feed_token else (None, None)
