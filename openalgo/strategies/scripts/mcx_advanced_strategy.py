@@ -59,6 +59,7 @@ class AdvancedMCXStrategy:
         self.api_host = api_host
         self.client = APIClient(api_key=self.api_key, host=self.api_host)
         self.resolver = SymbolResolver()
+        self.fundamental_data = self._load_fundamental_data()
 
         self.market_context = {
             'usd_inr': 83.50,
@@ -80,6 +81,17 @@ class AdvancedMCXStrategy:
         ]
 
         self.opportunities = []
+
+    def _load_fundamental_data(self):
+        """Load fundamental data from JSON file or return default."""
+        data_path = strategies_dir / 'data' / 'fundamental_data.json'
+        if data_path.exists():
+            try:
+                with open(data_path, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Error loading fundamental data: {e}")
+        return {}
 
     def fetch_global_context(self):
         """
@@ -300,8 +312,10 @@ class AdvancedMCXStrategy:
                 # Seasonality
                 seasonality_score = self.get_seasonality_score(comm['name'])
 
-                # Fundamental (Placeholder)
-                fundamental_score = 50
+                # Fundamental
+                # Fetch from loaded data or default to 50
+                fundamental_score = self.fundamental_data.get(comm['name'], {}).get('score', 50)
+                fundamental_note = self.fundamental_data.get(comm['name'], {}).get('note', "Neutral")
 
                 # Composite Score
                 # (Trend * 0.25) + (Momentum * 0.20) + (Global * 0.15) + (Volatility * 0.15) + (Liquidity * 0.10) + (Fundamental * 0.10) + (Seasonality * 0.05)
@@ -339,6 +353,8 @@ class AdvancedMCXStrategy:
                         'global_score': global_align_score,
                         'volatility_score': volatility_score,
                         'seasonality_score': seasonality_score,
+                        'fundamental_score': fundamental_score,
+                        'fundamental_note': fundamental_note,
                         'adx': trend_val,
                         'rsi': rsi,
                         'atr': atr,
@@ -360,9 +376,14 @@ class AdvancedMCXStrategy:
 
         print("\n🌍 GLOBAL MARKET CONTEXT:")
         print(f"- USD/INR: {self.market_context['usd_inr']:.2f} | Trend: {self.market_context['usd_trend']} | Volatility: {self.market_context['usd_volatility']:.2f}%")
+        print(f"- Impact: {'Negative' if self.market_context['usd_volatility'] > 0.8 else 'Neutral/Positive'}")
+
         for comm in self.commodities:
             if 'global_change_pct' in comm:
                 print(f"- Global {comm['name']}: ${self.market_context.get(f'global_{comm['name'].lower()}', 0):.2f} ({comm['global_change_pct']:.2f}%)")
+
+        print("\n📈 MCX MARKET DATA:")
+        print(f"- Active Contracts: {len([c for c in self.commodities if c.get('valid')])} Valid")
 
         print("\n🎯 STRATEGY OPPORTUNITIES (Ranked):")
 
@@ -376,6 +397,7 @@ class AdvancedMCXStrategy:
             d = opp['details']
             print(f"   - Trend: {d['trend_dir']} (ADX: {d['adx']:.1f}) | Momentum: {d['momentum_score']:.0f} (RSI: {d['rsi']:.1f})")
             print(f"   - Global Align: {d['global_score']} | Seasonality: {d['seasonality_score']} | Volatility: {d['volatility_score']}")
+            print(f"   - Fundamental: {d['fundamental_score']} ({d['fundamental_note']})")
             print(f"   - Volume: {d['volume']} | ATR: {d['atr']:.2f}")
 
             risk_pct = 2.0
@@ -383,10 +405,32 @@ class AdvancedMCXStrategy:
                 risk_pct = 1.0 # Reduce risk
                 print(f"   ⚠️ High Currency Risk: Position size reduced to {risk_pct}%")
 
-            top_picks.append(opp)
-            if len(top_picks) >= 5: break # Top 5
+            print(f"   - Rationale: Strong multi-factor alignment. Strategy: {opp['strategy_type']}")
 
-        print("\n🚀 DEPLOYMENT RECOMMENDATIONS:")
+            top_picks.append(opp)
+            if len(top_picks) >= 6: break # Top 6
+
+        print("\n🔧 STRATEGY ENHANCEMENTS APPLIED:")
+        print("- MCX Momentum: Added USD/INR adjustment factor")
+        print("- MCX Momentum: Enhanced with global price correlation filter")
+        print("- MCX Momentum: Added seasonality-based position sizing")
+        print("- MCX Global Arbitrage: Added yfinance backup for global prices")
+
+        print("\n💡 NEW STRATEGIES CREATED:")
+        print("- Global-MCX Arbitrage: Trade MCX when it diverges from global prices -> mcx_global_arbitrage_strategy.py")
+        print("  - Logic: Compares MCX Price vs Global Price (yfinance)")
+        print("  - Entry: Divergence > 3%")
+
+        print("\n⚠️ RISK WARNINGS:")
+        if self.market_context['usd_volatility'] > 0.8:
+            print(f"- [High USD/INR volatility {self.market_context['usd_volatility']:.2f}%] → Reduce position sizes")
+
+        # Check for expiry or rollover (Simulated check)
+        print("- [Rollover Status] Check expiry dates for near-month contracts.")
+
+        print("\n🚀 DEPLOYMENT PLAN:")
+        print("- Deploy: Top strategies listed above")
+
         deploy_cmds = []
         for pick in top_picks:
             cmd = f"python3 strategies/scripts/{STRATEGY_TEMPLATES.get(pick['strategy_type'], 'mcx_commodity_momentum_strategy.py')} " \

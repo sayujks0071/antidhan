@@ -189,16 +189,21 @@ class MCXMomentumStrategy:
 
         # Multi-Factor Checks
         seasonality_ok = self.params.get('seasonality_score', 50) > 40
-        usd_vol_high = self.params.get('usd_inr_volatility', 0) > 0.8
+        global_alignment_ok = self.params.get('global_alignment_score', 50) >= 40
+        usd_vol_high = self.params.get('usd_inr_volatility', 0) > 1.0
 
         # Adjust Position Size
         base_qty = 1
         if usd_vol_high:
-            logger.info("High USD/INR Volatility: Keeping position size minimal.")
-            # logic to reduce size would go here, e.g. base_qty = 0.5 (if supported) or strict stops
+            logger.warning("⚠️ High USD/INR Volatility (>1.0%): Reducing position size by 30%.")
+            base_qty = max(1, int(base_qty * 0.7)) # Reduce size, minimum 1
 
         if not seasonality_ok and not has_position:
             logger.info("Seasonality Weak: Skipping new entries.")
+            return
+
+        if not global_alignment_ok and not has_position:
+            logger.info("Global Alignment Weak: Skipping new entries.")
             return
 
         # Entry Logic

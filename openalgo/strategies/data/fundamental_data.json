@@ -1,0 +1,7 @@
+{
+    "GOLD": {"score": 60, "note": "Safe haven demand due to geopolitical tension"},
+    "SILVER": {"score": 55, "note": "Industrial demand picking up"},
+    "CRUDEOIL": {"score": 45, "note": "High inventory levels reported by EIA"},
+    "NATURALGAS": {"score": 80, "note": "Cold snap forecast in US"},
+    "COPPER": {"score": 50, "note": "China demand stable"}
+}
