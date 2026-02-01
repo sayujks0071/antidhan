@@ -10,15 +10,24 @@ from datetime import datetime, timedelta
 # Import utilities
 try:
     # Try relative import first (for package mode)
-    from .trading_utils import APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol
+    from .trading_utils import (
+        APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
+        calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
+    )
 except ImportError:
     # Fallback to absolute import or direct import (for script mode)
     try:
-        from trading_utils import APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol
+        from trading_utils import (
+            APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
+            calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
+        )
     except ImportError:
         # If running from a script that didn't set path correctly
         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-        from trading_utils import APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol
+        from trading_utils import (
+            APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
+            calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
+        )
 
 class BaseStrategy:
     def __init__(self, name, symbol, quantity, interval="5m", exchange="NSE",
@@ -157,65 +166,20 @@ class BaseStrategy:
 
     def calculate_rsi(self, series, period=14):
         """Calculate Relative Strength Index."""
-        delta = series.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        rs = gain / loss
-        return 100 - (100 / (1 + rs))
+        return calculate_rsi(series, period)
 
     def calculate_atr(self, df, period=14):
         """Calculate Average True Range."""
-        high = df['high']
-        low = df['low']
-        close = df['close']
-        tr1 = high - low
-        tr2 = (high - close.shift(1)).abs()
-        tr3 = (low - close.shift(1)).abs()
-        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        return tr.rolling(period).mean().iloc[-1]
+        return calculate_atr(df, period).iloc[-1]
 
     def calculate_adx(self, df, period=14):
         """Calculate ADX."""
-        try:
-            plus_dm = df['high'].diff()
-            minus_dm = df['low'].diff()
-            plus_dm[plus_dm < 0] = 0
-            minus_dm[minus_dm > 0] = 0
-
-            tr1 = df['high'] - df['low']
-            tr2 = (df['high'] - df['close'].shift(1)).abs()
-            tr3 = (df['low'] - df['close'].shift(1)).abs()
-            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-
-            atr = tr.rolling(period).mean()
-            plus_di = 100 * (plus_dm.ewm(alpha=1/period).mean() / atr)
-            minus_di = 100 * (minus_dm.abs().ewm(alpha=1/period).mean() / atr)
-            dx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
-            adx = dx.rolling(period).mean().iloc[-1]
-            return 0 if np.isnan(adx) else adx
-        except:
-            return 0
+        result = calculate_adx(df, period)
+        return result.iloc[-1] if not result.empty else 0
 
     def analyze_volume_profile(self, df, n_bins=20):
         """Find Point of Control (POC)."""
-        price_min = df['low'].min()
-        price_max = df['high'].max()
-        if price_min == price_max: return 0, 0
-        bins = np.linspace(price_min, price_max, n_bins)
-        df['bin'] = pd.cut(df['close'], bins=bins, labels=False)
-        volume_profile = df.groupby('bin')['volume'].sum()
-
-        if volume_profile.empty: return 0, 0
-
-        poc_bin = volume_profile.idxmax()
-        poc_volume = volume_profile.max()
-        if np.isnan(poc_bin): return 0, 0
-
-        poc_bin = int(poc_bin)
-        if poc_bin >= len(bins)-1: poc_bin = len(bins)-2
-
-        poc_price = bins[poc_bin] + (bins[1] - bins[0]) / 2
-        return poc_price, poc_volume
+        return analyze_volume_profile(df, n_bins)
 
     @staticmethod
     def get_standard_parser(description="Strategy"):

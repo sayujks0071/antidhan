@@ -21,6 +21,18 @@ logger = get_logger(__name__)
 
 
 def get_api_response(endpoint, auth, method="GET", payload=""):
+    """
+    Helper function to make API requests to the Dhan Sandbox.
+
+    Args:
+        endpoint (str): The API endpoint (e.g., "/v2/orders").
+        auth (str): The authentication token (Access Token).
+        method (str, optional): HTTP method (GET, POST, PUT, DELETE). Defaults to "GET".
+        payload (str, optional): JSON string payload for POST/PUT requests. Defaults to "".
+
+    Returns:
+        dict: The JSON response from the API, or an error dictionary.
+    """
     AUTH_TOKEN = auth
     api_key = os.getenv("BROKER_API_KEY")
 
@@ -78,22 +90,70 @@ def get_api_response(endpoint, auth, method="GET", payload=""):
 
 
 def get_order_book(auth):
+    """
+    Fetch the order book.
+
+    Args:
+        auth (str): Authentication token.
+
+    Returns:
+        dict or list: The order book data or error response.
+    """
     return get_api_response("/v2/orders", auth)
 
 
 def get_trade_book(auth):
+    """
+    Fetch the trade book.
+
+    Args:
+        auth (str): Authentication token.
+
+    Returns:
+        dict or list: The trade book data or error response.
+    """
     return get_api_response("/v2/trades", auth)
 
 
 def get_positions(auth):
+    """
+    Fetch current positions.
+
+    Args:
+        auth (str): Authentication token.
+
+    Returns:
+        dict or list: The positions data or error response.
+    """
     return get_api_response("/v2/positions", auth)
 
 
 def get_holdings(auth):
+    """
+    Fetch holdings.
+
+    Args:
+        auth (str): Authentication token.
+
+    Returns:
+        dict or list: The holdings data or error response.
+    """
     return get_api_response("/v2/holdings", auth)
 
 
 def get_open_position(tradingsymbol, exchange, product, auth):
+    """
+    Get the net quantity of an open position for a specific symbol.
+
+    Args:
+        tradingsymbol (str): Trading symbol (OpenAlgo format).
+        exchange (str): Exchange (e.g., NSE, MCX).
+        product (str): Product type (e.g., MIS, NRML).
+        auth (str): Authentication token.
+
+    Returns:
+        str: The net quantity as a string (e.g., "10", "-5", "0").
+    """
     # Convert Trading Symbol from OpenAlgo Format to Broker Format Before Search in OpenPosition
     tradingsymbol = get_br_symbol(tradingsymbol, exchange)
     positions_data = get_positions(auth)
@@ -125,6 +185,16 @@ def get_open_position(tradingsymbol, exchange, product, auth):
 
 
 def place_order_api(data, auth):
+    """
+    Place an order via the Dhan API.
+
+    Args:
+        data (dict): Order parameters (symbol, quantity, price, etc.).
+        auth (str): Authentication token.
+
+    Returns:
+        tuple: (response_object, response_dict, order_id)
+    """
     AUTH_TOKEN = auth
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
     data["apikey"] = BROKER_API_KEY
@@ -169,6 +239,17 @@ def place_order_api(data, auth):
 
 
 def place_smartorder_api(data, auth):
+    """
+    Place a smart order (adaptive order based on current position).
+    Used for closing positions or managing net quantity.
+
+    Args:
+        data (dict): Order parameters including 'position_size'.
+        auth (str): Authentication token.
+
+    Returns:
+        tuple: (response_object, response_dict, order_id)
+    """
     AUTH_TOKEN = auth
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
     # If no API call is made in this function then res will return None
@@ -244,6 +325,16 @@ def place_smartorder_api(data, auth):
 
 
 def close_all_positions(current_api_key, auth):
+    """
+    Close all open positions.
+
+    Args:
+        current_api_key (str): The user's API Key (OpenAlgo context).
+        auth (str): Authentication token (Broker context).
+
+    Returns:
+        tuple: (response_dict, status_code)
+    """
     AUTH_TOKEN = auth
     # Fetch the current open positions
     positions_response = get_positions(AUTH_TOKEN)
@@ -296,6 +387,16 @@ def close_all_positions(current_api_key, auth):
 
 
 def cancel_order(orderid, auth):
+    """
+    Cancel a specific order.
+
+    Args:
+        orderid (str): The ID of the order to cancel.
+        auth (str): Authentication token.
+
+    Returns:
+        tuple: (response_dict, status_code)
+    """
     # Assuming you have a function to get the authentication token
     AUTH_TOKEN = auth
 
@@ -334,6 +435,16 @@ def cancel_order(orderid, auth):
 
 
 def modify_order(data, auth):
+    """
+    Modify an existing order.
+
+    Args:
+        data (dict): Order modification parameters (must include 'orderid').
+        auth (str): Authentication token.
+
+    Returns:
+        tuple: (response_dict, status_code)
+    """
     # Assuming you have a function to get the authentication token
     AUTH_TOKEN = auth
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
@@ -381,6 +492,16 @@ def modify_order(data, auth):
 
 
 def cancel_all_orders_api(data, auth):
+    """
+    Cancel all pending orders.
+
+    Args:
+        data (dict): Request data (unused).
+        auth (str): Authentication token.
+
+    Returns:
+        tuple: (canceled_orders_list, failed_cancellations_list)
+    """
     # Get the order book
     AUTH_TOKEN = auth
     order_book_response = get_order_book(AUTH_TOKEN)

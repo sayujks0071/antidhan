@@ -82,6 +82,15 @@ def transform_data(data, token):
 
 
 def transform_modify_order_data(data):
+    """
+    Transforms modify order request to Dhan API format.
+
+    Args:
+        data (dict): Modify order parameters.
+
+    Returns:
+        dict: Transformed payload for Dhan API.
+    """
     return {
         "dhanClientId": data["apikey"],
         "orderId": data["orderid"],
@@ -97,7 +106,13 @@ def transform_modify_order_data(data):
 
 def map_order_type(pricetype):
     """
-    Maps the new pricetype to the existing order type.
+    Maps OpenAlgo price type to Dhan order type.
+
+    Args:
+        pricetype (str): OpenAlgo price type (e.g., 'LIMIT', 'SL').
+
+    Returns:
+        str: Dhan order type (e.g., 'LIMIT', 'STOP_LOSS').
     """
     order_type_mapping = {
         "MARKET": "MARKET",
@@ -110,7 +125,13 @@ def map_order_type(pricetype):
 
 def map_exchange_type(exchange):
     """
-    Maps the Broker Exchange to the OpenAlgo Exchange.
+    Maps OpenAlgo exchange code to Dhan exchange segment.
+
+    Args:
+        exchange (str): OpenAlgo exchange (e.g., 'NSE').
+
+    Returns:
+        str: Dhan exchange segment (e.g., 'NSE_EQ').
     """
     exchange_mapping = {
         "NSE": "NSE_EQ",
@@ -121,12 +142,18 @@ def map_exchange_type(exchange):
         "BCD": "BSE_CURRENCY",
         "MCX": "MCX_COMM",
     }
-    return exchange_mapping.get(exchange)  # Default to MARKET if not found
+    return exchange_mapping.get(exchange)
 
 
 def map_exchange(brexchange):
     """
-    Maps the Broker Exchange to the OpenAlgo Exchange.
+    Maps Dhan exchange segment to OpenAlgo exchange code.
+
+    Args:
+        brexchange (str): Dhan exchange segment.
+
+    Returns:
+        str: OpenAlgo exchange code.
     """
     exchange_mapping = {
         "NSE_EQ": "NSE",
@@ -137,12 +164,18 @@ def map_exchange(brexchange):
         "BSE_CURRENCY": "BCD",
         "MCX_COMM": "MCX",
     }
-    return exchange_mapping.get(brexchange)  # Default to MARKET if not found
+    return exchange_mapping.get(brexchange)
 
 
 def map_product_type(product):
     """
-    Maps the new product type to the existing product type.
+    Maps OpenAlgo product type to Dhan product type.
+
+    Args:
+        product (str): OpenAlgo product (e.g., 'MIS', 'NRML').
+
+    Returns:
+        str: Dhan product type (e.g., 'INTRADAY', 'MARGIN').
     """
     product_type_mapping = {
         "CNC": "CNC",
@@ -154,7 +187,13 @@ def map_product_type(product):
 
 def reverse_map_product_type(product):
     """
-    Reverse maps the broker product type to the OpenAlgo product type, considering the exchange.
+    Reverse maps the broker product type to the OpenAlgo product type.
+
+    Args:
+        product (str): Dhan product type.
+
+    Returns:
+        str: OpenAlgo product type.
     """
     # Exchange to OpenAlgo product type mapping for 'D'
     product_mapping = {"CNC": "CNC", "MARGIN": "NRML", "MIS": "INTRADAY"}
