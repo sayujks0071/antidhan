@@ -6,6 +6,7 @@ import datetime
 import psutil
 import yfinance as yf
 import requests
+import pandas as pd
 from pathlib import Path
 
 # Configure Logging
@@ -36,6 +37,7 @@ class WeeklyAudit:
         # Risk Limits
         self.MAX_PORTFOLIO_HEAT = 0.15  # 15%
         self.MAX_DRAWDOWN = 0.10  # 10%
+        self.MAX_CORRELATION = 0.80
 
         # Mock Capital Base (Assume 10 Lakhs if unknown)
         self.CAPITAL = 1000000.0
@@ -43,6 +45,23 @@ class WeeklyAudit:
     def add_section(self, title, content):
         self.report_lines.append(f"\n{title}")
         self.report_lines.append(content)
+
+    def _get_ticker(self, symbol):
+        # Map internal symbol to Yahoo Finance Ticker
+        if "NIFTY" in symbol and "BANK" in symbol:
+             return "^NSEBANK"
+        elif "NIFTY" in symbol and "FUT" not in symbol and "OPT" not in symbol:
+            return "^NSEI"
+        elif "SILVER" in symbol:
+            return "SI=F" # Global Silver or MCX equivalent
+        elif "GOLD" in symbol:
+            return "GC=F"
+        elif symbol.endswith(".NS"):
+             return symbol
+        else:
+             # Assume NSE Equity if not specified
+             return f"{symbol}.NS"
+        return None
 
     def analyze_portfolio_risk(self):
         logger.info("Analyzing Portfolio Risk...")
@@ -126,15 +145,7 @@ class WeeklyAudit:
         return tracked_symbols
 
     def get_market_price(self, symbol):
-        # Map internal symbol to Yahoo Finance Ticker
-        ticker = None
-        if "NIFTY" in symbol and "FUT" not in symbol and "OPT" not in symbol:
-            ticker = "^NSEI"
-        elif "SILVER" in symbol:
-            ticker = "SI=F" # Global Silver or MCX equivalent
-        elif "GOLD" in symbol:
-            ticker = "GC=F"
-
+        ticker = self._get_ticker(symbol)
         if not ticker:
             return None
 
@@ -146,6 +157,103 @@ class WeeklyAudit:
         except:
             pass
         return None
+
+    def analyze_correlations(self, tracked_symbols):
+        logger.info("Analyzing Correlations...")
+        if len(tracked_symbols) < 2:
+            return
+
+        tickers = {}
+        for sym in tracked_symbols:
+            t = self._get_ticker(sym)
+            if t:
+                tickers[sym] = t
+
+        if len(tickers) < 2:
+            return
+
+        try:
+            data = yf.download(list(tickers.values()), period="1mo", progress=False)['Close']
+            if data.empty:
+                return
+
+            # If multiple tickers, columns are the tickers.
+            # If single ticker (shouldn't happen due to check), it's a Series.
+
+            corr_matrix = data.corr()
+
+            high_corr_pairs = []
+            for i in range(len(corr_matrix.columns)):
+                for j in range(i):
+                    val = corr_matrix.iloc[i, j]
+                    if abs(val) > self.MAX_CORRELATION:
+                        t1 = corr_matrix.columns[i]
+                        t2 = corr_matrix.columns[j]
+                        # Map back to internal symbols if possible
+                        s1 = [k for k,v in tickers.items() if v == t1]
+                        s2 = [k for k,v in tickers.items() if v == t2]
+                        s1_name = s1[0] if s1 else t1
+                        s2_name = s2[0] if s2 else t2
+
+                        high_corr_pairs.append(f"{s1_name} <-> {s2_name}: {val:.2f}")
+                        self.risk_issues.append(f"High Correlation: {s1_name} & {s2_name} ({val:.2f})")
+
+            if high_corr_pairs:
+                content = "⚠️ High Correlations Detected:\n" + "\n".join([f"- {p}" for p in high_corr_pairs])
+                self.add_section("🔗 CORRELATION ANALYSIS:", content)
+            else:
+                 self.add_section("🔗 CORRELATION ANALYSIS:", "✅ No significant correlations detected.")
+
+        except Exception as e:
+            logger.error(f"Correlation analysis failed: {e}")
+
+    def analyze_sector_distribution(self, tracked_symbols):
+        logger.info("Analyzing Sector Distribution...")
+        if not tracked_symbols:
+            return
+
+        sectors = {}
+        for sym in tracked_symbols:
+            sector = "Equity" # Default
+            if "NIFTY" in sym or "BANK" in sym:
+                sector = "Index"
+            elif "SILVER" in sym or "GOLD" in sym or "CRUDE" in sym:
+                sector = "Commodity"
+            elif "USD" in sym:
+                sector = "Forex"
+            # Simple heuristic for now
+
+            sectors[sector] = sectors.get(sector, 0) + 1
+
+        total = len(tracked_symbols)
+        content = ""
+        for sec, count in sectors.items():
+            pct = (count / total) * 100
+            content += f"- {sec}: {pct:.1f}% ({count})\n"
+
+        self.add_section("🍰 SECTOR DISTRIBUTION:", content)
+
+    def check_data_quality(self, tracked_symbols):
+        logger.info("Checking Data Quality...")
+        issues = []
+        for sym in tracked_symbols:
+            t = self._get_ticker(sym)
+            if t:
+                try:
+                    data = yf.Ticker(t).history(period="5d")
+                    if data.empty:
+                        issues.append(f"{sym}: No data in last 5 days")
+                    # Check for gaps could be more complex, but this is a start
+                except Exception:
+                    issues.append(f"{sym}: Fetch failed")
+
+        if issues:
+            content = "⚠️ Data Issues:\n" + "\n".join([f"- {i}" for i in issues])
+            self.risk_issues.append(f"Data Feed Quality Issues: {len(issues)} symbols affected")
+        else:
+            content = "✅ Data Feed Stable (Checked last 5 days)"
+
+        self.add_section("📡 DATA FEED QUALITY:", content)
 
     def fetch_broker_positions(self, port):
         """Fetch positions from broker API"""
@@ -345,6 +453,9 @@ class WeeklyAudit:
 
     def run(self):
         tracked_symbols = self.analyze_portfolio_risk()
+        self.analyze_correlations(tracked_symbols)
+        self.analyze_sector_distribution(tracked_symbols)
+        self.check_data_quality(tracked_symbols)
         self.reconcile_positions(tracked_symbols)
         self.check_system_health()
         self.detect_market_regime()
