@@ -651,3 +651,38 @@ class APIClient:
         # Fallback to a default or raise error?
         # For safety, return None so caller handles it
         return None
+
+def calculate_rsi(df, period=14):
+    """
+    Calculate RSI for a DataFrame.
+    Expects 'close' column.
+    """
+    if df.empty or 'close' not in df.columns:
+        return df
+
+    delta = df['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+
+    rs = gain / loss
+    df['rsi'] = 100 - (100 / (1 + rs))
+    return df
+
+
+def calculate_atr(df, period=14):
+    """
+    Calculate ATR for a DataFrame.
+    Expects 'high', 'low', 'close' columns.
+    """
+    if df.empty or not all(col in df.columns for col in ['high', 'low', 'close']):
+        return df
+
+    high_low = df['high'] - df['low']
+    high_close = (df['high'] - df['close'].shift()).abs()
+    low_close = (df['low'] - df['close'].shift()).abs()
+
+    ranges = pd.concat([high_low, high_close, low_close], axis=1)
+    true_range = ranges.max(axis=1)
+
+    df['atr'] = true_range.rolling(window=period).mean()
+    return df
