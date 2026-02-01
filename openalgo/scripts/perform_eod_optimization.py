@@ -298,7 +298,7 @@ class StrategyOptimizer:
                 symbol = self.metrics.get(strategy, {}).get('symbol', 'NIFTY')
                 # Check if we have specific port requirements or other args
                 # For now, default args
-                f.write(f"nohup python3 openalgo/strategies/scripts/{strategy}.py --symbol {symbol} --api_key $OPENALGO_APIKEY > openalgo/log/strategies/{strategy}.log 2>&1 &\n")
+                f.write(f"nohup python3 openalgo/strategies/scripts/{strategy}.py --symbol {symbol} --api_key $OPENALGO_APIKEY > openalgo/log/strategies/{strategy}_{symbol}.log 2>&1 &\n")
 
             f.write("\necho 'Deployment complete.'\n")
 

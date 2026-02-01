@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+
+# [Optimization 2026-01-31] Changes: rsi_lower: 30.0 -> 35.0 (Relaxed due to WR 100.0%)
 AI Hybrid Reversion Breakout Strategy
 Enhanced with Sector Rotation, Market Breadth, Earnings Filter, and VIX Sizing.
 """
@@ -321,7 +323,7 @@ def run_strategy():
     parser.add_argument('--symbol', type=str, required=True, help='Stock Symbol')
     parser.add_argument('--port', type=int, default=5001, help='API Port')
     parser.add_argument('--api_key', type=str, help='API Key (or set OPENALGO_APIKEY env var)')
-    parser.add_argument('--rsi_lower', type=float, default=30.0, help='RSI Lower Threshold')
+    parser.add_argument('--rsi_lower', type=float, default=35.0, help='RSI Lower Threshold')
     parser.add_argument('--sector', type=str, default='NIFTY 50', help='Sector Benchmark')
     parser.add_argument('--earnings_date', type=str, help='Earnings Date YYYY-MM-DD')
     parser.add_argument("--logfile", type=str, help="Log file path")
@@ -339,7 +341,7 @@ def run_strategy():
     if not logfile:
         log_dir = os.path.join(strategies_dir, "..", "log", "strategies")
         os.makedirs(log_dir, exist_ok=True)
-        logfile = os.path.join(log_dir, f"{args.symbol}_ai_hybrid.log")
+        logfile = os.path.join(log_dir, f"ai_hybrid_reversion_breakout_{args.symbol}.log")
 
     strategy = AIHybridStrategy(
         args.symbol,
