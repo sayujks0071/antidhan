@@ -130,45 +130,13 @@ class MCXMomentumStrategy:
         df = self.data.copy()
 
         # RSI
-        delta = df['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=self.params['period_rsi']).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=self.params['period_rsi']).mean()
-        rs = gain / loss
-        df['rsi'] = 100 - (100 / (1 + rs))
+        df['rsi'] = calculate_rsi(df['close'], period=self.params['period_rsi'])
 
         # ATR
-        high_low = df['high'] - df['low']
-        high_close = (df['high'] - df['close'].shift()).abs()
-        low_close = (df['low'] - df['close'].shift()).abs()
-        ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        true_range = ranges.max(axis=1)
-        df['atr'] = true_range.rolling(window=self.params['period_atr']).mean()
+        df['atr'] = calculate_atr(df, period=self.params['period_atr'])
 
-        # ADX Calculation
-        up = df['high'] - df['high'].shift(1)
-        down = df['low'].shift(1) - df['low']
-
-        # +DM: if up > down and up > 0
-        plus_dm = np.where((up > down) & (up > 0), up, 0.0)
-        # -DM: if down > up and down > 0
-        minus_dm = np.where((down > up) & (down > 0), down, 0.0)
-
-        df['plus_dm'] = plus_dm
-        df['minus_dm'] = minus_dm
-
-        # Smooth (using simple moving average for simplicity as originally intended in simple mock)
-        tr_smooth = true_range.rolling(window=self.params['period_adx']).mean()
-        plus_dm_smooth = df['plus_dm'].rolling(window=self.params['period_adx']).mean()
-        minus_dm_smooth = df['minus_dm'].rolling(window=self.params['period_adx']).mean()
-
-        # Avoid division by zero
-        tr_smooth = tr_smooth.replace(0, np.nan)
-
-        plus_di = 100 * (plus_dm_smooth / tr_smooth)
-        minus_di = 100 * (minus_dm_smooth / tr_smooth)
-
-        dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
-        df['adx'] = dx.rolling(window=self.params['period_adx']).mean()
+        # ADX
+        df['adx'] = calculate_adx(df, period=self.params['period_adx'])
 
         self.data = df
 

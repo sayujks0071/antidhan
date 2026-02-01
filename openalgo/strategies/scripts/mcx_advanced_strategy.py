@@ -28,12 +28,12 @@ utils_dir = strategies_dir / 'utils'
 sys.path.insert(0, str(utils_dir))
 
 try:
-    from trading_utils import APIClient, is_market_open
+    from trading_utils import APIClient, is_market_open, calculate_rsi, calculate_atr, calculate_adx
     from symbol_resolver import SymbolResolver
 except ImportError:
     # Fallback for direct execution
     sys.path.insert(0, str(strategies_dir))
-    from utils.trading_utils import APIClient, is_market_open
+    from utils.trading_utils import APIClient, is_market_open, calculate_rsi, calculate_atr, calculate_adx
     from utils.symbol_resolver import SymbolResolver
 
 # Configuration
@@ -208,40 +208,22 @@ class AdvancedMCXStrategy:
         if df.empty: return {}
 
         # RSI
-        delta = df['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-        rs = gain / loss
-        df['rsi'] = 100 - (100 / (1 + rs))
+        df['rsi'] = calculate_rsi(df['close'])
 
-        # ATR
-        high_low = df['high'] - df['low']
-        high_close = (df['high'] - df['close'].shift()).abs()
-        low_close = (df['low'] - df['close'].shift()).abs()
-        df['atr'] = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1).rolling(14).mean()
+        # ATR (Scalar last value)
+        atr_series = calculate_atr(df)
+        df['atr'] = atr_series # Store series for usage if needed
+        atr_val = atr_series.iloc[-1]
 
-        # ADX (Simplified)
-        df['adx'] = np.random.uniform(15, 45, len(df)) # Placeholder for full ADX logic to save space, assuming sufficient for demo
-        # Proper ADX requires +DI/-DI smoothing. Let's do a quick approximation using volatility expansion
-        # Or better, implement proper ADX if critical.
-        # Implementation of full ADX:
-        up = df['high'] - df['high'].shift(1)
-        down = df['low'].shift(1) - df['low']
-        plus_dm = np.where((up > down) & (up > 0), up, 0.0)
-        minus_dm = np.where((down > up) & (down > 0), down, 0.0)
-
-        tr = df['atr'] # Approximation of TR
-
-        # Smooth
-        plus_di = 100 * (pd.Series(plus_dm).rolling(14).mean() / tr)
-        minus_di = 100 * (pd.Series(minus_dm).rolling(14).mean() / tr)
-        dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
-        df['adx'] = dx.rolling(14).mean()
+        # ADX (Scalar last value)
+        adx_series = calculate_adx(df)
+        df['adx'] = adx_series
+        adx_val = adx_series.iloc[-1]
 
         return {
-            'adx': df['adx'].iloc[-1],
+            'adx': adx_val,
             'rsi': df['rsi'].iloc[-1],
-            'atr': df['atr'].iloc[-1],
+            'atr': atr_val,
             'close': df['close'].iloc[-1],
             'prev_close': df['close'].iloc[-2]
         }
