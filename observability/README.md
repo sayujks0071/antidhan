@@ -1,88 +1,79 @@
 # OpenAlgo Local Observability Stack
 
-This directory contains the "local drain" observability stack for OpenAlgo, using Grafana Loki, Promtail, and Grafana.
+This directory contains the configuration for running a local observability stack using Grafana, Loki, and Promtail.
 
 ## Components
 
 1.  **Loki**: Log aggregation system (Port 3100).
-2.  **Promtail**: Log shipper that tails `../logs/*.log` and sends them to Loki.
+2.  **Promtail**: Log collector that tails logs from `../logs/*.log` and ships them to Loki.
 3.  **Grafana**: Visualization dashboard (Port 3000).
 
-## Setup & Usage
+## Setup
 
 ### Prerequisites
-- Docker and Docker Compose
-- Python 3
+- Docker and Docker Compose installed.
+- Python 3 for running OpenAlgo.
 
 ### Quick Start
 
-Use the `Makefile` in the repository root:
-
-1.  **Start the Stack**:
-    ```bash
-    make obs-up
-    ```
-    This brings up Loki, Promtail, and Grafana in the background.
-
-2.  **Access Grafana**:
-    - URL: http://localhost:3000
-    - User: `admin`
-    - Password: `admin` (or as configured in `docker-compose.yml`)
-    - Go to **Dashboards** > **OpenAlgo** folder > **OpenAlgo Dashboard**.
-
-3.  **Run OpenAlgo**:
-    ```bash
-    make run
-    ```
-    Or run normally: `python3 -m openalgo.app`. Logs will be written to `logs/openalgo.log` and automatically shipped to Grafana.
-
-4.  **Check Status**:
-    ```bash
-    make status
-    ```
-
-5.  **Stop Stack**:
-    ```bash
-    make obs-down
-    ```
-
-## Logging Configuration
-
-Logging is configured in `openalgo_observability/logging_setup.py`.
-- **Log File**: `logs/openalgo.log` (Rotates at 10MB, keeps 5 backups).
-- **Format**: Text (default) or JSON (if `OPENALGO_LOG_JSON=1`).
-- **Redaction**: Secrets (API keys, tokens) are redacted automatically.
-
-### Environment Variables
-- `OPENALGO_LOG_LEVEL`: Set log level (default: INFO).
-- `OPENALGO_LOG_JSON`: Set to `1` for JSON logs.
-
-## Monitoring & Alerts
-
-### Health Check Script
-Located at `scripts/healthcheck.py`. It checks:
-- OpenAlgo port (5000)
-- Loki/Grafana availability
-- Recent errors in `logs/openalgo.log`
-
-### Automated Monitoring
-You can install a background scheduler (Systemd timer or Cron) to run the health check every 5 minutes:
+Use the `Makefile` in the repo root:
 
 ```bash
-make install-monitoring
+# Start Observability Stack
+make obs-up
+
+# Check Status
+make status
+
+# View Logs (Tail)
+make obs-logs
+
+# Stop Stack
+make obs-down
 ```
 
-This will log health status to `logs/healthcheck.log`.
+### Accessing Dashboards
 
-### Telegram Alerts
-To enable Telegram notifications for health issues:
-1.  Add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` to your `.env` file.
-2.  The health check script will send a message if:
-    - Services are down.
-    - Error rate spikes (>10 errors in 5 mins).
-    - Critical errors ("auth failed", "order rejected") are found.
+1.  Open [http://localhost:3000](http://localhost:3000).
+2.  Login with `admin` / `admin`.
+3.  Navigate to **Dashboards > Manage**.
+4.  You should see **OpenAlgo Local Dashboard**.
 
-To uninstall monitoring:
+### Logging Configuration
+
+OpenAlgo uses a custom logging module `openalgo_observability` that:
+- Writes to `logs/openalgo.log`.
+- Redacts sensitive keys (api_key, password, etc.).
+- Supports JSON logging via `OPENALGO_LOG_JSON=1`.
+
+To run OpenAlgo with logging enabled:
+
 ```bash
-make uninstall-monitoring
+# Run the daily startup script
+make run
+
+# Or manually
+python3 daily_startup.py
+```
+
+### Alerts
+
+A health check script is provided in `scripts/healthcheck.py`. It runs periodically to:
+1.  Check if OpenAlgo and Observability services are up.
+2.  Query Loki for error spikes or critical failures.
+3.  Send alerts to Console/Desktop/Telegram.
+
+To enable Telegram alerts, set environment variables:
+```bash
+export TELEGRAM_BOT_TOKEN="your_token"
+export TELEGRAM_CHAT_ID="your_chat_id"
+```
+
+To install the scheduled health check:
+```bash
+# Install as Systemd User Timer (Recommended)
+./scripts/install_systemd_user_timers.sh
+
+# Or Install as Cron job
+./scripts/install_cron.sh
 ```

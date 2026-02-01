@@ -3,7 +3,7 @@ apiVersion: 1
 providers:
   - name: 'OpenAlgo'
     orgId: 1
-    folder: ''
+    folder: 'OpenAlgo'
     type: file
     disableDeletion: false
     updateIntervalSeconds: 10

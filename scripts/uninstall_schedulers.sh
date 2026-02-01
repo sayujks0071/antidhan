@@ -1,19 +1,18 @@
 #!/bin/bash
-set -e
+# Remove Systemd User Timer for OpenAlgo Healthcheck
 
-# Stop systemd timer
-echo "Disabling systemd timers..."
-systemctl --user stop openalgo-health.timer 2>/dev/null || true
-systemctl --user disable openalgo-health.timer 2>/dev/null || true
-rm -f ~/.config/systemd/user/openalgo-health.service
-rm -f ~/.config/systemd/user/openalgo-health.timer
+echo "Stopping Systemd User Service..."
+systemctl --user stop openalgo-health.timer
+systemctl --user disable openalgo-health.timer
+systemctl --user stop openalgo-health.service
+systemctl --user disable openalgo-health.service
+rm ~/.config/systemd/user/openalgo-health.timer
+rm ~/.config/systemd/user/openalgo-health.service
 systemctl --user daemon-reload
+echo "✅ Systemd user timer removed."
 
-# Remove cron
-echo "Removing cron jobs..."
-# Only update if grep found something to remove to avoid clearing empty crontab if pipe behavior varies
-if crontab -l 2>/dev/null | grep -q "healthcheck.py"; then
-    crontab -l 2>/dev/null | grep -v "healthcheck.py" | crontab -
-fi
-
-echo "✅ Schedulers uninstalled."
+echo "Removing Cron job..."
+crontab -l | grep -v "healthcheck.py" > /tmp/cron_backup
+crontab /tmp/cron_backup
+rm /tmp/cron_backup
+echo "✅ Cron job removed."

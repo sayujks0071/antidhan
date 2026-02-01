@@ -3,28 +3,30 @@ import os
 import sys
 import subprocess
 import argparse
+import logging
+from openalgo_observability.logging_setup import setup_logging
 
 REPO_URL = "https://github.com/dheerajw7/OpenAlgo.git"
 TARGET_DIR = "openalgo"
 
 def check_and_clone():
     if not os.path.exists(TARGET_DIR):
-        print(f"Directory '{TARGET_DIR}' not found. Cloning from {REPO_URL}...")
+        logging.info(f"Directory '{TARGET_DIR}' not found. Cloning from {REPO_URL}...")
         try:
             subprocess.check_call(["git", "clone", REPO_URL, TARGET_DIR])
-            print("Cloning successful.")
+            logging.info("Cloning successful.")
         except subprocess.CalledProcessError as e:
-            print(f"Failed to clone repository: {e}")
+            logging.error(f"Failed to clone repository: {e}")
             sys.exit(1)
     else:
-        print(f"Directory '{TARGET_DIR}' exists.")
+        logging.info(f"Directory '{TARGET_DIR}' exists.")
 
 def run_script(script_path, description):
     if not os.path.exists(script_path):
-        print(f"Error: {script_path} not found.")
+        logging.error(f"Error: {script_path} not found.")
         sys.exit(1)
 
-    print(f"Executing {description} ({script_path})...")
+    logging.info(f"Executing {description} ({script_path})...")
     try:
         env = os.environ.copy()
         env['PYTHONPATH'] = os.getcwd() + ":" + env.get('PYTHONPATH', '')
@@ -34,17 +36,20 @@ def run_script(script_path, description):
         python_exec = venv_python if os.path.exists(venv_python) else sys.executable
 
         subprocess.check_call([python_exec, script_path], env=env)
-        print(f"✅ {description} Success.")
+        logging.info(f"✅ {description} Success.")
     except subprocess.CalledProcessError as e:
-        print(f"❌ {description} Failed with exit code {e.returncode}")
+        logging.error(f"❌ {description} Failed with exit code {e.returncode}")
         sys.exit(e.returncode)
 
 def main():
+    # Initialize Observability Logging
+    setup_logging()
+
     parser = argparse.ArgumentParser(description="OpenAlgo Daily Startup Routine")
     parser.add_argument("--backtest", action="store_true", help="Run backtest and leaderboard generation after prep")
     args = parser.parse_args()
 
-    print("=== DAILY STARTUP ROUTINE ===")
+    logging.info("=== DAILY STARTUP ROUTINE ===")
 
     # 1. Ensure Repo
     check_and_clone()
@@ -58,7 +63,7 @@ def main():
         backtest_script = os.path.join("openalgo", "scripts", "daily_backtest_leaderboard.py")
         run_script(backtest_script, "Daily Backtest & Leaderboard")
 
-    print("=== DAILY ROUTINE COMPLETE ===")
+    logging.info("=== DAILY ROUTINE COMPLETE ===")
 
 if __name__ == "__main__":
     main()

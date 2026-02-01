@@ -18,7 +18,13 @@ from openalgo.strategies.utils.symbol_resolver import SymbolResolver
 from openalgo.strategies.utils.trading_utils import APIClient
 
 # Configure Logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+try:
+    from openalgo_observability.logging_setup import setup_logging
+    setup_logging()
+except ImportError:
+    # Fallback if module not found
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
 logger = logging.getLogger("DailyPrep")
 
 DATA_DIR = os.path.join(repo_root, 'openalgo/data')

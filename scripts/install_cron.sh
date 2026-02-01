@@ -1,30 +1,20 @@
 #!/bin/bash
-set -e
+# Install Crontab entry (fallback)
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-HEALTH_SCRIPT="$REPO_ROOT/scripts/healthcheck.py"
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+SCRIPT_PATH="$SCRIPT_DIR/healthcheck.py"
+PYTHON_EXEC=$(which python3)
 
-# Detect Python
-if [ -f "$REPO_ROOT/openalgo/.venv/bin/python" ]; then
-    PYTHON_BIN="$REPO_ROOT/openalgo/.venv/bin/python"
-elif [ -f "$REPO_ROOT/.venv/bin/python" ]; then
-    PYTHON_BIN="$REPO_ROOT/.venv/bin/python"
-else
-    PYTHON_BIN=$(which python3)
-fi
+echo "Installing Cron job..."
 
-# Ensure log dir exists
-mkdir -p "$REPO_ROOT/logs"
+# Remove existing entry to avoid duplicates
+crontab -l 2>/dev/null | grep -v "healthcheck.py" > /tmp/cron_backup
 
-CRON_CMD="*/5 * * * * $PYTHON_BIN $HEALTH_SCRIPT >> $REPO_ROOT/logs/cron_health.log 2>&1"
+# Add new entry
+echo "*/5 * * * * $PYTHON_EXEC $SCRIPT_PATH >> /tmp/openalgo_cron.log 2>&1" >> /tmp/cron_backup
 
-# Check if already exists
-if crontab -l 2>/dev/null | grep -Fq "$HEALTH_SCRIPT"; then
-    echo "Cron job already exists."
-    exit 0
-fi
+crontab /tmp/cron_backup
+rm /tmp/cron_backup
 
-# Add job
-(crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
-echo "✅ Cron job added."
+echo "✅ Cron job installed."
+crontab -l | grep healthcheck.py

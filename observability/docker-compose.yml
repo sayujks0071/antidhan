@@ -1,34 +1,38 @@
-# OpenAlgo Observability Stack
 version: "3"
+
 services:
   loki:
     image: grafana/loki:3.0.0
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
-    restart: unless-stopped
+    networks:
+      - openalgo-net
 
   promtail:
     image: grafana/promtail:3.0.0
     volumes:
       - ./promtail.yaml:/etc/promtail/config.yaml
-      - ../logs:/var/log/openalgo
+      - ../logs:/var/log/openalgo:ro
     command: -config.file=/etc/promtail/config.yaml
-    restart: unless-stopped
-    depends_on:
-      - loki
+    networks:
+      - openalgo-net
 
   grafana:
-    image: grafana/grafana:10.4.0
-    ports:
-      - "3000:3000"
+    image: grafana/grafana:11.0.0
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
-    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - openalgo-net
     depends_on:
       - loki
+
+networks:
+  openalgo-net:
+    driver: bridge
