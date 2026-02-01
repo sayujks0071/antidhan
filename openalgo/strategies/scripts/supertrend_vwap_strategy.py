@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 [Optimization 2026-01-31] Changes: threshold: 155 -> 150 (Lowered due to Rejection 100.0%)
+[Improvement 2026-02-01] Found 'threshold' parameter was unused. Relaxing dev_threshold to improve participation.
 SuperTrend VWAP Strategy
 VWAP mean reversion with volume profile analysis, Enhanced Sector RSI Filter, and Dynamic Risk.
 """
@@ -54,7 +55,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         self.sector_benchmark = sector_benchmark
 
         # Optimization Parameters
-        self.threshold = 150
+        self.threshold = 150 # Note: This parameter was previously unused in logic. Keeping for compatibility but ignoring.
         self.stop_pct = 1.8
         self.adx_threshold = 20
         self.adx_period = 14
@@ -92,16 +93,17 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Dynamic Deviation based on VIX
         vix = self.get_vix()
-        dev_threshold = 0.02
+        dev_threshold = 0.03 # Increased from 0.02 to allow more entries
         size_multiplier = 1.0
 
+        # Relaxed VIX thresholds to prevent total rejection
         if vix > 25:
-            dev_threshold = 0.008
+            dev_threshold = 0.012 # Increased from 0.008
             size_multiplier = 0.5
         elif vix > 20:
-            dev_threshold = 0.015
+            dev_threshold = 0.025 # Increased from 0.015
         elif vix < 12:
-            dev_threshold = 0.03
+            dev_threshold = 0.04 # Increased from 0.03
 
         # Indicators
         is_above_vwap = last['close'] > last['vwap']
@@ -138,6 +140,10 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             # Entry Logic
             sector_bullish = self.check_sector_correlation()
 
+            # Logic Block Improvement Suggestion:
+            # Previous Win Rate < 40% (or 0% due to rejection) was likely caused by overly strict 'is_not_overextended' check
+            # combined with 'threshold' parameter being disconnected.
+            # We have relaxed 'dev_threshold' to allow more participation.
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
                 adj_qty = int(self.quantity * size_multiplier)
                 if adj_qty < 1: adj_qty = 1
@@ -188,7 +194,8 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Mock VIX for backtest if not available
         vix = 15.0
-        dev_threshold = 0.02
+        # Relaxed dev_threshold for backtest as well
+        dev_threshold = 0.03
 
         # Logic
         df['ema200'] = df['close'].ewm(span=200, adjust=False).mean()
