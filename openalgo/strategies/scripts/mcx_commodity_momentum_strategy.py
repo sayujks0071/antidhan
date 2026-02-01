@@ -103,6 +103,11 @@ class MCXMomentumStrategy:
         if not seasonality_ok:
             return 'HOLD', 0.0, {'reason': 'Seasonality Weak'}
 
+        # Volatility Filter
+        min_atr = self.params.get('min_atr', 0)
+        if current.get('atr', 0) < min_atr:
+             return 'HOLD', 0.0, {'reason': 'Low Volatility'}
+
         if (current['adx'] > self.params['adx_threshold'] and
             current['rsi'] > 50 and
             current['close'] > prev['close']):
@@ -278,6 +283,7 @@ if __name__ == "__main__":
         'period_rsi': 14,
         'period_atr': 14,
         'adx_threshold': 25,
+        'min_atr': 10,
         'risk_per_trade': 0.02,
         'usd_inr_trend': args.usd_inr_trend,
         'usd_inr_volatility': args.usd_inr_volatility,
@@ -329,6 +335,7 @@ DEFAULT_PARAMS = {
     'period_rsi': 14,
     'period_atr': 14,
     'adx_threshold': 25,
+    'min_atr': 10,
     'risk_per_trade': 0.02,
 }
 
@@ -342,4 +349,8 @@ def generate_signal(df, client=None, symbol=None, params=None):
     host = client.host if client and hasattr(client, 'host') else "http://127.0.0.1:5001"
 
     strat = MCXMomentumStrategy(symbol or "TEST", api_key, host, strat_params)
+
+    # Set Time Stop for Engine
+    setattr(strat, 'TIME_STOP_BARS', 12) # 3 Hours (12 * 15m)
+
     return strat.generate_signal(df)

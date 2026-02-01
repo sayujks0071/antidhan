@@ -132,6 +132,12 @@ class SuperTrendVWAPStrategy:
         elif vix < 12: dev_threshold = 0.03
 
         # Logic
+        # HTF Trend Filter (EMA 200)
+        df['ema200'] = df['close'].ewm(span=200, adjust=False).mean()
+        is_uptrend = True
+        if not pd.isna(last['ema200']):
+            is_uptrend = last['close'] > last['ema200']
+
         is_above_vwap = last['close'] > last['vwap']
 
         vol_mean = df['volume'].rolling(20).mean().iloc[-1]
@@ -158,7 +164,7 @@ class SuperTrendVWAPStrategy:
             'adx': adx
         }
 
-        if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish and is_strong_trend:
+        if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish and is_strong_trend and is_uptrend:
             return 'BUY', 1.0, details
 
         # Sell Logic (Inverse for completeness?)
@@ -356,11 +362,13 @@ class SuperTrendVWAPStrategy:
 
                 if self.pm and self.pm.has_position():
                     # Manage Position (Trailing Stop)
+                    sl_mult = getattr(self, 'ATR_SL_MULTIPLIER', 3.0)
+
                     if self.trailing_stop == 0:
-                        self.trailing_stop = last['close'] - (2 * self.atr) # Initial SL
+                        self.trailing_stop = last['close'] - (sl_mult * self.atr) # Initial SL
 
                     # Update Trailing Stop (Only move up)
-                    new_stop = last['close'] - (2 * self.atr)
+                    new_stop = last['close'] - (sl_mult * self.atr)
                     if new_stop > self.trailing_stop:
                         self.trailing_stop = new_stop
                         self.logger.info(f"Trailing Stop Updated: {self.trailing_stop:.2f}")
@@ -385,7 +393,8 @@ class SuperTrendVWAPStrategy:
                         self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}, Qty: {adj_qty} (VIX: {vix})")
                         if self.pm:
                             self.pm.update_position(adj_qty, last['close'], 'BUY')
-                            self.trailing_stop = last['close'] - (2 * self.atr)
+                            sl_mult = getattr(self, 'ATR_SL_MULTIPLIER', 3.0)
+                            self.trailing_stop = last['close'] - (sl_mult * self.atr)
 
             except Exception as e:
                 self.logger.error(f"Error in SuperTrend VWAP strategy for {self.symbol}: {e}", exc_info=True)
@@ -457,6 +466,8 @@ def generate_signal(df, client=None, symbol=None, params=None):
 
     # Set Breakeven Trigger
     setattr(strat, 'BREAKEVEN_TRIGGER_R', 1.5)
+    setattr(strat, 'ATR_SL_MULTIPLIER', 3.0)
+    setattr(strat, 'ATR_TP_MULTIPLIER', 5.0)
 
     action, score, details = strat.generate_signal(df)
     return action, score, details

@@ -91,13 +91,19 @@ class AIHybridStrategy:
         last = df.iloc[-1]
 
         # Volatility Sizing (Target Risk)
-        # Simplified: Quantity = 100 * (20 / ATR) -> if ATR is high, size down
+        # Robust Sizing: Risk 1% of Capital (1000) per trade
+        # Stop Loss distance is roughly 2 * ATR
+        # Risk = Qty * 2 * ATR  => Qty = Risk / (2 * ATR)
+
         atr = df['high'].diff().abs().rolling(14).mean().iloc[-1] # Simple ATR approx
+
+        risk_amount = 1000.0 # 1% of 100k
+
         if atr > 0:
-            qty = int(100 * (20 / atr)) # Example base sizing
-            qty = max(1, min(qty, 500)) # Cap
+            qty = int(risk_amount / (2.0 * atr))
+            qty = max(1, min(qty, 500)) # Cap to reasonable limits
         else:
-            qty = 100
+            qty = 50 # Safe default
 
         # Note: External filters (Sector, Earnings, Breadth) are skipped in simple backtest
         # unless mocked via client or params. Here we focus on price action.
