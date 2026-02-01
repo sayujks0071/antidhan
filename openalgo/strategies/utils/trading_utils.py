@@ -13,10 +13,15 @@ import numpy as np
 # Configure logging
 try:
     from openalgo_observability.logging_setup import setup_logging
+
     setup_logging()
 except ImportError:
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
 logger = logging.getLogger("TradingUtils")
+
 
 def normalize_symbol(symbol):
     """
@@ -36,15 +41,16 @@ def normalize_symbol(symbol):
 
     return symbol
 
+
 def is_mcx_market_open():
     """
     Check if MCX market is open (09:00 - 23:30 IST) on weekdays.
     """
-    ist = pytz.timezone('Asia/Kolkata')
+    ist = pytz.timezone("Asia/Kolkata")
     now = datetime.now(ist)
 
     # Check weekend
-    if now.weekday() >= 5: # 5=Sat, 6=Sun
+    if now.weekday() >= 5:  # 5=Sat, 6=Sun
         return False
 
     market_start = dt_time(9, 0)
@@ -52,6 +58,7 @@ def is_mcx_market_open():
     current_time = now.time()
 
     return market_start <= current_time <= market_end
+
 
 def is_market_open(exchange="NSE"):
     """
@@ -62,11 +69,11 @@ def is_market_open(exchange="NSE"):
     if exchange == "MCX":
         return is_mcx_market_open()
 
-    ist = pytz.timezone('Asia/Kolkata')
+    ist = pytz.timezone("Asia/Kolkata")
     now = datetime.now(ist)
 
     # Check weekend
-    if now.weekday() >= 5: # 5=Sat, 6=Sun
+    if now.weekday() >= 5:  # 5=Sat, 6=Sun
         return False
 
     market_start = dt_time(9, 15)
@@ -75,49 +82,52 @@ def is_market_open(exchange="NSE"):
 
     return market_start <= current_time <= market_end
 
+
 def calculate_intraday_vwap(df):
     """
     Calculate VWAP resetting daily.
     Expects DataFrame with 'datetime' (or index), 'close', 'high', 'low', 'volume'.
     """
     df = df.copy()
-    
+
     # Handle datetime column or index
     if isinstance(df.index, pd.DatetimeIndex):
-        df['datetime'] = df.index
-    elif 'datetime' not in df.columns and 'timestamp' in df.columns:
-        df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
-    elif 'datetime' not in df.columns:
+        df["datetime"] = df.index
+    elif "datetime" not in df.columns and "timestamp" in df.columns:
+        df["datetime"] = pd.to_datetime(df["timestamp"], unit="s")
+    elif "datetime" not in df.columns:
         # If no datetime info, create from index if it's numeric (Unix timestamp)
-        if df.index.dtype in ['int64', 'float64']:
-            df['datetime'] = pd.to_datetime(df.index, unit='s')
+        if df.index.dtype in ["int64", "float64"]:
+            df["datetime"] = pd.to_datetime(df.index, unit="s")
         else:
-            df['datetime'] = pd.to_datetime(df.index)
+            df["datetime"] = pd.to_datetime(df.index)
 
     # Ensure datetime is datetime object
-    df['datetime'] = pd.to_datetime(df['datetime'])
-    df['date'] = df['datetime'].dt.date
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df["date"] = df["datetime"].dt.date
 
     # Typical Price
-    df['tp'] = (df['high'] + df['low'] + df['close']) / 3
-    df['pv'] = df['tp'] * df['volume']
+    df["tp"] = (df["high"] + df["low"] + df["close"]) / 3
+    df["pv"] = df["tp"] * df["volume"]
 
     # Group by Date and calculate cumulative sums
-    df['cum_pv'] = df.groupby('date')['pv'].cumsum()
-    df['cum_vol'] = df.groupby('date')['volume'].cumsum()
+    df["cum_pv"] = df.groupby("date")["pv"].cumsum()
+    df["cum_vol"] = df.groupby("date")["volume"].cumsum()
 
-    df['vwap'] = df['cum_pv'] / df['cum_vol']
+    df["vwap"] = df["cum_pv"] / df["cum_vol"]
 
     # Deviation
-    df['vwap_dev'] = (df['close'] - df['vwap']) / df['vwap']
+    df["vwap_dev"] = (df["close"] - df["vwap"]) / df["vwap"]
 
     return df
+
 
 class PositionManager:
     """
     Persistent position manager to track trades and prevent duplicate orders.
     Saves state to openalgo/strategies/state/{symbol}_state.json
     """
+
     def __init__(self, symbol):
         self.symbol = symbol
         # Determine state directory relative to this file
@@ -136,24 +146,26 @@ class PositionManager:
     def load_state(self):
         if self.state_file.exists():
             try:
-                with open(self.state_file, 'r') as f:
+                with open(self.state_file, "r") as f:
                     data = json.load(f)
-                    self.position = data.get('position', 0)
-                    self.entry_price = data.get('entry_price', 0.0)
-                    self.pnl = data.get('pnl', 0.0)
-                    logger.info(f"Loaded state for {self.symbol}: Pos={self.position} @ {self.entry_price}")
+                    self.position = data.get("position", 0)
+                    self.entry_price = data.get("entry_price", 0.0)
+                    self.pnl = data.get("pnl", 0.0)
+                    logger.info(
+                        f"Loaded state for {self.symbol}: Pos={self.position} @ {self.entry_price}"
+                    )
             except Exception as e:
                 logger.error(f"Failed to load state for {self.symbol}: {e}")
 
     def save_state(self):
         try:
             data = {
-                'position': self.position,
-                'entry_price': self.entry_price,
-                'pnl': self.pnl,
-                'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                "position": self.position,
+                "entry_price": self.entry_price,
+                "pnl": self.pnl,
+                "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
-            with open(self.state_file, 'w') as f:
+            with open(self.state_file, "w") as f:
                 json.dump(data, f, indent=4)
         except Exception as e:
             logger.error(f"Failed to save state for {self.symbol}: {e}")
@@ -165,9 +177,9 @@ class PositionManager:
         """
         side = side.upper()
 
-        if side == 'BUY':
+        if side == "BUY":
             if self.position == 0:
-                self.entry_price = price # Long Entry
+                self.entry_price = price  # Long Entry
             elif self.position < 0:
                 # Closing Short
                 realized_pnl = (self.entry_price - price) * qty
@@ -176,9 +188,9 @@ class PositionManager:
 
             self.position += qty
 
-        elif side == 'SELL':
+        elif side == "SELL":
             if self.position == 0:
-                self.entry_price = price # Short Entry
+                self.entry_price = price  # Short Entry
             elif self.position > 0:
                 # Closing Long
                 realized_pnl = (price - self.entry_price) * qty
@@ -190,7 +202,9 @@ class PositionManager:
         if self.position == 0:
             self.entry_price = 0.0
 
-        logger.info(f"Position Updated for {self.symbol}: {self.position} @ {self.entry_price}")
+        logger.info(
+            f"Position Updated for {self.symbol}: {self.position} @ {self.entry_price}"
+        )
         self.save_state()
 
     def has_position(self):
@@ -206,35 +220,49 @@ class PositionManager:
         else:
             return (self.entry_price - current_price) * abs(self.position)
 
+
 class SmartOrder:
     """
     Intelligent Order Execution logic.
     Wraps an API client to provide advanced order capabilities.
     """
+
     def __init__(self, api_client):
         self.client = api_client
 
-    def place_adaptive_order(self, strategy, symbol, action, exchange, quantity,
-                           limit_price=None, product='MIS',
-                           urgency='MEDIUM'):
+    def place_adaptive_order(
+        self,
+        strategy,
+        symbol,
+        action,
+        exchange,
+        quantity,
+        limit_price=None,
+        product="MIS",
+        urgency="MEDIUM",
+    ):
         """
         Place an order adapting to market conditions.
 
         Args:
             urgency: 'LOW' (Passive Limit), 'MEDIUM' (Limit then Market), 'HIGH' (Market)
         """
-        logger.info(f"SmartOrder: Placing {action} {quantity} {symbol} (Urgency: {urgency})")
+        logger.info(
+            f"SmartOrder: Placing {action} {quantity} {symbol} (Urgency: {urgency})"
+        )
 
         order_type = "LIMIT" if limit_price else "MARKET"
         price = limit_price if limit_price else 0
 
         # Override based on urgency
-        if urgency == 'HIGH':
+        if urgency == "HIGH":
             order_type = "MARKET"
             price = 0
-        elif urgency == 'LOW' and not limit_price:
+        elif urgency == "LOW" and not limit_price:
             # Low urgency but no limit price provided? Fallback to Market but warn
-            logger.warning("SmartOrder: Low urgency requested but no limit price. Using MARKET.")
+            logger.warning(
+                "SmartOrder: Low urgency requested but no limit price. Using MARKET."
+            )
             order_type = "MARKET"
 
         # In a real async system, we would:
@@ -252,7 +280,7 @@ class SmartOrder:
         try:
             # Use the client's place_smart_order if available (wrapper around placesmartorder)
             # Or use standard place_order
-            if hasattr(self.client, 'placesmartorder'):
+            if hasattr(self.client, "placesmartorder"):
                 return self.client.placesmartorder(
                     strategy=strategy,
                     symbol=symbol,
@@ -261,7 +289,7 @@ class SmartOrder:
                     price_type=order_type,
                     product=product,
                     quantity=quantity,
-                    position_size=quantity # Simplification
+                    position_size=quantity,  # Simplification
                 )
             else:
                 logger.error("SmartOrder: Client does not support 'placesmartorder'")
@@ -280,15 +308,25 @@ class SmartOrder:
         else:
             return (self.entry_price - current_price) * abs(self.position)
 
+
 class APIClient:
     """
     Fallback API Client using httpx if openalgo package is missing.
     """
-    def __init__(self, api_key, host="http://127.0.0.1:5001"):
-        self.api_key = api_key
-        self.host = host.rstrip('/')
 
-    def history(self, symbol, exchange="NSE", interval="5m", start_date=None, end_date=None, max_retries=3):
+    def __init__(self, api_key, host="http://127.0.0.1:5002"):
+        self.api_key = api_key
+        self.host = host.rstrip("/")
+
+    def history(
+        self,
+        symbol,
+        exchange="NSE",
+        interval="5m",
+        start_date=None,
+        end_date=None,
+        max_retries=3,
+    ):
         """Fetch historical data with retry logic and exponential backoff"""
         url = f"{self.host}/api/v1/history"
         payload = {
@@ -297,65 +335,77 @@ class APIClient:
             "interval": interval,  # Fixed: was "resolution"
             "start_date": start_date,  # Fixed: was "from"
             "end_date": end_date,  # Fixed: was "to"
-            "apikey": self.api_key
+            "apikey": self.api_key,
         }
         for attempt in range(max_retries):
             try:
                 response = httpx.post(url, json=payload, timeout=30)
                 if response.status_code == 200:
                     data = response.json()
-                    if data.get('status') == 'success' and 'data' in data:
-                        df = pd.DataFrame(data['data'])
-                        if 'timestamp' in df.columns:
-                            df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
-                        required_cols = ['open', 'high', 'low', 'close', 'volume']
+                    if data.get("status") == "success" and "data" in data:
+                        df = pd.DataFrame(data["data"])
+                        if "timestamp" in df.columns:
+                            df["datetime"] = pd.to_datetime(df["timestamp"], unit="s")
+                        required_cols = ["open", "high", "low", "close", "volume"]
                         for col in required_cols:
                             if col not in df.columns:
                                 df[col] = 0
-                        logger.debug(f"Successfully fetched {len(df)} rows for {symbol} on {exchange}")
+                        logger.debug(
+                            f"Successfully fetched {len(df)} rows for {symbol} on {exchange}"
+                        )
                         return df
                     else:
-                        error_msg = data.get('message', 'Unknown error')
+                        error_msg = data.get("message", "Unknown error")
                         if attempt < max_retries - 1:
-                            wait_time = 2 ** attempt
-                            logger.warning(f"History fetch failed for {symbol} (attempt {attempt+1}/{max_retries}): {error_msg}. Retrying in {wait_time}s...")
+                            wait_time = 2**attempt
+                            logger.warning(
+                                f"History fetch failed for {symbol} (attempt {attempt + 1}/{max_retries}): {error_msg}. Retrying in {wait_time}s..."
+                            )
                             time_module.sleep(wait_time)
                             continue
-                        logger.error(f"History fetch failed after {max_retries} attempts: {error_msg}")
+                        logger.error(
+                            f"History fetch failed after {max_retries} attempts: {error_msg}"
+                        )
                 else:
                     error_text = response.text[:500] if response.text else "(empty)"
                     if attempt < max_retries - 1:
-                        wait_time = 2 ** attempt
-                        logger.warning(f"API call failed for {symbol} (HTTP {response.status_code}, attempt {attempt+1}/{max_retries}), retrying in {wait_time}s...")
+                        wait_time = 2**attempt
+                        logger.warning(
+                            f"API call failed for {symbol} (HTTP {response.status_code}, attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s..."
+                        )
                         time_module.sleep(wait_time)
                         continue
-                    logger.error(f"History fetch failed after {max_retries} attempts (HTTP {response.status_code}): {error_text}")
+                    logger.error(
+                        f"History fetch failed after {max_retries} attempts (HTTP {response.status_code}): {error_text}"
+                    )
             except httpx.TimeoutException:
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt
-                    logger.warning(f"API timeout for {symbol} (attempt {attempt+1}/{max_retries}), retrying in {wait_time}s...")
+                    wait_time = 2**attempt
+                    logger.warning(
+                        f"API timeout for {symbol} (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s..."
+                    )
                     time_module.sleep(wait_time)
                     continue
                 logger.error(f"API timeout after {max_retries} attempts for {symbol}")
             except Exception as e:
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt
-                    logger.warning(f"API Error for {symbol} (attempt {attempt+1}/{max_retries}): {e}. Retrying in {wait_time}s...")
+                    wait_time = 2**attempt
+                    logger.warning(
+                        f"API Error for {symbol} (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time}s..."
+                    )
                     time_module.sleep(wait_time)
                     continue
-                logger.error(f"API Error after {max_retries} attempts for {symbol}: {e}")
-        
+                logger.error(
+                    f"API Error after {max_retries} attempts for {symbol}: {e}"
+                )
+
         return pd.DataFrame()
 
     def get_quote(self, symbol, exchange="NSE", max_retries=3):
         """Fetch real-time quote from Kite API via OpenAlgo"""
         url = f"{self.host}/api/v1/quotes"
-        payload = {
-            "symbol": symbol,
-            "exchange": exchange,
-            "apikey": self.api_key
-        }
-        
+        payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
+
         for attempt in range(max_retries):
             try:
                 response = httpx.post(url, json=payload, timeout=10)
@@ -363,64 +413,90 @@ class APIClient:
                     # Check if response has content
                     if not response.text or len(response.text.strip()) == 0:
                         if attempt < max_retries - 1:
-                            wait_time = 2 ** attempt
-                            logger.warning(f"Quote API returned empty response for {symbol} (attempt {attempt+1}/{max_retries}). Retrying in {wait_time}s...")
+                            wait_time = 2**attempt
+                            logger.warning(
+                                f"Quote API returned empty response for {symbol} (attempt {attempt + 1}/{max_retries}). Retrying in {wait_time}s..."
+                            )
                             time.sleep(wait_time)
                             continue
-                        logger.error(f"Quote API returned empty response after {max_retries} attempts for {symbol}")
+                        logger.error(
+                            f"Quote API returned empty response after {max_retries} attempts for {symbol}"
+                        )
                         return None
-                    
+
                     try:
                         data = response.json()
                     except ValueError as json_err:
                         error_text = response.text[:200] if response.text else "(empty)"
                         if attempt < max_retries - 1:
-                            wait_time = 2 ** attempt
-                            logger.warning(f"Quote API returned non-JSON for {symbol} (attempt {attempt+1}/{max_retries}): {error_text}. Retrying in {wait_time}s...")
+                            wait_time = 2**attempt
+                            logger.warning(
+                                f"Quote API returned non-JSON for {symbol} (attempt {attempt + 1}/{max_retries}): {error_text}. Retrying in {wait_time}s..."
+                            )
                             time.sleep(wait_time)
                             continue
-                        logger.error(f"Quote API returned non-JSON after {max_retries} attempts for {symbol}: {error_text}")
+                        logger.error(
+                            f"Quote API returned non-JSON after {max_retries} attempts for {symbol}: {error_text}"
+                        )
                         return None
-                    
-                    if data.get('status') == 'success' and 'data' in data:
-                        quote_data = data['data']
+
+                    if data.get("status") == "success" and "data" in data:
+                        quote_data = data["data"]
                         # Ensure ltp is available
-                        if 'ltp' in quote_data:
+                        if "ltp" in quote_data:
                             return quote_data
                         else:
-                            logger.warning(f"Quote for {symbol} missing 'ltp' field. Available fields: {list(quote_data.keys())}")
+                            logger.warning(
+                                f"Quote for {symbol} missing 'ltp' field. Available fields: {list(quote_data.keys())}"
+                            )
                             return None
                     else:
-                        error_msg = data.get('message', 'Unknown error')
+                        error_msg = data.get("message", "Unknown error")
                         if attempt < max_retries - 1:
-                            wait_time = 2 ** attempt
-                            logger.warning(f"Quote fetch failed for {symbol} (attempt {attempt+1}/{max_retries}): {error_msg}. Retrying in {wait_time}s...")
+                            wait_time = 2**attempt
+                            logger.warning(
+                                f"Quote fetch failed for {symbol} (attempt {attempt + 1}/{max_retries}): {error_msg}. Retrying in {wait_time}s..."
+                            )
                             time.sleep(wait_time)
                             continue
-                        logger.error(f"Quote fetch failed after {max_retries} attempts: {error_msg}")
+                        logger.error(
+                            f"Quote fetch failed after {max_retries} attempts: {error_msg}"
+                        )
                 else:
                     error_text = response.text[:500] if response.text else "(empty)"
                     if attempt < max_retries - 1:
-                        wait_time = 2 ** attempt
-                        logger.warning(f"Quote API call failed for {symbol} (HTTP {response.status_code}, attempt {attempt+1}/{max_retries}), retrying in {wait_time}s...")
+                        wait_time = 2**attempt
+                        logger.warning(
+                            f"Quote API call failed for {symbol} (HTTP {response.status_code}, attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s..."
+                        )
                         time.sleep(wait_time)
                         continue
-                    logger.error(f"Quote fetch failed after {max_retries} attempts (HTTP {response.status_code}): {error_text}")
+                    logger.error(
+                        f"Quote fetch failed after {max_retries} attempts (HTTP {response.status_code}): {error_text}"
+                    )
             except httpx.TimeoutException:
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt
-                    logger.warning(f"Quote API timeout for {symbol} (attempt {attempt+1}/{max_retries}), retrying in {wait_time}s...")
+                    wait_time = 2**attempt
+                    logger.warning(
+                        f"Quote API timeout for {symbol} (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s..."
+                    )
                     time.sleep(wait_time)
                     continue
-                logger.error(f"Quote API timeout after {max_retries} attempts for {symbol}")
+                logger.error(
+                    f"Quote API timeout after {max_retries} attempts for {symbol}"
+                )
             except Exception as e:
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt
-                    logger.warning(f"Quote API Error for {symbol} (attempt {attempt+1}/{max_retries}): {e}. Retrying in {wait_time}s...")
+                    wait_time = 2**attempt
+                    logger.warning(
+                        f"Quote API Error for {symbol} (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time}s..."
+                    )
                     time.sleep(wait_time)
                     continue
-                logger.error(f"Quote API Error after {max_retries} attempts for {symbol}: {e}")
-        
+                logger.error(
+                    f"Quote API Error after {max_retries} attempts for {symbol}: {e}"
+                )
+
         return None  # Failed to fetch quote
 
     def get_instruments(self, exchange="NSE", max_retries=3):
@@ -432,16 +508,29 @@ class APIClient:
                 if response.status_code == 200:
                     # Usually returns CSV text
                     from io import StringIO
+
                     return pd.read_csv(StringIO(response.text))
                 else:
-                    logger.warning(f"Instruments fetch failed (HTTP {response.status_code})")
+                    logger.warning(
+                        f"Instruments fetch failed (HTTP {response.status_code})"
+                    )
                     time_module.sleep(1)
             except Exception as e:
                 logger.error(f"Instruments fetch error: {e}")
                 time_module.sleep(1)
         return pd.DataFrame()
 
-    def placesmartorder(self, strategy, symbol, action, exchange, price_type, product, quantity, position_size):
+    def placesmartorder(
+        self,
+        strategy,
+        symbol,
+        action,
+        exchange,
+        price_type,
+        product,
+        quantity,
+        position_size,
+    ):
         """Place smart order"""
         # Correct endpoint is /api/v1/placesmartorder (not /api/v1/smartorder)
         url = f"{self.host}/api/v1/placesmartorder"
@@ -458,12 +547,12 @@ class APIClient:
             "position_size": str(position_size),  # API expects string
             "price": "0",
             "trigger_price": "0",
-            "disclosed_quantity": "0"
+            "disclosed_quantity": "0",
         }
-        
+
         try:
             response = httpx.post(url, json=payload, timeout=10)
-            
+
             if response.status_code == 200:
                 # Handle response - may be JSON or empty
                 try:
@@ -473,27 +562,34 @@ class APIClient:
                 except ValueError:
                     # Response is not JSON - might be empty or HTML
                     response_text = response.text[:200] if response.text else "(empty)"
-                    logger.warning(f"Order API returned non-JSON response (status 200): {response_text}")
+                    logger.warning(
+                        f"Order API returned non-JSON response (status 200): {response_text}"
+                    )
                     # Return success indication even if response isn't JSON
-                    return {"status": "success", "message": "Order placed (non-JSON response)"}
+                    return {
+                        "status": "success",
+                        "message": "Order placed (non-JSON response)",
+                    }
             else:
                 error_text = response.text[:500] if response.text else "(empty)"
-                logger.error(f"Order Failed (HTTP {response.status_code}): {error_text}")
-                return {"status": "error", "message": f"HTTP {response.status_code}: {error_text}"}
+                logger.error(
+                    f"Order Failed (HTTP {response.status_code}): {error_text}"
+                )
+                return {
+                    "status": "error",
+                    "message": f"HTTP {response.status_code}: {error_text}",
+                }
         except Exception as e:
             logger.error(f"Order API Error: {e}")
             import traceback
+
             logger.debug(traceback.format_exc())
             return {"status": "error", "message": str(e)}
 
     def get_option_chain(self, symbol, exchange="NFO", max_retries=3):
         """Fetch option chain for a symbol"""
         url = f"{self.host}/api/v1/optionchain"
-        payload = {
-            "symbol": symbol,
-            "exchange": exchange,
-            "apikey": self.api_key
-        }
+        payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
 
         for attempt in range(max_retries):
             try:
@@ -501,14 +597,18 @@ class APIClient:
                 if response.status_code == 200:
                     try:
                         data = response.json()
-                        if data.get('status') == 'success' and 'data' in data:
-                            return data['data']
+                        if data.get("status") == "success" and "data" in data:
+                            return data["data"]
                         else:
-                            logger.warning(f"Option Chain fetch failed: {data.get('message')}")
+                            logger.warning(
+                                f"Option Chain fetch failed: {data.get('message')}"
+                            )
                     except ValueError:
                         logger.warning("Option Chain API returned non-JSON")
                 else:
-                    logger.warning(f"Option Chain API failed HTTP {response.status_code}")
+                    logger.warning(
+                        f"Option Chain API failed HTTP {response.status_code}"
+                    )
 
                 if attempt < max_retries - 1:
                     time_module.sleep(1)
@@ -521,12 +621,9 @@ class APIClient:
     def get_option_greeks(self, symbol, expiry=None, max_retries=3):
         """Fetch option greeks"""
         url = f"{self.host}/api/v1/optiongreeks"
-        payload = {
-            "symbol": symbol,
-            "apikey": self.api_key
-        }
+        payload = {"symbol": symbol, "apikey": self.api_key}
         if expiry:
-            payload['expiry'] = expiry
+            payload["expiry"] = expiry
 
         for attempt in range(max_retries):
             try:
@@ -534,8 +631,8 @@ class APIClient:
                 if response.status_code == 200:
                     try:
                         data = response.json()
-                        if data.get('status') == 'success' and 'data' in data:
-                            return data['data']
+                        if data.get("status") == "success" and "data" in data:
+                            return data["data"]
                     except ValueError:
                         pass
                 if attempt < max_retries - 1:
@@ -549,8 +646,8 @@ class APIClient:
     def get_vix(self):
         """Fetch INDIA VIX"""
         quote = self.get_quote("INDIA VIX", "NSE")
-        if quote and 'ltp' in quote:
-            return float(quote['ltp'])
+        if quote and "ltp" in quote:
+            return float(quote["ltp"])
         # Fallback to a default or raise error?
         # For safety, return None so caller handles it
         return None
