@@ -26,11 +26,12 @@ logging.basicConfig(
 logger = logging.getLogger("DeltaNeutralIronCondor")
 
 class DeltaNeutralIronCondor:
-    def __init__(self, api_client, symbol="NIFTY", qty=50, max_vix=30):
+    def __init__(self, api_client, symbol="NIFTY", qty=50, max_vix=30, sentiment_score=None):
         self.client = api_client
         self.symbol = symbol
         self.qty = qty
         self.max_vix = max_vix
+        self.sentiment_score = sentiment_score
         self.pm = PositionManager(f"{symbol}_IC")
 
     def get_vix(self):
@@ -40,8 +41,6 @@ class DeltaNeutralIronCondor:
     def select_strikes(self, spot, vix, chain_data):
         """
         Select strikes based on Delta and VIX.
-        Higher VIX -> Wider Wings (Lower Delta for Shorts?)
-        Actually, High VIX means we can sell further OTM for same premium.
         """
         # Calculate Max Pain
         max_pain = calculate_max_pain(chain_data)
@@ -57,65 +56,52 @@ class DeltaNeutralIronCondor:
         target_delta = 0.20
 
         # Adjust Wing Width based on VIX
-        # Base width 200 for NIFTY
-        wing_width = 200
-        if vix > 20:
+        wing_width = 200 # Default
+        if vix >= 20:
             wing_width = 400
+            logger.info(f"High VIX ({vix}) -> Widening Wings to {wing_width}")
         elif vix < 12:
             wing_width = 100
-
-        logger.info(f"VIX: {vix} -> Wing Width: {wing_width}")
+            logger.info(f"Low VIX ({vix}) -> Narrowing Wings to {wing_width}")
+        else:
+            logger.info(f"Medium VIX ({vix}) -> Default Wings {wing_width}")
 
         # Delta-Based Selection Logic
         ce_short = None
         pe_short = None
 
-        # Try to find strikes with Delta ~ 0.20
-        # If chain_data is available and has 'delta' or needed params
         try:
             strikes = sorted([item for item in chain_data if 'strike' in item], key=lambda x: x['strike'])
-
             best_ce_diff = 1.0
             best_pe_diff = 1.0
 
             # Assumptions
-            T = 7/365.0 # 7 days to expiry (Weekly)
-            r = 0.06    # Risk Free Rate
+            T = 7/365.0
+            r = 0.06
 
             for item in strikes:
                 strike = item['strike']
 
-                # Helper to get IV
                 def get_iv(itm, type_key):
-                    # Try flattened first
                     iv = itm.get(f'{type_key}_iv', 0)
                     if iv == 0:
-                        # Try nested
                         iv = itm.get(type_key, {}).get('iv', 0)
-
                     if iv > 0:
-                         # Assume IV is percentage (e.g., 20.0), convert to decimal
                          return iv / 100.0
                     return vix / 100.0
 
-                # Calculate Call Delta
                 iv_ce = get_iv(item, 'ce')
                 ce_greeks = calculate_greeks(spot, strike, T, r, iv_ce, 'ce')
                 ce_delta = ce_greeks.get('delta', 0.5)
 
-                # We want Call Delta ~ 0.20 (OTM Call)
-                # Ensure strike > spot for OTM Call logic check
                 if strike > spot and abs(ce_delta - target_delta) < best_ce_diff:
                     best_ce_diff = abs(ce_delta - target_delta)
                     ce_short = strike
 
-                # Calculate Put Delta
                 iv_pe = get_iv(item, 'pe')
                 pe_greeks = calculate_greeks(spot, strike, T, r, iv_pe, 'pe')
-                pe_delta = abs(pe_greeks.get('delta', -0.5)) # Put Delta is negative
+                pe_delta = abs(pe_greeks.get('delta', -0.5))
 
-                # We want Put Delta ~ 0.20 (OTM Put)
-                # Ensure strike < spot for OTM Put logic check
                 if strike < spot and abs(pe_delta - target_delta) < best_pe_diff:
                     best_pe_diff = abs(pe_delta - target_delta)
                     pe_short = strike
@@ -127,7 +113,7 @@ class DeltaNeutralIronCondor:
             ce_short = None
             pe_short = None
 
-        # Fallback to ATM + Width if Delta search failed or not enough data
+        # Fallback to ATM + Width
         atm = round(center_price / 50) * 50
 
         if not ce_short:
@@ -149,21 +135,27 @@ class DeltaNeutralIronCondor:
     def execute(self):
         logger.info(f"Starting execution for {self.symbol}")
 
-        if not is_market_open():
-             logger.warning("Market is closed.")
-             # return # Allow running for testing/mocking
-
         vix = self.get_vix()
         logger.info(f"Current VIX: {vix}")
 
-        # Filter: Only Sell Premium if VIX > 20 (as requested)
-        if vix < 20:
-            logger.warning(f"VIX {vix} < 20. Market conditions not suitable for selling premium (Iron Condor). Skipping.")
+        # VIX Filters
+        if vix < 12:
+            logger.warning(f"VIX {vix} < 12. Too low for Iron Condor (Low Premium/High Gamma Risk). Skipping.")
             return
 
         if vix > self.max_vix:
             logger.warning(f"VIX {vix} > {self.max_vix}. Reducing Quantity by 50%.")
             self.qty = int(self.qty * 0.5)
+
+        # Sentiment Filter
+        if self.sentiment_score is not None:
+            logger.info(f"Checking Sentiment Score: {self.sentiment_score}")
+            # Score 0 (Negative) to 1 (Positive), 0.5 Neutral
+            # Iron Condor is Neutral. Avoid if sentiment is extreme.
+            dist_from_neutral = abs(self.sentiment_score - 0.5)
+            if dist_from_neutral > 0.3: # < 0.2 or > 0.8
+                logger.warning(f"Sentiment Score {self.sentiment_score} is strongly directional. Iron Condor risk is high. Skipping.")
+                return
 
         quote = self.client.get_quote(f"{self.symbol} 50", "NSE")
         spot = float(quote['ltp']) if quote else 0
@@ -175,16 +167,19 @@ class DeltaNeutralIronCondor:
 
         # Fetch Chain
         chain = self.client.get_option_chain(self.symbol)
+        if not chain:
+            logger.error("Could not fetch option chain.")
+            return
 
         strikes = self.select_strikes(spot, vix, chain)
         logger.info(f"Selected Strikes: {strikes}")
 
         # Place Orders (Mock)
-        # Sell Shorts, Buy Longs
         logger.info(f"Placing orders for {self.qty} qty...")
 
-        # Example calls
+        # In real scenario:
         # self.client.placesmartorder(...)
+
         logger.info("Strategy execution completed (Simulation).")
 
 def main():
@@ -192,10 +187,11 @@ def main():
     parser.add_argument("--symbol", default="NIFTY", help="Index Symbol")
     parser.add_argument("--qty", type=int, default=50, help="Quantity")
     parser.add_argument("--port", type=int, default=5002, help="Broker API Port")
+    parser.add_argument("--sentiment_score", type=float, default=None, help="External Sentiment Score (0.0-1.0)")
     args = parser.parse_args()
 
     client = APIClient(api_key=os.getenv("OPENALGO_API_KEY"), host=f"http://127.0.0.1:{args.port}")
-    strategy = DeltaNeutralIronCondor(client, args.symbol, args.qty)
+    strategy = DeltaNeutralIronCondor(client, args.symbol, args.qty, sentiment_score=args.sentiment_score)
     strategy.execute()
 
 if __name__ == "__main__":
