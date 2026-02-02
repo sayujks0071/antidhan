@@ -67,7 +67,8 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         """
         exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper() else "NSE"
 
-        df = self.fetch_history(days=5, exchange=exchange)
+        # Increased lookback to 10 days to handle weekends/data gaps better
+        df = self.fetch_history(days=10, exchange=exchange)
         if df.empty or len(df) < 50:
             self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows. Need at least 50.")
             return
@@ -165,8 +166,8 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 return last_rsi > 50
             return False
         except Exception as e:
-            self.logger.warning(f"Sector Check Failed: {e}")
-            return False
+            self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True (Allow) to prevent blocking on data issues.")
+            return True
 
     def generate_signal(self, df):
         """
