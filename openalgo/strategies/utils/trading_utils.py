@@ -650,7 +650,7 @@ class APIClient:
                     if data.get("status") == "success" and "data" in data:
                         return data["data"]
                 except ValueError:
-                    pass
+                    logger.warning("Greeks API returned non-JSON or invalid JSON response")
         except Exception as e:
             logger.error(f"Greeks API Error: {e}")
         return {}
