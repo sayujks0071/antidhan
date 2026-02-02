@@ -31,8 +31,9 @@ def audit_latency():
     client = APIClient(api_key="audit_test")
 
     # Mocking httpx_client inside APIClient for this specific test
-    # We patch 'strategies.utils.trading_utils.httpx_client' because that's where it's imported
-    with patch('strategies.utils.trading_utils.httpx_client') as mock_client:
+    # Build the correct patch path based on where APIClient was imported from
+    httpx_client_path = f"{APIClient.__module__}.httpx_client"
+    with patch(httpx_client_path) as mock_client:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"status": "success", "orderid": "audit_123"}
