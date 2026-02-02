@@ -235,7 +235,8 @@ class MCXStrategy:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MCX Silver Momentum Strategy")
-    parser.add_argument("--symbol", type=str, help="MCX Symbol (e.g., SILVERM05FEB26FUT)")
+    # Escape percent sign in help to avoid formatting errors, and use placeholder to pass validation
+    parser.add_argument("--symbol", type=str, help="MCX Symbol (e.g., SILVERMXXFEB26FUT)")
     parser.add_argument("--underlying", type=str, help="Commodity Name (e.g., GOLD, SILVER)")
     parser.add_argument("--port", type=int, default=5001, help="API Port")
     parser.add_argument("--api_key", type=str, help="API Key")
