@@ -10,7 +10,6 @@ import json
 sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
 
 from strategies.utils.trading_utils import APIClient
-from utils import httpx_client
 
 class TestTradingUtilsRefactor(unittest.TestCase):
     def setUp(self):
