@@ -22,6 +22,11 @@ except ImportError:
         sys.path.insert(0, utils_dir)
     from base_strategy import BaseStrategy
 
+try:
+    from trading_utils import check_sector_correlation
+except ImportError:
+    check_sector_correlation = None
+
 class SuperTrendVWAPStrategy(BaseStrategy):
     def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
                  sector_benchmark='NIFTY BANK', log_file=None, client=None, **kwargs):
@@ -148,6 +153,10 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
     def check_sector_correlation(self):
         try:
+            if check_sector_correlation:
+                return check_sector_correlation(self.client, self.sector_benchmark)
+
+            # Fallback Logic if utility not found
             sector_symbol = self.sector_benchmark.replace(" ", "").upper()
             if "BANK" in sector_symbol and "NIFTY" in sector_symbol:
                 sector_symbol = "BANKNIFTY"
