@@ -3,7 +3,7 @@ import glob
 import json
 import re
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime
 
 # Configuration
 LOG_DIRS = [

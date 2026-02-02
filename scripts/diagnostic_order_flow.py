@@ -2,7 +2,6 @@ import os
 import sys
 import logging
 import json
-from datetime import datetime
 
 # Setup paths
 script_dir = os.path.dirname(os.path.abspath(__file__))

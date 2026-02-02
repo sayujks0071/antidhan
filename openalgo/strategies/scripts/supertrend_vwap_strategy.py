@@ -135,7 +135,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 self.trailing_stop = 0.0
         else:
             # Entry Logic
-            sector_bullish = self.check_sector_correlation()
+            sector_bullish = self.check_sector_correlation(self.sector_benchmark)
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
                 adj_qty = int(self.quantity * size_multiplier)
@@ -145,28 +145,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                     self.pm.update_position(adj_qty, last['close'], 'BUY')
                     sl_mult = getattr(self, 'ATR_SL_MULTIPLIER', 3.0)
                     self.trailing_stop = last['close'] - (sl_mult * self.atr)
-
-    def check_sector_correlation(self):
-        try:
-            sector_symbol = self.sector_benchmark.replace(" ", "").upper()
-            if "BANK" in sector_symbol and "NIFTY" in sector_symbol:
-                sector_symbol = "BANKNIFTY"
-            elif "NIFTY" in sector_symbol:
-                sector_symbol = "NIFTY"
-            else:
-                sector_symbol = "NIFTY"
-
-            df = self.fetch_history(days=5, symbol=sector_symbol, interval="D", exchange="NSE_INDEX")
-
-            if not df.empty and len(df) > 15:
-                rsi = self.calculate_rsi(df['close'])
-                last_rsi = rsi.iloc[-1]
-                self.logger.info(f"Sector {self.sector_benchmark} RSI: {last_rsi:.2f}")
-                return last_rsi > 50
-            return False
-        except Exception as e:
-            self.logger.warning(f"Sector Check Failed: {e}")
-            return False
 
     def generate_signal(self, df):
         """

@@ -5,7 +5,7 @@ import pytz
 import json
 import time as time_module
 from pathlib import Path
-from datetime import datetime, time as dt_time
+from datetime import datetime, timedelta, time as dt_time
 from functools import lru_cache
 import httpx
 import pandas as pd
@@ -202,6 +202,66 @@ def analyze_volume_profile(df, n_bins=20):
 
     poc_price = bins[poc_bin] + (bins[1] - bins[0]) / 2
     return poc_price, poc_volume
+
+
+def check_sector_correlation(client, sector_benchmark, period=14, threshold=50, logger=None):
+    """
+    Check if the sector benchmark is bullish (RSI > threshold).
+    Requires a client with .history() method.
+    """
+    if logger is None:
+        logger = logging.getLogger("TradingUtils")
+
+    try:
+        # Normalize symbol
+        sector_symbol = normalize_symbol(sector_benchmark)
+
+        # Fallback normalization logic
+        if sector_symbol not in ["NIFTY", "BANKNIFTY"]:
+            if "NIFTY" in sector_symbol:
+                sector_symbol = "NIFTY"
+            elif "BANK" in sector_symbol:
+                sector_symbol = "BANKNIFTY"
+
+        # Fetch history - need enough for RSI
+        # 60 days to be safe for RSI 14
+        start_date = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d")
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
+        exchange = "NSE_INDEX"
+
+        # Use client.history
+        df = client.history(
+            symbol=sector_symbol,
+            exchange=exchange,
+            interval="D",
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        if df.empty:
+            # Try 1d if D failed
+            df = client.history(
+                symbol=sector_symbol,
+                exchange=exchange,
+                interval="1d",
+                start_date=start_date,
+                end_date=end_date
+            )
+
+        if not df.empty and len(df) > period + 1:
+            # Standardize datetime if needed
+            if "close" in df.columns:
+                rsi = calculate_rsi(df['close'], period=period)
+                last_rsi = rsi.iloc[-1]
+                logger.info(f"Sector {sector_benchmark} ({sector_symbol}) RSI: {last_rsi:.2f}")
+                return last_rsi > threshold
+
+        return False
+
+    except Exception as e:
+        logger.warning(f"Sector Check Failed: {e}")
+        return False
 
 
 class PositionManager:

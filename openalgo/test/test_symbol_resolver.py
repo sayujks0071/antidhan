@@ -1,7 +1,7 @@
-import unittest
-import sys
-import os
 import datetime
+import os
+import sys
+import unittest
 from unittest.mock import MagicMock, patch
 
 # Setup paths
@@ -14,8 +14,9 @@ sys.path.insert(0, OPENALGO_ROOT)
 # Set dummy env vars
 os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 
-from openalgo.utils.symbol_resolver import SymbolResolver
 from openalgo.database.symbol import SymToken
+from openalgo.utils.symbol_resolver import SymbolResolver
+
 
 class TestSymbolResolver(unittest.TestCase):
 

@@ -13,7 +13,6 @@ import time
 import urllib.request
 import urllib.parse
 import urllib.error
-from datetime import datetime, timedelta
 
 # Configuration
 LOKI_URL = "http://localhost:3100"
@@ -107,7 +106,7 @@ def send_alert(title, message):
             url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
             payload = json.dumps({"chat_id": tg_chat, "text": alert_msg}).encode('utf-8')
             req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=5):
                 logger.info("Telegram notification sent.")
         except Exception as e:
             logger.error(f"Failed to send Telegram alert: {e}")
