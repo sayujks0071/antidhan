@@ -35,13 +35,17 @@ def get_httpx_client() -> httpx.Client:
     return _httpx_client
 
 
-def request(method: str, url: str, **kwargs) -> httpx.Response:
+def request(
+    method: str, url: str, max_retries: int = 0, backoff_factor: float = 0.5, **kwargs
+) -> httpx.Response:
     """
     Make an HTTP request using the shared client with automatic protocol negotiation.
 
     Args:
         method: HTTP method (GET, POST, etc.)
         url: URL to request
+        max_retries: Number of retries on failure (default 0)
+        backoff_factor: Factor for exponential backoff (default 0.5)
         **kwargs: Additional arguments to pass to the request
 
     Returns:
@@ -56,21 +60,62 @@ def request(method: str, url: str, **kwargs) -> httpx.Response:
 
     client = get_httpx_client()
 
-    # Track actual broker API call time for latency monitoring
-    broker_api_start = time.time()
-    response = client.request(method, url, **kwargs)
-    broker_api_end = time.time()
+    last_exception = None
+    response = None
 
-    # Store broker API time in Flask's g object for latency tracking
-    if hasattr(g, "latency_tracker"):
-        broker_api_time_ms = (broker_api_end - broker_api_start) * 1000
-        g.broker_api_time = broker_api_time_ms
-        logger.debug(f"Broker API call took {broker_api_time_ms:.2f}ms")
+    for attempt in range(max_retries + 1):
+        try:
+            # Track actual broker API call time for latency monitoring
+            broker_api_start = time.time()
+            response = client.request(method, url, **kwargs)
+            broker_api_end = time.time()
 
-    # Log the actual HTTP version used (info level for visibility)
-    if response.http_version:
-        logger.info(f"Request used {response.http_version} - URL: {url[:50]}...")
+            # Check for server errors or rate limits if retries are enabled
+            if max_retries > 0 and (
+                response.status_code >= 500 or response.status_code == 429
+            ):
+                if attempt < max_retries:
+                    wait_time = backoff_factor * (2**attempt)
+                    logger.warning(
+                        f"Request to {url} failed (HTTP {response.status_code}). Retrying in {wait_time}s..."
+                    )
+                    time.sleep(wait_time)
+                    continue
 
+            # If we get here, either success or non-retriable error
+            # Store broker API time in Flask's g object for latency tracking
+            try:
+                if hasattr(g, "latency_tracker"):
+                    broker_api_time_ms = (broker_api_end - broker_api_start) * 1000
+                    g.broker_api_time = broker_api_time_ms
+                    logger.debug(f"Broker API call took {broker_api_time_ms:.2f}ms")
+            except RuntimeError:
+                # Working outside of application context
+                pass
+
+            # Log the actual HTTP version used (info level for visibility)
+            if response.http_version:
+                logger.info(
+                    f"Request used {response.http_version} - URL: {url[:50]}..."
+                )
+
+            return response
+
+        except httpx.RequestError as e:
+            last_exception = e
+            if attempt < max_retries:
+                wait_time = backoff_factor * (2**attempt)
+                logger.warning(
+                    f"Request to {url} failed: {e}. Retrying in {wait_time}s..."
+                )
+                time.sleep(wait_time)
+            else:
+                logger.error(
+                    f"Request to {url} failed after {max_retries} retries: {e}"
+                )
+                raise last_exception
+
+    # Should only reach here if max_retries > 0 and we exhausted retries on status codes
     return response
 
 

@@ -9,6 +9,7 @@ from datetime import datetime, time as dt_time
 import httpx
 import pandas as pd
 import numpy as np
+from utils import httpx_client
 
 # Configure logging
 try:
@@ -551,7 +552,10 @@ class APIClient:
         }
 
         try:
-            response = httpx.post(url, json=payload, timeout=10)
+            # Use shared client with retry logic
+            response = httpx_client.post(
+                url, json=payload, timeout=10, max_retries=3, backoff_factor=1.0
+            )
 
             if response.status_code == 200:
                 # Handle response - may be JSON or empty
