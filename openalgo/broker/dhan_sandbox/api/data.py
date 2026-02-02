@@ -578,15 +578,85 @@ class BrokerData:
             logger.error(f"Error fetching historical data: {str(e)}")
             raise Exception(f"Error fetching historical data: {str(e)}")
 
+    def get_batch_quotes(self, symbols: list, exchange: str) -> dict:
+        """
+        Get real-time quotes for multiple symbols
+        Args:
+            symbols: List of trading symbols
+            exchange: Exchange (e.g., NSE, BSE)
+        Returns:
+            dict: Map of symbol -> Quote data
+        """
+        try:
+            exchange_type = self._get_exchange_segment(exchange)
+            security_ids = []
+            symbol_map = {}  # id -> symbol
+
+            for symbol in symbols:
+                sid = get_token(symbol, exchange)
+                if sid:
+                    security_ids.append(int(sid))
+                    symbol_map[str(sid)] = symbol
+                else:
+                    logger.warning(f"Could not find security ID for {symbol}")
+
+            if not security_ids:
+                return {}
+
+            logger.info(f"Getting batch quotes for {len(symbols)} symbols")
+
+            payload = {
+                exchange_type: security_ids
+            }
+
+            response = get_api_response(
+                "/v2/marketfeed/quote", self.auth_token, "POST", json.dumps(payload)
+            )
+
+            data = response.get("data", {}).get(exchange_type, {})
+            results = {}
+
+            for sid, quote_data in data.items():
+                if sid in symbol_map:
+                    sym = symbol_map[sid]
+                    # Transform to expected format
+                    results[sym] = {
+                        "ltp": float(quote_data.get("last_price", 0)),
+                        "open": float(quote_data.get("ohlc", {}).get("open", 0)),
+                        "high": float(quote_data.get("ohlc", {}).get("high", 0)),
+                        "low": float(quote_data.get("ohlc", {}).get("low", 0)),
+                        "volume": int(quote_data.get("volume", 0)),
+                        "oi": int(quote_data.get("oi", 0)),
+                        "prev_close": float(quote_data.get("ohlc", {}).get("close", 0)),
+                    }
+                    # Update bid/ask from depth if available
+                    depth = quote_data.get("depth", {})
+                    if depth:
+                        buy_orders = depth.get("buy", [])
+                        sell_orders = depth.get("sell", [])
+                        if buy_orders:
+                            results[sym]["bid"] = float(buy_orders[0].get("price", 0))
+                        if sell_orders:
+                            results[sym]["ask"] = float(sell_orders[0].get("price", 0))
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Error in get_batch_quotes: {e}")
+            return {}
+
     def get_quotes(self, symbol: str, exchange: str) -> dict:
         """
         Get real-time quotes for given symbol
         Args:
-            symbol: Trading symbol
+            symbol: Trading symbol or List of symbols
             exchange: Exchange (e.g., NSE, BSE)
         Returns:
             dict: Quote data with required fields
         """
+        if isinstance(symbol, list):
+            return self.get_batch_quotes(symbol, exchange)
+
         try:
             security_id = get_token(symbol, exchange)
             exchange_type = self._get_exchange_segment(
