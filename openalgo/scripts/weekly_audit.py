@@ -1,13 +1,14 @@
-import os
-import sys
+import datetime
 import json
 import logging
-import datetime
-import psutil
-import yfinance as yf
-import requests
-import pandas as pd
+import os
+import sys
 from pathlib import Path
+
+import pandas as pd
+import psutil
+import requests
+import yfinance as yf
 
 # Configure Logging
 log_dir = Path("openalgo/log/audit_reports")
@@ -75,7 +76,7 @@ class WeeklyAudit:
 
         # Load Active Strategies
         if self.config_file.exists():
-            with open(self.config_file, 'r') as f:
+            with open(self.config_file) as f:
                 active_strats = json.load(f)
                 strategies_count = len(active_strats)
         else:
@@ -86,7 +87,7 @@ class WeeklyAudit:
         if self.state_dir.exists():
             for state_file in self.state_dir.glob("*_state.json"):
                 try:
-                    with open(state_file, 'r') as f:
+                    with open(state_file) as f:
                         data = json.load(f)
                         pos = data.get('position', 0)
                         entry = data.get('entry_price', 0.0)

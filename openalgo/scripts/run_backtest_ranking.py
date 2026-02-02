@@ -3,16 +3,17 @@
 Backtest Ranking Script
 Run backtests for all strategies using their adapters and rank them.
 """
-import os
-import sys
 import importlib
 import inspect
-import pandas as pd
-import numpy as np
-import logging
-from datetime import datetime, timedelta, time
-from collections import defaultdict
 import json
+import logging
+import os
+import sys
+from collections import defaultdict
+from datetime import datetime, time, timedelta
+
+import numpy as np
+import pandas as pd
 
 # Setup paths
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,8 +36,8 @@ os.environ.setdefault('API_SECRET_KEY', 'mock_secret')
 
 # Import Utils
 try:
-    from openalgo_mock import set_current_timestamp, get_mock
-    from aitrapp_integration import StrategyContext, SignalSide, Instrument, InstrumentType
+    from aitrapp_integration import Instrument, InstrumentType, SignalSide, StrategyContext
+    from openalgo_mock import get_mock, set_current_timestamp
     from strategy_adapter import StrategyAdapter
 except ImportError as e:
     print(f"Error importing backtest utils: {e}")
@@ -159,7 +160,7 @@ class SimpleBacktestEngine:
                                             })
                                             equity += pnl
 
-                        except Exception as e:
+                        except Exception:
                             pass # logger.error(f"Error in step: {e}")
 
                         current_time += timedelta(minutes=1)

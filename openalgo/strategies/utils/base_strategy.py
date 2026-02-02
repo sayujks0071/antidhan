@@ -24,7 +24,7 @@ try:
     # Try relative import first (for package mode)
     from .trading_utils import (
         APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
-        calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
+        calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile, check_sector_correlation
     )
     from .symbol_resolver import SymbolResolver
 except ImportError:
@@ -32,7 +32,7 @@ except ImportError:
     try:
         from trading_utils import (
             APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
-            calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
+            calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile, check_sector_correlation
         )
         from symbol_resolver import SymbolResolver
     except ImportError:
@@ -40,7 +40,7 @@ except ImportError:
         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
         from trading_utils import (
             APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
-            calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
+            calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile, check_sector_correlation
         )
         from symbol_resolver import SymbolResolver
 
@@ -251,6 +251,10 @@ class BaseStrategy:
     def analyze_volume_profile(self, df, n_bins=20):
         """Find Point of Control (POC)."""
         return analyze_volume_profile(df, n_bins)
+
+    def check_sector_correlation(self, sector_benchmark):
+        """Check sector correlation using shared utility."""
+        return check_sector_correlation(self.client, sector_benchmark, logger=self.logger)
 
     @staticmethod
     def get_standard_parser(description="Strategy"):

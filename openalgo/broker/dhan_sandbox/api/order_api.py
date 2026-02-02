@@ -250,6 +250,11 @@ def place_order_api(data, auth):
     orderid = None
     if res.status_code == 200 or res.status_code == 201:
         if response_data and "orderId" in response_data:
+            # Check if order was rejected even if API call was successful
+            if response_data.get("orderStatus") in ["REJECTED", "FAILED"]:
+                logger.warning(f"Order placed but status is {response_data.get('orderStatus')}: {response_data}")
+                return res, response_data, None
+
             orderid = response_data["orderId"]
         else:
             logger.error(f"orderId not found in response: {response_data}")

@@ -7,17 +7,18 @@ between strategies, helping to identify over-concentration and
 improve portfolio diversification.
 """
 
-import os
-import sys
-import re
 import json
 import logging
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from datetime import datetime
+import os
+import re
+import sys
 from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
 from typing import Dict, List
+
+import numpy as np
+import pandas as pd
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -28,7 +29,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = BASE_DIR / "strategies/logs"
 ALT_LOG_DIR = BASE_DIR / "log/strategies"
 
-def find_all_logs() -> List[Path]:
+def find_all_logs() -> list[Path]:
     """Find all strategy log files."""
     logs = []
     for d in [LOG_DIR, ALT_LOG_DIR]:
@@ -53,7 +54,7 @@ def parse_pnl_series(log_file: Path) -> pd.Series:
     time_pattern = re.compile(r'^\[?(\d{4}-\d{2}-\d{2})')
 
     try:
-        with open(log_file, 'r', errors='ignore') as f:
+        with open(log_file, errors='ignore') as f:
             for line in f:
                 # Extract Date
                 time_match = time_pattern.search(line)
@@ -157,7 +158,7 @@ def analyze_portfolio_diversification(df_pnl: pd.DataFrame, df_corr: pd.DataFram
         print("⚠️  HIGH CORRELATION WARNINGS (Redundant Strategies):")
         for s1, s2, val in high_corr_pairs:
             print(f"  • {s1} <-> {s2}: {val:.2f}")
-            print(f"    -> Action: Reduce allocation to one or run on different assets.")
+            print("    -> Action: Reduce allocation to one or run on different assets.")
     else:
         print("✅ No highly correlated strategy pairs found.")
 
