@@ -6,7 +6,6 @@ import re
 import json
 import pandas as pd
 from datetime import datetime
-from collections import defaultdict
 
 # Setup paths
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -45,7 +44,6 @@ def normalize_mcx_symbol(match):
 
 def scan_file(filepath, instruments, strict=False):
     issues = []
-    normalized_content = ""
     changes_made = False
 
     with open(filepath, 'r', encoding='utf-8') as f:
