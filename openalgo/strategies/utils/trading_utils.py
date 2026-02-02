@@ -6,6 +6,7 @@ import json
 import time as time_module
 from pathlib import Path
 from datetime import datetime, time as dt_time
+from functools import lru_cache
 import httpx
 import pandas as pd
 import numpy as np
@@ -288,6 +289,34 @@ class PositionManager:
         )
         self.save_state()
 
+    def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price):
+        """
+        Calculate position size based on ATR-based stop loss.
+        Risk Amount = Capital * (risk_per_trade_pct/100)
+        Stop Distance = ATR * 2
+        Qty = Risk Amount / Stop Distance
+        """
+        if atr <= 0 or price <= 0:
+            logger.warning(f"Invalid ATR ({atr}) or Price ({price}) for sizing.")
+            return 0
+
+        risk_amount = capital * (risk_per_trade_pct / 100.0)
+        stop_loss_dist = atr * 2.0
+
+        # Avoid division by zero
+        if stop_loss_dist == 0:
+            qty = 0
+        else:
+            qty = risk_amount / stop_loss_dist
+
+        # Ensure quantity is at least 1 if risk allowed it, but respect capital limits
+        # Max quantity based on capital = capital / price
+        max_qty_capital = capital / price
+
+        qty = min(qty, max_qty_capital)
+
+        return int(qty)
+
     def has_position(self):
         return self.position != 0
 
@@ -457,7 +486,7 @@ class APIClient:
         return pd.DataFrame()
 
     def get_quote(self, symbol, exchange="NSE", max_retries=3):
-        """Fetch real-time quote from Kite API via OpenAlgo"""
+        """Fetch real-time quote from Kite API via OpenAlgo. Supports single symbol or list."""
         url = f"{self.host}/api/v1/quotes"
         payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
 
@@ -488,6 +517,10 @@ class APIClient:
                     return None
 
                 if data.get("status") == "success" and "data" in data:
+                    # If input was a list, return the data directly (it's a dict of symbols)
+                    if isinstance(symbol, list):
+                        return data["data"]
+
                     quote_data = data["data"]
                     # Ensure ltp is available
                     if "ltp" in quote_data:
@@ -512,8 +545,9 @@ class APIClient:
 
         return None  # Failed to fetch quote
 
+    @lru_cache(maxsize=4)
     def get_instruments(self, exchange="NSE", max_retries=3):
-        """Fetch instruments list"""
+        """Fetch instruments list (Cached)"""
         url = f"{self.host}/instruments/{exchange}"
 
         try:

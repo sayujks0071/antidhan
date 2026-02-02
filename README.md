@@ -162,3 +162,26 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 - Structured logs (`[ENTRY]`, `[EXIT]`, `[REJECTED]`, `[POSITION]`, `[METRICS]`)
 - Central monitor via `openalgo/scripts/monitor_trades.py`
 - Broker positionbook is used to reconcile live positions.
+
+## 🛡️ System Audit & Performance (Feb 2026)
+
+### Audit Findings
+- **High Correlation:** Strategies `SuperTrendVWAP`, `TrendPullback`, and `ORB` showed 100% correlation in recent logs. This poses a risk of simultaneous drawdowns.
+  - **Action:** Recommend consolidating capital into `SuperTrendVWAP` (Highest Calmar Ratio: ~17.7k) and investigating/diversifying the other two logic.
+- **Equity Curve Stress Test:**
+  - **Worst Day:** 2026-01-19.
+  - **Worst Strategy:** `TrendPullback` (relative to potential).
+  - The system has shown resilience but the lack of diversity in signals is a concern.
+
+### Infrastructure Upgrades
+- **Batch Data Fetching:** Implemented `get_batch_quotes` in Dhan sandbox and `APIClient` to reduce latency when tracking multiple instruments.
+- **Caching:** Added caching to `get_instruments` to minimize API load.
+- **Adaptive Sizing:** Updated `PositionManager` to include `calculate_adaptive_quantity`, allowing position sizing based on ATR volatility (Target Risk / ATR).
+
+## 🚀 Ahead Roadmap
+
+Based on the audit, the following areas are prioritized for the next iteration:
+
+1.  **Gamma Scalping on Earnings:** Explore strategies that exploit high IV environments around earnings releases, hedging delta while capturing gamma.
+2.  **Mean Reversion on High IV Rank:** Develop a counter-trend strategy specifically for instruments with IV Rank > 80, fading extreme moves.
+3.  **Volume Profile POC Bounce:** Implement a strategy trading off the Point of Control (POC) from the previous day's Volume Profile, aiming for mean reversion or support/resistance tests.
