@@ -14,7 +14,7 @@ import zmq.asyncio
 from dotenv import load_dotenv
 from sqlalchemy import text
 
-from database.auth_db import get_broker_name, verify_api_key
+from database.auth_db import get_broker_name, verify_api_key, db_session
 from services.market_data_service import get_market_data_service
 from utils.logging import get_logger, highlight_url
 
@@ -215,11 +215,11 @@ class WebSocketProxy:
             # Wait for all connections to close with timeout
             if close_tasks:
                 try:
-                    await asyncio.wait_for(
-                        asyncio.gather(*close_tasks, return_exceptions=True),
+                    await aio.wait_for(
+                        aio.gather(*close_tasks, return_exceptions=True),
                         timeout=2.0,  # 2 second timeout
                     )
-                except asyncio.TimeoutError:
+                except aio.TimeoutError:
                     logger.warning("Timeout waiting for client connections to close")
 
             # Disconnect all broker adapters
@@ -432,15 +432,15 @@ class WebSocketProxy:
             from database.auth_db import get_broker_name
 
             # Get user's connected broker from database
-            # This queries the auth_token table to find the user's active broker
+            # This queries the auth table to find the user's active broker
             query = text("""
-                SELECT broker FROM auth_token 
+                SELECT broker FROM auth
                 WHERE user_id = :user_id 
                 ORDER BY id DESC 
                 LIMIT 1
             """)
 
-            result = db.session.execute(query, {"user_id": user_id}).fetchone()
+            result = db_session.execute(query, {"user_id": user_id}).fetchone()
 
             if result and result.broker:
                 broker_name = result.broker

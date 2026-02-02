@@ -123,6 +123,86 @@ def calculate_intraday_vwap(df):
     return df
 
 
+def calculate_rsi(series, period=14):
+    """Calculate Relative Strength Index."""
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
+
+
+def calculate_atr(df, period=14):
+    """Calculate Average True Range (Returns Series)."""
+    high = df['high']
+    low = df['low']
+    close = df['close']
+    tr1 = high - low
+    tr2 = (high - close.shift(1)).abs()
+    tr3 = (low - close.shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    return tr.rolling(period).mean()
+
+
+def calculate_adx(df, period=14):
+    """Calculate ADX (Returns Series)."""
+    try:
+        # Cleaned up implementation to avoid SettingWithCopyWarning and potential errors
+        plus_dm = df['high'].diff()
+        minus_dm = df['low'].diff()
+
+        # Vectorized modification
+        plus_dm = np.where(plus_dm < 0, 0, plus_dm)
+        # If low goes UP (diff > 0), then downward movement is 0.
+        # If low goes DOWN (diff < 0), then downward movement is negative.
+        # BaseStrategy used: minus_dm[minus_dm > 0] = 0.
+        # This keeps negative values (downward moves).
+        minus_dm = np.where(minus_dm > 0, 0, minus_dm)
+
+        tr1 = df['high'] - df['low']
+        tr2 = (df['high'] - df['close'].shift(1)).abs()
+        tr3 = (df['low'] - df['close'].shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+        atr = tr.rolling(period).mean()
+
+        plus_dm_series = pd.Series(plus_dm, index=df.index)
+        minus_dm_series = pd.Series(minus_dm, index=df.index)
+
+        plus_di = 100 * (plus_dm_series.ewm(alpha=1/period).mean() / atr)
+        minus_di = 100 * (minus_dm_series.abs().ewm(alpha=1/period).mean() / atr)
+
+        dx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
+        adx = dx.rolling(period).mean()
+        return adx.fillna(0)
+    except Exception:
+        return pd.Series(0, index=df.index)
+
+
+def analyze_volume_profile(df, n_bins=20):
+    """Find Point of Control (POC)."""
+    price_min = df['low'].min()
+    price_max = df['high'].max()
+    if price_min == price_max: return 0, 0
+    bins = np.linspace(price_min, price_max, n_bins)
+
+    df = df.copy()
+    df['bin'] = pd.cut(df['close'], bins=bins, labels=False)
+    volume_profile = df.groupby('bin')['volume'].sum()
+
+    if volume_profile.empty: return 0, 0
+
+    poc_bin = volume_profile.idxmax()
+    poc_volume = volume_profile.max()
+    if pd.isna(poc_bin): return 0, 0
+
+    poc_bin = int(poc_bin)
+    if poc_bin >= len(bins)-1: poc_bin = len(bins)-2
+
+    poc_price = bins[poc_bin] + (bins[1] - bins[0]) / 2
+    return poc_price, poc_volume
+
+
 class PositionManager:
     """
     Persistent position manager to track trades and prevent duplicate orders.
