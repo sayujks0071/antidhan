@@ -24,7 +24,7 @@ try:
     # Try relative import first (for package mode)
     from .trading_utils import (
         APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
-        calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
+        calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile, check_sector_correlation
     )
     from .symbol_resolver import SymbolResolver
 except ImportError:
@@ -32,7 +32,7 @@ except ImportError:
     try:
         from trading_utils import (
             APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
-            calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
+            calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile, check_sector_correlation
         )
         from symbol_resolver import SymbolResolver
     except ImportError:

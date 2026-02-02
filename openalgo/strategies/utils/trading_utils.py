@@ -697,3 +697,50 @@ class APIClient:
         # Fallback to a default or raise error?
         # For safety, return None so caller handles it
         return None
+
+
+def check_sector_correlation(client, sector_benchmark, days=30):
+    """
+    Check if sector benchmark RSI is bullish (>50).
+    Args:
+        client: APIClient instance
+        sector_benchmark: Symbol like 'NIFTY BANK'
+        days: Days of history to fetch (needs enough for RSI calculation)
+    """
+    try:
+        sector_symbol = normalize_symbol(sector_benchmark)
+
+        # Calculate start/end dates
+        from datetime import datetime, timedelta
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+        # Use NSE_INDEX for indices
+        exchange = "NSE_INDEX" if "NIFTY" in sector_symbol or "BANK" in sector_symbol else "NSE"
+
+        df = client.history(
+            symbol=sector_symbol,
+            interval="1d",
+            exchange=exchange,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        if not df.empty:
+            # Standardise columns if needed
+            if "timestamp" in df.columns and "datetime" not in df.columns:
+                 df["datetime"] = pd.to_datetime(df["timestamp"], unit="s")
+
+            # Ensure we have enough data for RSI(14)
+            if len(df) > 15 and 'close' in df.columns:
+                rsi = calculate_rsi(df['close'], period=14)
+                last_rsi = rsi.iloc[-1]
+                logger.info(f"Sector {sector_benchmark} RSI: {last_rsi:.2f}")
+                return last_rsi > 50
+            else:
+                logger.warning(f"Insufficient data for Sector Check: {len(df)} rows")
+
+        return False
+    except Exception as e:
+        logger.warning(f"Sector Check Failed: {e}")
+        return False
