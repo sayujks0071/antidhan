@@ -1,14 +1,4 @@
 {
-    "ORB_NIFTY": {
-        "strategy": "orb_strategy",
-        "underlying": "NIFTY",
-        "type": "EQUITY",
-        "exchange": "NSE",
-        "params": {
-            "quantity": 50,
-            "timeframe": 15
-        }
-    },
     "SuperTrend_NIFTY": {
         "strategy": "supertrend_vwap_strategy",
         "underlying": "NIFTY",
