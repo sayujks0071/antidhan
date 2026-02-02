@@ -1,6 +1,7 @@
 """
 Shared httpx client module with connection pooling support for all broker APIs
-with automatic protocol negotiation (HTTP/2 when available, HTTP/1.1 fallback)
+with automatic protocol negotiation (HTTP/2 when available, HTTP/1.1 fallback).
+Includes Retry-with-Backoff logic for robust error handling.
 """
 
 from typing import Optional
