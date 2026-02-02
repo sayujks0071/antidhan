@@ -5,7 +5,7 @@ import argparse
 import time
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Add repo root to path
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
