@@ -14,7 +14,7 @@ from broker.dhan_sandbox.mapping.transform_data import (
 )
 from database.auth_db import get_auth_token
 from database.token_db import get_br_symbol, get_oa_symbol, get_symbol, get_token
-from utils.httpx_client import get_httpx_client
+from utils.httpx_client import get_httpx_client, request
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,9 +36,7 @@ def get_api_response(endpoint, auth, method="GET", payload=""):
     AUTH_TOKEN = auth
     api_key = os.getenv("BROKER_API_KEY")
 
-    # Get the shared httpx client with connection pooling
-    client = get_httpx_client()
-
+    # Headers for the request
     headers = {
         "access-token": AUTH_TOKEN,
         "Content-Type": "application/json",
@@ -48,12 +46,15 @@ def get_api_response(endpoint, auth, method="GET", payload=""):
     url = get_url(endpoint)
 
     try:
-        if method == "GET":
-            response = client.get(url, headers=headers)
-        elif method == "POST":
-            response = client.post(url, headers=headers, content=payload)
-        else:
-            response = client.request(method, url, headers=headers, content=payload)
+        # Use the shared request function which includes retry logic for 500/429 errors
+        # max_retries=3 is appropriate for handling transient server errors
+        response = request(
+            method,
+            url,
+            headers=headers,
+            content=payload,
+            max_retries=3
+        )
 
         # Add status attribute for compatibility with existing codebase
         response.status = response.status_code
@@ -195,10 +196,23 @@ def place_order_api(data, auth):
     Returns:
         tuple: (response_object, response_dict, order_id)
     """
+    # 1. Error handling for Invalid Token (Auth Token)
+    if not auth:
+        logger.error("Invalid Token: Authentication token is missing or empty")
+        return None, {"status": "error", "message": "Invalid Token"}, None
+
     AUTH_TOKEN = auth
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
     data["apikey"] = BROKER_API_KEY
+
+    # Get SecurityId (Token)
     token = get_token(data["symbol"], data["exchange"])
+
+    # 2. Error handling for SecurityId Required
+    if not token:
+        logger.error(f"SecurityId Required: Token not found for {data['symbol']} {data['exchange']}")
+        return None, {"status": "error", "message": "SecurityId Required"}, None
+
     newdata = transform_data(data, token)
     headers = {
         "access-token": AUTH_TOKEN,
@@ -209,11 +223,18 @@ def place_order_api(data, auth):
 
     logger.debug(f"Placing order with payload: {payload}")
 
-    # Get the shared httpx client with connection pooling
-    client = get_httpx_client()
-
     url = get_url("/v2/orders")
-    res = client.post(url, headers=headers, content=payload)
+
+    # 3. Automatic retry mechanism for 500-level API responses
+    # Use the shared request function which includes retry logic for 500/429 errors
+    res = request(
+        "POST",
+        url,
+        headers=headers,
+        content=payload,
+        max_retries=3
+    )
+
     # Add status attribute for compatibility with existing codebase
     res.status = res.status_code
 
@@ -407,14 +428,16 @@ def cancel_order(orderid, auth):
         "Accept": "application/json",
     }
 
-    # Get the shared httpx client with connection pooling
-    client = get_httpx_client()
-
     # Construct the URL for deleting the order
     url = get_url(f"/v2/orders/{orderid}")
 
-    # Make the DELETE request using httpx
-    res = client.delete(url, headers=headers)
+    # Make the DELETE request using shared request function with retry logic
+    res = request(
+        "DELETE",
+        url,
+        headers=headers,
+        max_retries=3
+    )
 
     # Add status attribute for compatibility with existing codebase
     res.status = res.status_code
@@ -465,14 +488,17 @@ def modify_order(data, auth):
 
     logger.debug(f"Modify order payload: {payload}")
 
-    # Get the shared httpx client with connection pooling
-    client = get_httpx_client()
-
     # Construct the URL for modifying the order
     url = get_url(f"/v2/orders/{orderid}")
 
-    # Make the PUT request using httpx
-    res = client.put(url, headers=headers, content=payload)
+    # Make the PUT request using shared request function with retry logic
+    res = request(
+        "PUT",
+        url,
+        headers=headers,
+        content=payload,
+        max_retries=3
+    )
 
     # Add status attribute for compatibility with existing codebase
     res.status = res.status_code
