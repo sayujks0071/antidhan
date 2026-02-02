@@ -8,6 +8,17 @@ from utils.httpx_client import get_httpx_client
 
 
 def authenticate_broker(code):
+    """
+    Authenticate with the broker using the provided code.
+
+    Args:
+        code (str): The authentication code received from the broker's redirect.
+
+    Returns:
+        tuple: (access_token, error_message)
+               access_token (str): The access token if successful, else None.
+               error_message (str): Error message if failed, else None.
+    """
     try:
         BROKER_API_KEY = os.getenv("BROKER_API_KEY")
         BROKER_API_SECRET = os.getenv("BROKER_API_SECRET")

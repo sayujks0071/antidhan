@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-import os
-import sys
-import json
-import logging
-import random
 import argparse
 import importlib
-import pandas as pd
-import numpy as np
+import json
+import logging
+import os
+import random
+import sys
 from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
 
 # Add repo root to path
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
@@ -92,7 +93,7 @@ class DailyBacktester:
         if not os.path.exists(CONFIG_FILE):
             logger.error(f"Config file not found: {CONFIG_FILE}")
             return {}
-        with open(CONFIG_FILE, 'r') as f:
+        with open(CONFIG_FILE) as f:
             return json.load(f)
 
     def load_strategy_module(self, strategy_name):

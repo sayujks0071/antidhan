@@ -1,8 +1,6 @@
 import os
 import json
 import pandas as pd
-import numpy as np
-from datetime import datetime
 from glob import glob
 
 def load_trades(log_dir):
@@ -152,7 +150,7 @@ def main():
             f.write("### ⚠️ High Correlation Alerts (> 0.7)\n")
             for s1, s2, val in high_corr:
                 f.write(f"- **{s1}** vs **{s2}**: {val:.2f}\n")
-                f.write(f"  - Action: Consider merging or keeping higher Calmar strategy.\n")
+                f.write("  - Action: Consider merging or keeping higher Calmar strategy.\n")
         else:
             f.write("No strategies showed correlation > 0.7.\n")
 
@@ -168,7 +166,7 @@ def main():
         f.write("## 3. Equity Curve Stress Test\n\n")
         daily_pnl, worst_day, worst_loss, worst_trades = equity_curve_stress_test(df)
 
-        f.write(f"### Worst Day Analysis\n")
+        f.write("### Worst Day Analysis\n")
         f.write(f"- **Date:** {worst_day}\n")
         f.write(f"- **Net Loss:** {worst_loss:.2f}\n\n")
 

@@ -4,9 +4,9 @@ from utils.env_check import load_and_check_env_variables  # Import the environme
 load_and_check_env_variables()
 
 import mimetypes
+import os
 import re
 import sys
-import os
 
 # Initialize Observability Logging (Local Drain)
 # Ensure openalgo_observability is importable

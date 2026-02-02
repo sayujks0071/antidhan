@@ -17,6 +17,21 @@ logger = get_logger(__name__)
 
 
 def get_api_response(endpoint, auth, method="POST", payload=""):
+    """
+    Helper function to make API requests to the Dhan Sandbox Data API.
+
+    Args:
+        endpoint (str): The API endpoint (e.g., "/v2/charts/intraday").
+        auth (str): The authentication token (Access Token).
+        method (str, optional): HTTP method (GET, POST). Defaults to "POST".
+        payload (str, optional): JSON string payload for POST requests. Defaults to "".
+
+    Returns:
+        dict: The JSON response from the API.
+
+    Raises:
+        Exception: If the API returns an error status or fails to connect.
+    """
     AUTH_TOKEN = auth
     client_id = os.getenv("BROKER_API_KEY")
 
