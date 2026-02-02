@@ -1,39 +1,50 @@
 #!/usr/bin/env python3
 import sys
 import os
-import argparse
-import logging
-from datetime import datetime, timedelta
 from pathlib import Path
 
-# Add repo root to path to allow imports
-script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, 'utils')
-sys.path.insert(0, utils_dir)
-
+# Add repo root to path to allow imports (if running as script)
 try:
     from base_strategy import BaseStrategy
 except ImportError:
-    try:
-        sys.path.insert(0, strategies_dir)
-        from utils.base_strategy import BaseStrategy
-    except ImportError:
-        sys.path.append(utils_dir)
-        from base_strategy import BaseStrategy
+    # Try setting path to find utils
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    strategies_dir = os.path.dirname(script_dir)
+    utils_dir = os.path.join(strategies_dir, 'utils')
+    if utils_dir not in sys.path:
+        sys.path.insert(0, utils_dir)
+    from base_strategy import BaseStrategy
 
 class GapFadeStrategy(BaseStrategy):
-    def __init__(self, symbol, quantity, gap_threshold=0.5, api_key=None, host=None, logfile=None, client=None):
+    def __init__(self, symbol, quantity, gap_threshold=0.5, api_key=None, host=None, log_file=None, client=None, **kwargs):
         super().__init__(
             name="GapFadeStrategy",
             symbol=symbol,
             quantity=quantity,
             api_key=api_key,
             host=host,
-            log_file=logfile,
+            log_file=log_file,
             client=client
         )
         self.gap_threshold = gap_threshold
+
+    @classmethod
+    def add_arguments(cls, parser):
+        parser.add_argument("--threshold", type=float, default=0.5, help="Gap Threshold %%")
+
+    @classmethod
+    def parse_arguments(cls, args):
+        kwargs = super().parse_arguments(args)
+        kwargs['gap_threshold'] = args.threshold
+        # Default symbol for Gap Fade if not provided
+        if not kwargs.get('symbol'):
+            kwargs['symbol'] = "NIFTY"
+        return kwargs
+
+    def run(self):
+        """Override run to execute only once (Gap Fade is a daily strategy)"""
+        self.logger.info(f"Starting {self.name} for {self.symbol} (Single Cycle)")
+        self.cycle()
 
     def cycle(self):
         self.logger.info(f"Starting Gap Fade Check for {self.symbol}")
@@ -105,27 +116,5 @@ class GapFadeStrategy(BaseStrategy):
         if self.pm:
             self.pm.update_position(qty, 100, "BUY")
 
-def main():
-    parser = BaseStrategy.get_standard_parser("Gap Fade Strategy")
-    parser.add_argument("--threshold", type=float, default=0.5, help="Gap Threshold %%")
-    args = parser.parse_args()
-
-    # Default logfile
-    logfile = args.logfile
-    if not logfile:
-        project_root = Path(__file__).resolve().parent.parent.parent.parent
-        logfile = project_root / "openalgo" / "strategies" / "logs" / "gap_fade.log"
-
-    strategy = GapFadeStrategy(
-        symbol=args.symbol or "NIFTY",
-        quantity=args.quantity,
-        gap_threshold=args.threshold,
-        api_key=args.api_key,
-        host=args.host,
-        logfile=str(logfile)
-    )
-    # Execute logic once
-    strategy.cycle()
-
 if __name__ == "__main__":
-    main()
+    GapFadeStrategy.cli()
