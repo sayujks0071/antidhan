@@ -7,41 +7,24 @@ VWAP mean reversion with volume profile analysis, Enhanced Sector RSI Filter, an
 """
 import os
 import sys
-import argparse
-import pandas as pd
-import numpy as np
 import logging
-from datetime import datetime, timedelta
+import pandas as pd
 
-# Add repo root to path to allow imports
-script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, 'utils')
-sys.path.insert(0, utils_dir)
-
+# Add repo root to path to allow imports (if running as script)
 try:
     from base_strategy import BaseStrategy
-    from trading_utils import calculate_intraday_vwap, normalize_symbol
-    from symbol_resolver import SymbolResolver
 except ImportError:
-    try:
-        sys.path.insert(0, strategies_dir)
-        from utils.base_strategy import BaseStrategy
-        from utils.trading_utils import calculate_intraday_vwap, normalize_symbol
-        from utils.symbol_resolver import SymbolResolver
-    except ImportError:
-        # Fallback for direct execution
-        sys.path.append(utils_dir)
-        try:
-             from base_strategy import BaseStrategy
-             from trading_utils import calculate_intraday_vwap, normalize_symbol
-             from symbol_resolver import SymbolResolver
-        except ImportError:
-             print("Critical: Failed to import BaseStrategy or Utils.")
-             sys.exit(1)
+    # Try setting path to find utils
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    strategies_dir = os.path.dirname(script_dir)
+    utils_dir = os.path.join(strategies_dir, 'utils')
+    if utils_dir not in sys.path:
+        sys.path.insert(0, utils_dir)
+    from base_strategy import BaseStrategy
 
 class SuperTrendVWAPStrategy(BaseStrategy):
-    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False, sector_benchmark='NIFTY BANK', logfile=None, client=None):
+    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
+                 sector_benchmark='NIFTY BANK', log_file=None, client=None, **kwargs):
         super().__init__(
             name=f"VWAP_{symbol}",
             symbol=symbol,
@@ -49,7 +32,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             api_key=api_key,
             host=host,
             ignore_time=ignore_time,
-            log_file=logfile,
+            log_file=log_file,
             client=client
         )
         self.sector_benchmark = sector_benchmark
@@ -64,6 +47,20 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         self.trailing_stop = 0.0
         self.atr = 0.0
 
+    @classmethod
+    def add_arguments(cls, parser):
+        parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
+        parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
+        parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
+        parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
+
+    @classmethod
+    def parse_arguments(cls, args):
+        kwargs = super().parse_arguments(args)
+        kwargs['sector_benchmark'] = args.sector
+        # BaseStrategy already extracts log_file from args.logfile
+        return kwargs
+
     def cycle(self):
         """
         Main Strategy Logic Execution Cycle
@@ -77,7 +74,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Pre-process
         try:
-            df = calculate_intraday_vwap(df)
+            df = self.calculate_intraday_vwap(df)
             if 'vwap' not in df.columns or 'vwap_dev' not in df.columns:
                 self.logger.error("VWAP calculation failed - missing required columns")
                 return
@@ -140,10 +137,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             # Entry Logic
             sector_bullish = self.check_sector_correlation()
 
-            # Logic Block Improvement Suggestion:
-            # Previous Win Rate < 40% (or 0% due to rejection) was likely caused by overly strict 'is_not_overextended' check
-            # combined with 'threshold' parameter being disconnected.
-            # We have relaxed 'dev_threshold' to allow more participation.
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
                 adj_qty = int(self.quantity * size_multiplier)
                 if adj_qty < 1: adj_qty = 1
@@ -183,7 +176,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         df = df.sort_index()
 
         try:
-            df = calculate_intraday_vwap(df)
+            df = self.calculate_intraday_vwap(df)
         except:
             return 'HOLD', {}, {}
 
@@ -231,47 +224,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         return 'HOLD', 0.0, details
 
-def run_strategy():
-    parser = BaseStrategy.get_standard_parser("SuperTrend VWAP Strategy")
-    parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
-    parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
-    parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
-    parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
-
-    args = parser.parse_args()
-
-    symbol = args.symbol
-    if not symbol and args.underlying:
-        if SymbolResolver:
-            resolver = SymbolResolver()
-            res = resolver.resolve({'underlying': args.underlying, 'type': args.type, 'exchange': args.exchange})
-            if isinstance(res, dict):
-                symbol = res.get('sample_symbol')
-            else:
-                symbol = res
-            print(f"Resolved {args.underlying} -> {symbol}")
-
-    if not symbol:
-        print("Error: Must provide --symbol or --underlying")
-        return
-
-    logfile = args.logfile
-    if not logfile:
-        log_dir = os.path.join(strategies_dir, "..", "log", "strategies")
-        os.makedirs(log_dir, exist_ok=True)
-        logfile = os.path.join(log_dir, f"supertrend_vwap_strategy_{symbol}.log")
-
-    strategy = SuperTrendVWAPStrategy(
-        symbol=symbol,
-        quantity=args.quantity,
-        api_key=args.api_key,
-        host=args.host,
-        ignore_time=args.ignore_time,
-        sector_benchmark=args.sector,
-        logfile=logfile
-    )
-    strategy.run()
-
 # Module level wrapper for SimpleBacktestEngine
 def generate_signal(df, client=None, symbol=None, params=None):
     strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test", client=client)
@@ -291,4 +243,4 @@ def generate_signal(df, client=None, symbol=None, params=None):
     return action, score, details
 
 if __name__ == "__main__":
-    run_strategy()
+    SuperTrendVWAPStrategy.cli()
