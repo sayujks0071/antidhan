@@ -2,6 +2,8 @@ import json
 import os
 import urllib.parse
 from datetime import datetime, timedelta
+import pickle
+import hashlib
 
 import httpx
 import jwt
@@ -89,6 +91,17 @@ class BrokerData:
             # Daily
             "D": "D",  # Daily data
         }
+
+        # Setup Cache
+        self.cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+
+    def _get_cache_path(self, key_data):
+        """Generate a unique cache path based on input data"""
+        key_str = json.dumps(key_data, sort_keys=True)
+        key_hash = hashlib.md5(key_str.encode()).hexdigest()
+        return os.path.join(self.cache_dir, f"{key_hash}.pkl")
 
     def _convert_to_dhan_request(self, symbol, exchange):
         """Convert symbol and exchange to Dhan format"""
@@ -319,6 +332,28 @@ class BrokerData:
 
             # Adjust dates for trading days
             start_date, end_date = self._adjust_dates(start_date, end_date)
+
+            # Check Cache
+            cache_key = {
+                "symbol": symbol,
+                "exchange": exchange,
+                "interval": interval,
+                "start_date": start_date,
+                "end_date": end_date
+            }
+            cache_path = self._get_cache_path(cache_key)
+
+            if os.path.exists(cache_path):
+                # Check if cache is fresh (e.g., less than 1 hour old for intraday, 1 day for daily)
+                # But history is usually static for past dates. For current day, we might want to skip cache or expire it.
+                # Simplification: Use cache if it exists.
+                try:
+                    with open(cache_path, "rb") as f:
+                        df = pickle.load(f)
+                    logger.info(f"Loaded {symbol} history from cache")
+                    return df
+                except Exception as e:
+                    logger.warning(f"Failed to load cache: {e}")
 
             # If both dates are weekends, return empty DataFrame
             if not self._is_trading_day(start_date) and not self._is_trading_day(end_date):
@@ -571,6 +606,13 @@ class BrokerData:
                     .drop_duplicates(subset=["timestamp"])
                     .reset_index(drop=True)
                 )
+
+            # Save to Cache
+            try:
+                with open(cache_path, "wb") as f:
+                    pickle.dump(df, f)
+            except Exception as e:
+                logger.warning(f"Failed to save cache: {e}")
 
             return df
 
