@@ -1,17 +1,19 @@
-# SANDBOX LEADERBOARD (2026-02-02)
+# SANDBOX LEADERBOARD (2026-02-03)
 
+No trades executed today.
 | Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Status |
 |------|----------|---------------|--------------|----------|--------|
-| -    | SuperTrend VWAP | N/A | N/A | N/A | No Trades (Data Unavailable) |
-| -    | Advanced ML Momentum | N/A | N/A | N/A | No Trades (Data Unavailable) |
+| - | SuperTrendVWAP | N/A | N/A | N/A | No Trades (Data/Market Closed) |
+| - | AdvancedMLMomentum | N/A | N/A | N/A | No Trades (Data/Market Closed) |
+| - | ORB | N/A | N/A | N/A | No Trades (Data/Market Closed) |
+| - | TrendPullback | N/A | N/A | N/A | No Trades (Data/Market Closed) |
 
 ## Analysis & Improvements
 
-### SuperTrend VWAP
-* **Win Rate**: N/A (< 40% threshold triggered for analysis).
-* **Issue**: The strategy failed to execute any trades because the `fetch_history` call returned 0 rows ("Insufficient data"). This suggests the default 5-day lookback is insufficient when data gaps exist or the Sandbox is cold. Additionally, Sector Correlation check failures were observed in logs.
-* **Action**: Improve data resilience by increasing lookback period and making sector filter optional/robust on failure.
+### SuperTrendVWAP
+- **Win Rate**: N/A (No Trades)
+- **Suggestion**: Strategy failed to execute trades. Likely due to insufficient data lookback for indicators (VWAP/ATR) in Sandbox environment. Increasing `fetch_history` lookback to 30 days is recommended.
 
-### Advanced ML Momentum
-* **Win Rate**: N/A.
-* **Issue**: Failed to execute due to shared data availability issues.
+### AdvancedMLMomentum
+- **Win Rate**: N/A (No Trades)
+- **Suggestion**: Strategy failed to execute trades. Likely due to strict data requirements (50 days) and insufficient history fetching. Increasing `fetch_history` lookback to 30 days is recommended.
