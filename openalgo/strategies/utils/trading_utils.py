@@ -204,6 +204,20 @@ def analyze_volume_profile(df, n_bins=20):
     return poc_price, poc_volume
 
 
+def calculate_sma(series, period=20):
+    """Calculate Simple Moving Average."""
+    return series.rolling(window=period).mean()
+
+
+def calculate_bollinger_bands(series, period=20, std_dev=2):
+    """Calculate Bollinger Bands (Upper, Middle, Lower)."""
+    middle = series.rolling(window=period).mean()
+    std = series.rolling(window=period).std()
+    upper = middle + (std_dev * std)
+    lower = middle - (std_dev * std)
+    return upper, middle, lower
+
+
 class PositionManager:
     """
     Persistent position manager to track trades and prevent duplicate orders.

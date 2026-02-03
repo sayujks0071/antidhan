@@ -23,21 +23,48 @@ utils_dir = os.path.join(strategies_dir, 'utils')
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol
+    from trading_utils import (
+        APIClient,
+        PositionManager,
+        is_market_open,
+        normalize_symbol,
+        calculate_rsi,
+        calculate_sma,
+        calculate_bollinger_bands,
+    )
 except ImportError:
     try:
         # Try absolute import
         sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol
+        from utils.trading_utils import (
+            APIClient,
+            PositionManager,
+            is_market_open,
+            normalize_symbol,
+            calculate_rsi,
+            calculate_sma,
+            calculate_bollinger_bands,
+        )
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol
+            from openalgo.strategies.utils.trading_utils import (
+                APIClient,
+                PositionManager,
+                is_market_open,
+                normalize_symbol,
+                calculate_rsi,
+                calculate_sma,
+                calculate_bollinger_bands,
+            )
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
             APIClient = None
             PositionManager = None
             normalize_symbol = lambda s: s
             is_market_open = lambda: True
+            calculate_rsi = lambda s, p: pd.Series(0, index=s.index)
+            calculate_sma = lambda s, p: pd.Series(0, index=s.index)
+            calculate_bollinger_bands = lambda s, p, d: (pd.Series(0, index=s.index), pd.Series(0, index=s.index), pd.Series(0, index=s.index))
 
 class AIHybridStrategy:
     def __init__(self, symbol, api_key, port, rsi_lower=30, rsi_upper=60, stop_pct=1.0, sector='NIFTY 50', earnings_date=None, logfile=None, time_stop_bars=12):
@@ -76,16 +103,9 @@ class AIHybridStrategy:
             return 'HOLD', 0.0, {}
 
         # Indicators
-        delta = df['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        df['rsi'] = 100 - (100 / (1 + rs))
-
-        df['sma20'] = df['close'].rolling(20).mean()
-        df['std'] = df['close'].rolling(20).std()
-        df['upper'] = df['sma20'] + (2 * df['std'])
-        df['lower'] = df['sma20'] - (2 * df['std'])
+        df['rsi'] = calculate_rsi(df['close'], period=14)
+        df['sma20'] = calculate_sma(df['close'], period=20)
+        df['upper'], _, df['lower'] = calculate_bollinger_bands(df['close'], period=20, std_dev=2)
 
         # Regime Filter (SMA200)
         df['sma200'] = df['close'].rolling(200).mean()
@@ -263,16 +283,9 @@ class AIHybridStrategy:
                     continue
 
                 # Indicators
-                delta = df['close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                rs = gain / loss
-                df['rsi'] = 100 - (100 / (1 + rs))
-
-                df['sma20'] = df['close'].rolling(20).mean()
-                df['std'] = df['close'].rolling(20).std()
-                df['upper'] = df['sma20'] + (2 * df['std'])
-                df['lower'] = df['sma20'] - (2 * df['std'])
+                df['rsi'] = calculate_rsi(df['close'], period=14)
+                df['sma20'] = calculate_sma(df['close'], period=20)
+                df['upper'], _, df['lower'] = calculate_bollinger_bands(df['close'], period=20, std_dev=2)
 
                 last = df.iloc[-1]
                 current_price = last['close']
