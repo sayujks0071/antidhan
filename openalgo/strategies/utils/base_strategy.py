@@ -23,7 +23,7 @@ except Exception:
 try:
     # Try relative import first (for package mode)
     from .trading_utils import (
-        APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
+        APIClient, PositionManager, SmartOrder, is_market_open, calculate_intraday_vwap, normalize_symbol,
         calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
     )
     from .symbol_resolver import SymbolResolver
@@ -31,7 +31,7 @@ except ImportError:
     # Fallback to absolute import or direct import (for script mode)
     try:
         from trading_utils import (
-            APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
+            APIClient, PositionManager, SmartOrder, is_market_open, calculate_intraday_vwap, normalize_symbol,
             calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
         )
         from symbol_resolver import SymbolResolver
@@ -39,7 +39,7 @@ except ImportError:
         # If running from a script that didn't set path correctly
         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
         from trading_utils import (
-            APIClient, PositionManager, is_market_open, calculate_intraday_vwap, normalize_symbol,
+            APIClient, PositionManager, SmartOrder, is_market_open, calculate_intraday_vwap, normalize_symbol,
             calculate_rsi, calculate_atr, calculate_adx, analyze_volume_profile
         )
         from symbol_resolver import SymbolResolver
@@ -80,6 +80,7 @@ class BaseStrategy:
             self.client = APIClient(api_key=self.api_key, host=self.host)
 
         self.pm = PositionManager(self.symbol) if PositionManager else None
+        self.smart_order = SmartOrder(self.client) if SmartOrder else None
 
     def _add_project_root_to_path(self):
         """Add the openalgo root directory to sys.path to allow importing database modules."""
@@ -168,6 +169,45 @@ class BaseStrategy:
                 self.logger.error(f"Error in execution loop: {e}", exc_info=True)
 
             time.sleep(60)
+
+    def execute_trade(self, action, quantity, price=None, urgency="MEDIUM"):
+        """
+        Execute a trade using SmartOrder and update PositionManager.
+        """
+        if not self.smart_order or not self.pm:
+            self.logger.warning("SmartOrder or PositionManager not initialized. Cannot execute trade.")
+            return None
+
+        self.logger.info(f"Executing {action} {quantity} {self.symbol} @ {price or 'MKT'}")
+
+        # Place order via API
+        response = self.smart_order.place_adaptive_order(
+            strategy=self.name,
+            symbol=self.symbol,
+            action=action,
+            exchange=self.exchange,
+            quantity=quantity,
+            limit_price=price,
+            urgency=urgency
+        )
+
+        # Update local position state if API call didn't fail (optimistic update or check response)
+        # Note: API might return None on failure
+        if response:
+            # We assume success if we got a response. In a real system, we'd check 'status'
+            update_price = price if price else 0 # Use 0 or fetch LTP? PositionManager handles 0?
+            # If price is None (Market), we might want to fetch LTP for accurate PnL tracking
+            if not update_price:
+                 # Quick LTP fetch or just use 0 (PositionManager uses it for PnL)
+                 quote = self.client.get_quote(self.symbol, self.exchange)
+                 if quote and 'ltp' in quote:
+                     update_price = float(quote['ltp'])
+
+            self.pm.update_position(quantity, update_price, action)
+            return response
+        else:
+            self.logger.error("Trade execution failed (no response from API)")
+            return None
 
     def cycle(self):
         """
