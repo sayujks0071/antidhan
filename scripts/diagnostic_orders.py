@@ -45,8 +45,9 @@ def mock_request(method, url, headers=None, content=None, max_retries=3, backoff
     if content:
         try:
             payload = json.loads(content)
-        except Exception:
-            pass
+        except json.JSONDecodeError as exc:
+            logger.debug("Failed to decode JSON payload in mock_request: %s", exc)
+            payload = {}
 
     # 1. Successful Order (Price 500)
     if payload.get("price") == 500.0:
