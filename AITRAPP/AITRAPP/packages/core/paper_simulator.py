@@ -19,20 +19,20 @@ class PaperSimulator:
     - Fee calculation
     - Position tracking
     """
-    
+
     def __init__(self, slippage_bps: float = 5, fees_per_order: float = 20):
         self.slippage_bps = slippage_bps
         self.fees_per_order = fees_per_order
-        
+
         # Tracking
         self.orders: Dict[str, Order] = {}
         self.positions: Dict[str, Position] = {}
         self.trades: List[dict] = []
-        
+
         # Counters
         self.order_counter = 0
         self.position_counter = 0
-    
+
     def simulate_order(
         self,
         instrument_token: int,
@@ -52,14 +52,14 @@ class PaperSimulator:
         """
         self.order_counter += 1
         order_id = f"PAPER_{self.order_counter:08d}"
-        
+
         # Calculate fill price with slippage
         if order_type == "MARKET" or price is None:
             fill_price = self._apply_slippage(current_market_price, side)
         else:
             # For LIMIT orders, fill at limit price (simplified)
             fill_price = price
-        
+
         # Create order
         order = Order(
             order_id=order_id,
@@ -75,9 +75,9 @@ class PaperSimulator:
             filled_quantity=quantity,
             average_price=fill_price
         )
-        
+
         self.orders[order_id] = order
-        
+
         logger.info(
             "[PAPER] Order filled",
             order_id=order_id,
@@ -86,9 +86,9 @@ class PaperSimulator:
             quantity=quantity,
             fill_price=fill_price
         )
-        
+
         return order
-    
+
     def open_position(
         self,
         instrument,
@@ -101,7 +101,7 @@ class PaperSimulator:
         """Open a new simulated position"""
         self.position_counter += 1
         position_id = f"POS_{self.position_counter:08d}"
-        
+
         position = Position(
             position_id=position_id,
             instrument=instrument,
@@ -117,9 +117,9 @@ class PaperSimulator:
             status=PositionStatus.OPEN,
             entry_order_id=entry_order.order_id
         )
-        
+
         self.positions[position_id] = position
-        
+
         logger.info(
             "[PAPER] Position opened",
             position_id=position_id,
@@ -128,9 +128,9 @@ class PaperSimulator:
             quantity=entry_order.filled_quantity,
             entry_price=entry_order.average_price
         )
-        
+
         return position
-    
+
     def close_position(
         self,
         position: Position,
@@ -140,7 +140,7 @@ class PaperSimulator:
         """Close a simulated position"""
         # Simulate exit order
         exit_side = "SELL" if position.side == SignalSide.LONG else "BUY"
-        
+
         exit_order = self.simulate_order(
             instrument_token=position.instrument.token if position.instrument else 0,
             instrument_symbol=position.instrument.tradingsymbol if position.instrument else "UNKNOWN",
@@ -149,25 +149,25 @@ class PaperSimulator:
             order_type="MARKET",
             current_market_price=current_price
         )
-        
+
         # Update position
         position.status = PositionStatus.CLOSED
         position.close_time = datetime.now()
         position.close_price = exit_order.average_price
         position.exit_order_id = exit_order.order_id
-        
+
         # Calculate P&L
         if position.side == SignalSide.LONG:
             gross_pnl = (exit_order.average_price - position.entry_price) * position.quantity
         else:
             gross_pnl = (position.entry_price - exit_order.average_price) * position.quantity
-        
+
         # Subtract fees
         fees = self.fees_per_order * 2  # Entry + Exit
         net_pnl = gross_pnl - fees
-        
+
         position.realized_pnl = net_pnl
-        
+
         # Record trade
         trade = {
             "position_id": position.position_id,
@@ -182,33 +182,33 @@ class PaperSimulator:
             "duration_seconds": (position.close_time - position.entry_time).total_seconds(),
             "exit_reason": reason
         }
-        
+
         self.trades.append(trade)
-        
+
         logger.info(
             "[PAPER] Position closed",
             position_id=position.position_id,
             net_pnl=net_pnl,
             reason=reason
         )
-        
+
         return exit_order
-    
+
     def _apply_slippage(self, price: float, side: str) -> float:
         """Apply simulated slippage to fill price"""
         slippage_mult = self.slippage_bps / 10000.0
-        
+
         if side == "BUY":
             # Buy at slightly higher price
             return price * (1 + slippage_mult)
         else:
             # Sell at slightly lower price
             return price * (1 - slippage_mult)
-    
+
     def get_open_positions(self) -> List[Position]:
         """Get all open positions"""
         return [p for p in self.positions.values() if p.is_open]
-    
+
     def get_trade_summary(self) -> dict:
         """Get summary of simulated trades"""
         if not self.trades:
@@ -221,10 +221,10 @@ class PaperSimulator:
                 "avg_win": 0.0,
                 "avg_loss": 0.0
             }
-        
+
         wins = [t for t in self.trades if t["net_pnl"] > 0]
         losses = [t for t in self.trades if t["net_pnl"] <= 0]
-        
+
         return {
             "total_trades": len(self.trades),
             "wins": len(wins),

@@ -1,12 +1,14 @@
-import random
 import hashlib
 import json
+import random
 from typing import Any, Dict
+
 import pandas as pd
-import numpy as np
-from packages.strategy_foundry.factory.grammar import StrategyConfig, Rule, Filter
-from packages.strategy_foundry.factory.parameter_space import ParameterSpace
+
 from packages.strategy_foundry.adapters.core_indicators import IndicatorsAdapter
+from packages.strategy_foundry.factory.grammar import Filter, Rule, StrategyConfig
+from packages.strategy_foundry.factory.parameter_space import ParameterSpace
+
 
 class StrategyGenerator:
     def generate_candidate(self) -> StrategyConfig:

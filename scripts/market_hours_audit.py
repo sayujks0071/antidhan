@@ -107,7 +107,7 @@ def analyze_logs(filepath):
         print(f"Symbol: {rec['symbol']}, Latency: {rec['latency']:.2f} ms")
         total_latency += rec['latency']
         if rec['latency'] > 500:
-            print(f"  [WARNING] Latency > 500ms! Bottleneck investigation required.")
+            print("  [WARNING] Latency > 500ms! Bottleneck investigation required.")
 
     if latency_records:
         avg_latency = total_latency / len(latency_records)

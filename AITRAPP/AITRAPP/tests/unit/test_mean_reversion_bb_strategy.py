@@ -1,9 +1,11 @@
-import pytest
 from datetime import datetime, timedelta
-import pandas as pd
-from packages.core.strategies.mean_reversion_bb import MeanReversionBBStrategy
-from packages.core.models import Bar, Tick, Instrument, InstrumentType, SignalSide
+
+import pytest
+
+from packages.core.models import Bar, Instrument, InstrumentType, SignalSide, Tick
 from packages.core.strategies.base import StrategyContext
+from packages.core.strategies.mean_reversion_bb import MeanReversionBBStrategy
+
 
 @pytest.fixture
 def bb_strategy():

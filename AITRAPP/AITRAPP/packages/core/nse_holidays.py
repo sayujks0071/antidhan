@@ -2,8 +2,9 @@
 import json
 import os
 import time
-from datetime import datetime, date, timedelta
-from typing import Dict, List, Optional, Set, Any
+from datetime import datetime
+from typing import Any, Dict, Optional, Set
+
 import requests
 import structlog
 

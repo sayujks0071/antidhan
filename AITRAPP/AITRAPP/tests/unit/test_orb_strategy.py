@@ -1,9 +1,11 @@
+from datetime import datetime, timedelta
+
 import pytest
-from datetime import datetime, time, timedelta
-from unittest.mock import MagicMock
-from packages.core.strategies.orb import ORBStrategy
-from packages.core.models import Bar, Tick, Instrument, InstrumentType, SignalSide
+
+from packages.core.models import Bar, Instrument, InstrumentType, SignalSide, Tick
 from packages.core.strategies.base import StrategyContext
+from packages.core.strategies.orb import ORBStrategy
+
 
 @pytest.fixture
 def orb_strategy():

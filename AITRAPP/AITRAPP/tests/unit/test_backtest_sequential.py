@@ -1,9 +1,12 @@
-import pytest
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
+import pytest
+
 from packages.core.backtest import BacktestEngine
+from packages.core.models import Bar, Signal, SignalSide
 from packages.core.strategies.base import Strategy
-from packages.core.models import Signal, SignalSide, Instrument, InstrumentType, Bar, Tick
+
 
 class MockStrategy(Strategy):
     def __init__(self, name="MockStrategy", params=None):

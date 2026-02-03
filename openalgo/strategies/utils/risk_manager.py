@@ -15,13 +15,16 @@ Author: OpenAlgo Risk Management
 Version: 1.0.0
 """
 
-import os
 import json
 import logging
-import pytz
-from datetime import datetime, time as dt_time, timedelta
+import os
+from collections.abc import Callable
+from datetime import datetime, timedelta
+from datetime import time as dt_time
 from pathlib import Path
-from typing import Optional, Dict, Any, Callable
+from typing import Any, Dict, Optional
+
+import pytz
 
 logger = logging.getLogger("RiskManager")
 
@@ -50,7 +53,7 @@ class RiskManager:
     }
 
     def __init__(self, strategy_name: str, exchange: str = "NSE",
-                 capital: float = 100000, config: Optional[Dict] = None):
+                 capital: float = 100000, config: dict | None = None):
         """
         Initialize Risk Manager.
 
@@ -69,7 +72,7 @@ class RiskManager:
         self.daily_pnl = 0.0
         self.daily_trades = 0
         self.last_trade_time = 0
-        self.positions: Dict[str, Dict] = {}  # symbol -> {qty, entry_price, stop_loss, trailing_stop}
+        self.positions: dict[str, dict] = {}  # symbol -> {qty, entry_price, stop_loss, trailing_stop}
         self.is_circuit_breaker_active = False
 
         # State persistence
@@ -84,7 +87,7 @@ class RiskManager:
         """Load persisted state from file."""
         if self.state_file.exists():
             try:
-                with open(self.state_file, 'r') as f:
+                with open(self.state_file) as f:
                     data = json.load(f)
 
                     # Check if state is from today
@@ -171,7 +174,7 @@ class RiskManager:
         return self._is_near_market_close()
 
     def calculate_stop_loss(self, entry_price: float, side: str,
-                           stop_pct: Optional[float] = None) -> float:
+                           stop_pct: float | None = None) -> float:
         """
         Calculate stop-loss price.
 
@@ -190,7 +193,7 @@ class RiskManager:
         else:
             return entry_price * (1 + pct / 100)
 
-    def update_trailing_stop(self, symbol: str, current_price: float) -> Optional[float]:
+    def update_trailing_stop(self, symbol: str, current_price: float) -> float | None:
         """
         Update trailing stop for a position.
 
@@ -262,7 +265,7 @@ class RiskManager:
         return False, "OK"
 
     def register_entry(self, symbol: str, qty: int, entry_price: float,
-                       side: str, stop_loss: Optional[float] = None):
+                       side: str, stop_loss: float | None = None):
         """
         Register a new position entry.
 
@@ -294,7 +297,7 @@ class RiskManager:
 
         logger.info(f"Position registered: {side} {qty} {symbol} @ {entry_price:.2f}, SL: {stop_loss:.2f}")
 
-    def register_exit(self, symbol: str, exit_price: float, qty: Optional[int] = None):
+    def register_exit(self, symbol: str, exit_price: float, qty: int | None = None):
         """
         Register a position exit and calculate PnL.
 
@@ -332,11 +335,11 @@ class RiskManager:
         logger.info(f"Position closed: {symbol} @ {exit_price:.2f}, PnL: {pnl:.2f}, Daily PnL: {self.daily_pnl:.2f}")
         return pnl
 
-    def get_open_positions(self) -> Dict[str, Dict]:
+    def get_open_positions(self) -> dict[str, dict]:
         """Get all open positions."""
         return self.positions.copy()
 
-    def get_daily_stats(self) -> Dict[str, Any]:
+    def get_daily_stats(self) -> dict[str, Any]:
         """Get daily trading statistics."""
         return {
             'daily_pnl': self.daily_pnl,

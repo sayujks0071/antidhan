@@ -1,8 +1,9 @@
+import os
+import sys
 import unittest
 from datetime import datetime
-from unittest.mock import patch, MagicMock
-import sys
-import os
+from unittest.mock import MagicMock, patch
+
 import pytz
 
 # Add repo root to path
@@ -11,6 +12,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from openalgo.strategies.utils.trading_utils import is_market_open, is_mcx_market_open
+
 
 class TestMarketHours(unittest.TestCase):
     @patch('openalgo.strategies.utils.trading_utils.datetime')

@@ -1,9 +1,12 @@
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from packages.core.config import ExecutionConfig, Settings
 from packages.core.execution import ExecutionEngine, OrderResult, OrderStatus, SignalSide
-from packages.core.models import Signal, Instrument, InstrumentType, Order
-from packages.core.config import ExecutionConfig, Settings, AppMode
+from packages.core.models import Instrument, InstrumentType, Order, Signal
+
 
 @pytest.fixture
 def mock_kite():

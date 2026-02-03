@@ -1,6 +1,8 @@
 import pandas as pd
 import pytest
+
 from packages.strategy_foundry.backtest.engine import FoundryEngine
+
 
 def test_short_trade_profit():
     """Verify that a short trade in a falling market yields positive PnL."""

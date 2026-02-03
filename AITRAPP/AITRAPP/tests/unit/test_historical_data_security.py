@@ -1,5 +1,7 @@
 import pytest
+
 from packages.core.historical_data import HistoricalDataLoader
+
 
 def test_symbol_validation_valid():
     """Test that valid symbols are accepted (even if file not found)"""
@@ -23,8 +25,10 @@ def test_symbol_validation_invalid_type():
     loader = HistoricalDataLoader()
     with pytest.raises(ValueError, match="Invalid input"):
         loader.load_file("NIFTY", "CE/PE")
-from apps.api.main import BacktestRequest
 from pydantic import ValidationError
+
+from apps.api.main import BacktestRequest
+
 
 def test_historical_data_loader_path_traversal_check():
     """

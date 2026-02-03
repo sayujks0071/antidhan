@@ -1,8 +1,8 @@
 """Mean Reversion Bollinger Bands Strategy"""
-import structlog
-import pandas as pd
-import numpy as np
 from typing import List
+
+import pandas as pd
+import structlog
 
 from packages.core.models import Signal, SignalSide
 from packages.core.strategies.base import Strategy, StrategyContext

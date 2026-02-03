@@ -3,12 +3,12 @@
 Clawdbot Adapter for Trading Strategies
 Provides easy-to-use functions for strategies to interact with Clawdbot AI.
 """
+import asyncio
+import logging
 import os
 import sys
-import logging
-import asyncio
-from typing import Dict, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 # Add services to path
 services_path = Path(__file__).parent.parent.parent / 'services'
@@ -36,7 +36,7 @@ def _run_async(coro):
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(coro)
 
-def get_ai_market_context(symbol: str, exchange: str = "NSE", timeframe: str = "5m") -> Dict[str, Any]:
+def get_ai_market_context(symbol: str, exchange: str = "NSE", timeframe: str = "5m") -> dict[str, Any]:
     """
     Get AI analysis of market conditions for a symbol.
     
@@ -56,11 +56,11 @@ def get_ai_market_context(symbol: str, exchange: str = "NSE", timeframe: str = "
             "sentiment": "NEUTRAL",
             "confidence": 0.0
         }
-    
+
     try:
         bridge = get_bridge_service()
         result = _run_async(bridge.get_market_analysis(symbol, exchange, timeframe))
-        
+
         if "error" in result:
             logger.warning(f"Error getting AI market context: {result['error']}")
             return {
@@ -70,7 +70,7 @@ def get_ai_market_context(symbol: str, exchange: str = "NSE", timeframe: str = "
                 "sentiment": "NEUTRAL",
                 "confidence": 0.0
             }
-        
+
         # Extract key information from analysis
         analysis = result.get("analysis", {})
         return {
@@ -99,8 +99,8 @@ def get_ai_market_context(symbol: str, exchange: str = "NSE", timeframe: str = "
 def get_ai_entry_signal(
     symbol: str,
     exchange: str,
-    technical_data: Dict[str, Any]
-) -> Dict[str, Any]:
+    technical_data: dict[str, Any]
+) -> dict[str, Any]:
     """
     Get AI opinion on entry signal.
     
@@ -119,14 +119,14 @@ def get_ai_entry_signal(
             "confidence": 0.0,
             "reasoning": "Clawdbot disabled"
         }
-    
+
     try:
         # Get market context first
         market_context = get_ai_market_context(symbol, exchange)
-        
+
         # Combine with technical data for AI analysis
         bridge = get_bridge_service()
-        
+
         # Create prompt for entry analysis
         prompt_data = {
             "symbol": symbol,
@@ -134,13 +134,13 @@ def get_ai_entry_signal(
             "technical_indicators": technical_data,
             "market_context": market_context
         }
-        
+
         # Use bridge to get entry recommendation
         # For now, use market context to infer entry signal
         regime = market_context.get("regime", "UNKNOWN")
         sentiment = market_context.get("sentiment", "NEUTRAL")
         confidence = market_context.get("confidence", 0.0)
-        
+
         # Simple logic: if bullish sentiment and trending regime, recommend entry
         if sentiment == "BULLISH" and regime in ["TRENDING", "MIXED"] and confidence > 0.6:
             recommendation = "BUY"
@@ -148,7 +148,7 @@ def get_ai_entry_signal(
             recommendation = "SELL"
         else:
             recommendation = "NEUTRAL"
-        
+
         return {
             "enabled": True,
             "recommendation": recommendation,
@@ -166,7 +166,7 @@ def get_ai_entry_signal(
             "confidence": 0.0
         }
 
-def get_ai_exit_signal(position: Dict[str, Any], current_price: float) -> Dict[str, Any]:
+def get_ai_exit_signal(position: dict[str, Any], current_price: float) -> dict[str, Any]:
     """
     Get AI opinion on exit signal.
     
@@ -183,26 +183,26 @@ def get_ai_exit_signal(position: Dict[str, Any], current_price: float) -> Dict[s
             "recommendation": "HOLD",
             "confidence": 0.0
         }
-    
+
     try:
         symbol = position.get("symbol", "")
         exchange = position.get("exchange", "NSE")
         entry_price = position.get("entry_price", 0)
         side = position.get("side", "LONG")
-        
+
         # Calculate P&L
         if side == "LONG":
             pnl_pct = ((current_price - entry_price) / entry_price) * 100
         else:
             pnl_pct = ((entry_price - current_price) / entry_price) * 100
-        
+
         # Get current market context
         market_context = get_ai_market_context(symbol, exchange)
-        
+
         # Simple exit logic based on P&L and market context
         sentiment = market_context.get("sentiment", "NEUTRAL")
         confidence = market_context.get("confidence", 0.0)
-        
+
         # If profit and sentiment changed against position, consider exit
         if pnl_pct > 2.0:  # 2% profit
             if (side == "LONG" and sentiment == "BEARISH") or (side == "SHORT" and sentiment == "BULLISH"):
@@ -215,7 +215,7 @@ def get_ai_exit_signal(position: Dict[str, Any], current_price: float) -> Dict[s
             confidence = 0.8
         else:
             recommendation = "HOLD"
-        
+
         return {
             "enabled": True,
             "recommendation": recommendation,
@@ -237,7 +237,7 @@ def get_ai_position_size(
     signal_strength: float,
     account_balance: float,
     base_risk_pct: float = 1.0
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get AI-suggested position size multiplier.
     
@@ -256,16 +256,16 @@ def get_ai_position_size(
             "multiplier": 1.0,
             "reasoning": "Clawdbot disabled"
         }
-    
+
     try:
         market_context = get_ai_market_context(symbol)
         confidence = market_context.get("confidence", 0.5)
         regime = market_context.get("regime", "UNKNOWN")
-        
+
         # Calculate multiplier based on AI confidence and signal strength
         # High confidence + high signal strength = larger position
         # Low confidence or ranging market = smaller position
-        
+
         if regime == "TRENDING" and confidence > 0.7 and signal_strength > 75:
             multiplier = 1.2  # Increase position size
         elif regime == "RANGING" or confidence < 0.4:
@@ -274,7 +274,7 @@ def get_ai_position_size(
             multiplier = 1.0  # Normal size
         else:
             multiplier = 0.8  # Slightly reduced
-        
+
         return {
             "enabled": True,
             "multiplier": multiplier,
@@ -292,8 +292,8 @@ def get_ai_position_size(
 
 def get_ai_parameter_suggestion(
     strategy_name: str,
-    indicator_values: Dict[str, float]
-) -> Dict[str, Any]:
+    indicator_values: dict[str, float]
+) -> dict[str, Any]:
     """
     Get AI-suggested parameter adjustments.
     
@@ -310,21 +310,21 @@ def get_ai_parameter_suggestion(
             "suggestions": {},
             "reasoning": "Clawdbot disabled"
         }
-    
+
     try:
         bridge = get_bridge_service()
         result = _run_async(bridge.get_strategy_recommendation(
             strategy_name,
             indicator_values
         ))
-        
+
         if "error" in result:
             return {
                 "enabled": True,
                 "error": result["error"],
                 "suggestions": {}
             }
-        
+
         recommendations = result.get("recommendations", {})
         return {
             "enabled": True,
@@ -356,7 +356,7 @@ def send_ai_alert(message: str, priority: str = "info", channel: str = "telegram
     if not CLAWDBOT_ENABLED or get_bridge_service is None:
         logger.debug("Clawdbot disabled, alert not sent")
         return False
-    
+
     try:
         bridge = get_bridge_service()
         result = _run_async(bridge.send_trading_alert(channel, message, priority))

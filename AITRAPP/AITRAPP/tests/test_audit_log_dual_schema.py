@@ -1,16 +1,15 @@
 """Test AuditLog backward compatibility with dual schema (details vs data)"""
+
 import pytest
-from datetime import datetime
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from packages.storage.models import AuditLog, AuditActionEnum, Base
-from packages.storage.database import get_db_session
+from packages.storage.models import AuditActionEnum, AuditLog, Base
 
 
 class TestAuditLogDualSchema:
     """Test that AuditLog works with both details and data columns"""
-    
+
     @pytest.fixture
     def db_session(self):
         """Create a test database session"""
@@ -21,7 +20,7 @@ class TestAuditLogDualSchema:
         session = Session()
         yield session
         session.close()
-    
+
     def test_audit_log_with_details_column(self, db_session):
         """Test AuditLog creation when details column exists"""
         # Simulate details column existing
@@ -32,20 +31,20 @@ class TestAuditLogDualSchema:
         )
         db_session.add(audit_log)
         db_session.commit()
-        
+
         # Verify it was saved
         retrieved = db_session.query(AuditLog).first()
         assert retrieved is not None
         assert retrieved.message == "Test message"
         assert retrieved.details == {"key": "value", "reason": "test"}
         assert retrieved.action == AuditActionEnum.KILL_SWITCH
-    
+
     def test_audit_log_with_data_column_fallback(self, db_session):
         """Test AuditLog creation when only data column exists (backward compatibility)"""
         # Simulate only data column existing (legacy schema)
         # Note: This test requires mocking the schema or using a different DB setup
         # For now, we test the logic that would handle this
-        
+
         # Create with data instead of details
         audit_log = AuditLog(
             action=str(AuditActionEnum.KILL_SWITCH.value),
@@ -54,7 +53,7 @@ class TestAuditLogDualSchema:
         )
         db_session.add(audit_log)
         db_session.commit()
-        
+
         # Verify it was saved
         retrieved = db_session.query(AuditLog).first()
         assert retrieved is not None
@@ -64,7 +63,7 @@ class TestAuditLogDualSchema:
             assert retrieved.data == {"key": "value", "reason": "test"}
         elif hasattr(retrieved, 'details') and retrieved.details:
             assert retrieved.details == {"key": "value", "reason": "test"}
-    
+
     def test_audit_log_action_enum_handling(self, db_session):
         """Test that action can be both Enum and string"""
         # Test with Enum
@@ -73,40 +72,39 @@ class TestAuditLogDualSchema:
             message="Test 1"
         )
         db_session.add(audit_log1)
-        
+
         # Test with string
         audit_log2 = AuditLog(
             action="KILL_SWITCH",
             message="Test 2"
         )
         db_session.add(audit_log2)
-        
+
         db_session.commit()
-        
+
         # Verify both were saved
         logs = db_session.query(AuditLog).all()
         assert len(logs) == 2
         assert logs[0].message == "Test 1"
         assert logs[1].message == "Test 2"
-    
+
     def test_backward_compatible_creation_logic(self, mocker):
         """Test the backward-compatible creation logic"""
-        from sqlalchemy import inspect
         from unittest.mock import MagicMock
-        
+
         # Mock scenario: details column exists
         mock_inspector = MagicMock()
         mock_inspector.get_columns.return_value = [{"name": "details"}, {"name": "action"}]
-        
+
         mock_bind = MagicMock()
-        
+
         # Since we cannot easily mock sqlalchemy.inspect due to how it's implemented (it's a function, but also a registry),
         # we'll test the logic function directly if possible, or adapt the test to not rely on mocking sqlalchemy.inspect
         # directly in this way.
-        
+
         # Instead, let's verify that our logic inside config_guard.py matches what we expect.
         # We can simulate the `inspect` call return value.
-        
+
         def mock_inspect_wrapper(obj):
             return mock_inspector
 
@@ -136,7 +134,7 @@ class TestAuditLogDualSchema:
             )
 
             assert has_details is False
-        
+
         # Mock scenario: details column exists
         class MockColumn:
             def __init__(self, name):
@@ -146,7 +144,7 @@ class TestAuditLogDualSchema:
                 if key == "name":
                     return self.name
                 return None
-        
+
         class MockInspector:
             def get_columns(self, table_name):
                 return [MockColumn("details"), MockColumn("action")]
@@ -154,14 +152,14 @@ class TestAuditLogDualSchema:
         class MockInspectorNoDetails:
             def get_columns(self, table_name):
                 return [MockColumn("data"), MockColumn("action")]
-        
+
         class MockDB:
             def __init__(self):
                 self.bind = "mock_bind"
 
         # Mock sqlalchemy.inspect
         mock_inspect = mocker.patch("sqlalchemy.inspect")
-        
+
         # Case 1: details column exists
         mock_inspect.return_value = MockInspector()
         db = MockDB()
@@ -171,19 +169,19 @@ class TestAuditLogDualSchema:
             c.get("name") == "details" or getattr(c, "name", None) == "details"
             for c in columns
         )
-        
+
         assert has_details is True
-        
+
         # Case 2: details column missing
         mock_inspect.return_value = MockInspectorNoDetails()
         db_no_details = MockDB()
-        
+
         columns = mock_inspect(db_no_details.bind).get_columns("audit_logs")
         has_details = any(
             c.get("name") == "details" or getattr(c, "name", None) == "details"
             for c in columns
         )
-        
+
         assert has_details is False
 
 

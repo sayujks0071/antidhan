@@ -1,6 +1,7 @@
-from packages.core.market_hours import MarketHoursGuard, MARKET_OPEN, MARKET_CLOSE, HARD_CLOSE, IST
 from datetime import datetime, time
-import pytz
+
+from packages.core.market_hours import HARD_CLOSE, MARKET_CLOSE, MarketHoursGuard
+
 
 class MarketHoursAdapter:
     def __init__(self):

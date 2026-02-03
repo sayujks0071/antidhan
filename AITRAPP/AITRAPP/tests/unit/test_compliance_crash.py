@@ -1,6 +1,8 @@
 
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 
 def test_compliance_module_imports():
     """Test that packages.core.compliance can be imported without NameError"""

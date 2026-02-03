@@ -4,11 +4,11 @@ OpenAlgo Daily Workflow Script
 Purpose: Daily preparation, validation, and instrument refresh for OpenAlgo.
 Usage: python3 openalgo/scripts/daily_workflow.py
 """
-import os
-import sys
-import shutil
-import logging
 import datetime
+import logging
+import os
+import shutil
+import sys
 from pathlib import Path
 
 # Setup paths
@@ -82,8 +82,8 @@ def check_login_and_refresh_instruments():
     try:
         # Mocking for build environment if DB not accessible
         try:
-            from openalgo.database.auth_db import Auth, db_session
             from openalgo.broker.zerodha.database.master_contract_db import master_contract_download
+            from openalgo.database.auth_db import Auth, db_session
 
             # Check if we have valid users
             try:

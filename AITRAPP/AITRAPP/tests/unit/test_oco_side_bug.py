@@ -1,8 +1,9 @@
 
-import pytest
 from unittest.mock import Mock
-from packages.storage.models import Order, OrderSideEnum, OrderTypeEnum, OrderStatusEnum
+
 from packages.core.oco import OCOManager
+from packages.storage.models import Order, OrderSideEnum, OrderStatusEnum, OrderTypeEnum
+
 
 class TestOCOSideBug:
     def test_child_order_sides_are_opposite_to_entry(self):
