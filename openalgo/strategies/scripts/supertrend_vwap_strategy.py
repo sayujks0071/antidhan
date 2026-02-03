@@ -128,11 +128,11 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
             if last['close'] < self.trailing_stop:
                 self.logger.info(f"Trailing Stop Hit at {last['close']:.2f}")
-                self.pm.update_position(self.quantity, last['close'], 'SELL')
+                self.execute_trade('SELL', self.quantity, last['close'])
                 self.trailing_stop = 0.0
             elif last['close'] < last['vwap']:
                 self.logger.info(f"Price crossed below VWAP at {last['close']:.2f}. Exiting.")
-                self.pm.update_position(self.quantity, last['close'], 'SELL')
+                self.execute_trade('SELL', self.quantity, last['close'])
                 self.trailing_stop = 0.0
         else:
             # Entry Logic
@@ -142,10 +142,10 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 adj_qty = int(self.quantity * size_multiplier)
                 if adj_qty < 1: adj_qty = 1
                 self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}, Qty: {adj_qty} (VIX: {vix})")
-                if self.pm:
-                    self.pm.update_position(adj_qty, last['close'], 'BUY')
-                    sl_mult = getattr(self, 'ATR_SL_MULTIPLIER', 3.0)
-                    self.trailing_stop = last['close'] - (sl_mult * self.atr)
+
+                self.execute_trade('BUY', adj_qty, last['close'])
+                sl_mult = getattr(self, 'ATR_SL_MULTIPLIER', 3.0)
+                self.trailing_stop = last['close'] - (sl_mult * self.atr)
 
     def check_sector_correlation(self):
         try:
