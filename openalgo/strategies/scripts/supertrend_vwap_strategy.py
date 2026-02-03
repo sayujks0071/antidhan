@@ -67,6 +67,14 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         """
         exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper() else "NSE"
 
+        # Fetch Daily Data for Monthly ATR (Robust Sizing)
+        df_daily = self.fetch_history(days=35, exchange=exchange, interval="D")
+        monthly_atr = 0
+        if not df_daily.empty and len(df_daily) > 15:
+             # BaseStrategy.calculate_atr returns the last value (scalar)
+             monthly_atr = self.calculate_atr(df_daily, period=14)
+             self.logger.info(f"Monthly ATR (Daily): {monthly_atr:.2f}")
+
         # Increased lookback to 10 days to handle weekends/data gaps better
         df = self.fetch_history(days=10, exchange=exchange)
         if df.empty or len(df) < 50:
@@ -139,7 +147,17 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             sector_bullish = self.check_sector_correlation()
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
-                adj_qty = int(self.quantity * size_multiplier)
+                # Use Adaptive Sizing if PM available and monthly_atr is valid
+                if self.pm and monthly_atr > 0:
+                    adj_qty = self.pm.calculate_adaptive_quantity_monthly_atr(
+                        capital=float(os.getenv("STRATEGY_CAPITAL", 100000)),
+                        risk_per_trade_pct=2.0,
+                        monthly_atr=monthly_atr,
+                        current_price=last['close']
+                    )
+                else:
+                    adj_qty = int(self.quantity * size_multiplier)
+
                 if adj_qty < 1: adj_qty = 1
                 self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}, Qty: {adj_qty} (VIX: {vix})")
                 if self.pm:
