@@ -57,7 +57,10 @@ def request(
     Raises:
         httpx.HTTPError: If the request fails
     """
-    from flask import g
+    try:
+        from flask import g
+    except ImportError:
+        g = None
 
     client = get_httpx_client()
 
@@ -145,7 +148,10 @@ def _create_http_client() -> httpx.Client:
     Returns:
         httpx.Client: A configured HTTP client with protocol auto-negotiation and timing hooks
     """
-    from flask import g
+    try:
+        from flask import g
+    except ImportError:
+        g = None
 
     # Event hooks for tracking broker API timing
     def log_request(request):
@@ -163,11 +169,10 @@ def _create_http_client() -> httpx.Client:
                 # Store broker API time in Flask's g object for latency tracking
                 try:
                     from flask import has_request_context
-
-                    if has_request_context() and hasattr(g, "latency_tracker"):
+                    if g and has_request_context() and hasattr(g, "latency_tracker"):
                         g.broker_api_time = duration_ms
                         logger.debug(f"Broker API call took {duration_ms:.2f}ms")
-                except (RuntimeError, AttributeError):
+                except (ImportError, RuntimeError, AttributeError):
                     # Not in Flask request context or g not available
                     pass
 
