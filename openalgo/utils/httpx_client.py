@@ -5,6 +5,8 @@ Includes Retry-with-Backoff logic for robust error handling.
 """
 
 from typing import Optional
+import os
+import time
 
 import httpx
 
@@ -55,8 +57,6 @@ def request(
     Raises:
         httpx.HTTPError: If the request fails
     """
-    import time
-
     from flask import g
 
     client = get_httpx_client()
@@ -145,9 +145,6 @@ def _create_http_client() -> httpx.Client:
     Returns:
         httpx.Client: A configured HTTP client with protocol auto-negotiation and timing hooks
     """
-    import os
-    import time
-
     from flask import g
 
     # Event hooks for tracking broker API timing

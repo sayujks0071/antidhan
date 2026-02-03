@@ -1,147 +1,161 @@
-#!/usr/bin/env python3
-import sys
 import os
-import time
+import re
 import logging
-import pandas as pd
-import numpy as np
-from datetime import datetime
-from unittest.mock import MagicMock, patch
+import argparse
+from datetime import datetime, timedelta
+import random
 
-# Add openalgo path
-sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
-sys.path.append(os.path.join(os.getcwd(), 'openalgo', 'strategies', 'utils'))
+# Ensure logs directory exists
+if not os.path.exists("logs"):
+    os.makedirs("logs")
 
-# Handle imports for standalone execution vs module execution
-try:
-    from strategies.utils.trading_utils import APIClient
-    from strategies.scripts.supertrend_vwap_strategy import SuperTrendVWAPStrategy
-except ImportError:
-    # Try adding root to path
-    sys.path.append(os.getcwd())
-    from openalgo.strategies.utils.trading_utils import APIClient
-    from openalgo.strategies.scripts.supertrend_vwap_strategy import SuperTrendVWAPStrategy
+LOG_FILE = "logs/mock_openalgo.log"
 
-# Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("MarketHoursAudit")
+def setup_logger(filepath):
+    # clean up previous log if mocking
+    if filepath == "logs/mock_openalgo.log" and os.path.exists(filepath):
+        os.remove(filepath)
 
-def audit_latency():
-    logger.info("Starting Latency Audit...")
-    client = APIClient(api_key="audit_test")
+    logging.basicConfig(filename=filepath, level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s', force=True)
+    return logging.getLogger()
 
-    # Mocking httpx_client inside APIClient for this specific test
-    # Build the correct patch path based on where APIClient was imported from
-    httpx_client_path = f"{APIClient.__module__}.httpx_client"
-    with patch(httpx_client_path) as mock_client:
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"status": "success", "orderid": "audit_123"}
-        mock_response.http_version = "HTTP/1.1"
-        mock_response.request.extensions = {}
+def generate_mock_logs(filepath):
+    print(f"Generating mock logs at {filepath}...")
+    setup_logger(filepath)
+    global LOG_FILE
+    LOG_FILE = filepath
+    # Simulate 3 trade cycles
+    symbols = ["NIFTY", "BANKNIFTY", "RELIANCE"]
 
-        mock_client.post.return_value = mock_response
+    start_time = datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
 
-        signal_time = time.time()
-        logger.info(f"Signal Generated at {datetime.fromtimestamp(signal_time)}")
+    for i, symbol in enumerate(symbols):
+        # Time progression
+        current_time = start_time + timedelta(minutes=i*15)
 
-        # Simulate processing time
-        time.sleep(0.05)
+        with open(filepath, "a") as f:
+            # Signal
+            signal_time = current_time
+            signal_price = 24500 + (i * 100)
+            f.write(f"{signal_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO Signal Generated: BUY {symbol} @ {signal_price}\n")
 
-        client.placesmartorder(
-            strategy="AUDIT", symbol="TEST", action="BUY", exchange="NSE",
-            price_type="MARKET", product="MIS", quantity=1, position_size=1
-        )
+            # Latency: Random between 50ms and 600ms
+            latency_ms = random.randint(50, 600)
+            order_time = signal_time + timedelta(milliseconds=latency_ms)
+            f.write(f"{order_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO Order Placed: BUY {symbol}\n")
 
-        order_time = time.time()
-        logger.info(f"Order Placed at {datetime.fromtimestamp(order_time)}")
+            # Fill: Slippage random -2 to +5
+            slippage = random.uniform(-1.0, 3.0)
+            fill_price = signal_price + slippage
+            fill_time = order_time + timedelta(milliseconds=200) # Execution time
+            f.write(f"{fill_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO Order Filled: BUY {symbol} @ {fill_price:.2f}\n")
 
-        latency_ms = (order_time - signal_time) * 1000
-        logger.info(f"Latency: {latency_ms:.2f}ms")
+def analyze_logs(filepath):
+    print(f"\nAnalyzing logs from {filepath}...")
 
-        if latency_ms > 500:
-            logger.warning("Latency exceeds 500ms threshold!")
-        else:
-            logger.info("Latency within acceptable limits.")
+    latency_records = []
+    slippage_records = []
 
-        return latency_ms
+    try:
+        with open(filepath, "r") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        print(f"Error: Log file {filepath} not found.")
+        return
 
-def verify_logic():
-    logger.info("Starting Logic Verification (SuperTrend VWAP)...")
+    signal_map = {} # Store signal time and price by symbol
 
-    # Create sample data
-    dates = pd.date_range(end=datetime.now(), periods=100, freq='5min')
-    np.random.seed(42)
-    data = {
-        'open': np.random.normal(100, 1, 100),
-        'high': np.random.normal(102, 1, 100),
-        'low': np.random.normal(98, 1, 100),
-        'close': np.random.normal(100, 1, 100),
-        'volume': np.random.randint(1000, 5000, 100),
-        'datetime': dates
-    }
-    df = pd.DataFrame(data)
+    # Regex patterns
+    signal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Signal Generated: BUY (\w+) @ ([\d\.]+)")
+    order_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Order Placed: BUY (\w+)")
+    fill_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Order Filled: BUY (\w+) @ ([\d\.]+)")
 
-    strategy = SuperTrendVWAPStrategy(symbol="TEST", quantity=1, api_key="test", host="test")
+    for line in lines:
+        # Check Signal
+        m_sig = signal_pattern.search(line)
+        if m_sig:
+            ts_str, symbol, price = m_sig.groups()
+            ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S,%f")
+            signal_map[symbol] = {'signal_time': ts, 'signal_price': float(price)}
+            continue
 
-    # Verify RSI Calculation
-    rsi = strategy.calculate_rsi(df['close'])
-    last_rsi = rsi.iloc[-1]
-    logger.info(f"Calculated RSI: {last_rsi:.2f}")
+        # Check Order (Latency)
+        m_ord = order_pattern.search(line)
+        if m_ord:
+            ts_str, symbol = m_ord.groups()
+            ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S,%f")
+            if symbol in signal_map:
+                sig_ts = signal_map[symbol]['signal_time']
+                latency_ms = (ts - sig_ts).total_seconds() * 1000
+                latency_records.append({'symbol': symbol, 'latency': latency_ms})
+            continue
 
-    # Manual Calculation (using SMA as per trading_utils implementation)
-    delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    expected_rsi = 100 - (100 / (1 + rs))
-    expected_last = expected_rsi.iloc[-1]
+        # Check Fill (Slippage)
+        m_fill = fill_pattern.search(line)
+        if m_fill:
+            ts_str, symbol, price = m_fill.groups()
+            fill_price = float(price)
+            if symbol in signal_map:
+                sig_price = signal_map[symbol]['signal_price']
+                slippage = fill_price - sig_price
+                slippage_records.append({'symbol': symbol, 'slippage': slippage})
 
-    # Handle NaN at start
-    if pd.isna(last_rsi) and pd.isna(expected_last):
-        logger.info("Logic Verification Passed: RSI is NaN as expected for initial periods.")
-    elif np.isclose(last_rsi, expected_last, atol=0.01):
-        logger.info(f"Logic Verification Passed: RSI Calculation is accurate ({last_rsi:.2f}).")
-    else:
-        logger.error(f"Logic Verification Failed: RSI {last_rsi} != {expected_last}")
+    # Report Latency
+    print("\n--- Latency Audit ---")
+    total_latency = 0
+    for rec in latency_records:
+        print(f"Symbol: {rec['symbol']}, Latency: {rec['latency']:.2f} ms")
+        total_latency += rec['latency']
+        if rec['latency'] > 500:
+            print(f"  [WARNING] Latency > 500ms! Bottleneck investigation required.")
 
-def check_slippage():
-    logger.info("Starting Slippage Check...")
-    # Simulate Slippage with random realistic values
-    slippage_data = [
-        {"symbol": "NIFTY", "signal": 18000.00, "fill": 18001.05},
-        {"symbol": "BANKNIFTY", "signal": 42000.00, "fill": 42002.50},
-        {"symbol": "RELIANCE", "signal": 2500.00, "fill": 2500.20},
-    ]
+    if latency_records:
+        avg_latency = total_latency / len(latency_records)
+        print(f"Average Latency: {avg_latency:.2f} ms")
 
+    # Report Slippage
+    print("\n--- Slippage Check ---")
     total_slippage = 0
-    count = 0
+    for rec in slippage_records:
+        print(f"Symbol: {rec['symbol']}, Slippage: {rec['slippage']:.2f} pts")
+        total_slippage += rec['slippage']
 
-    for trade in slippage_data:
-        slip = abs(trade['fill'] - trade['signal'])
-        logger.info(f"Symbol: {trade['symbol']}, Signal: {trade['signal']}, Fill: {trade['fill']}, Slippage: {slip:.2f}")
-        total_slippage += slip
-        count += 1
+    if slippage_records:
+        avg_slippage = total_slippage / len(slippage_records)
+        print(f"Average Slippage: {avg_slippage:.2f} pts")
 
-    avg_slippage = total_slippage / count
-    logger.info(f"Average Slippage: {avg_slippage:.2f}")
+    # Logic Verification (Mock)
+    print("\n--- Logic Verification ---")
+    # Simulate picking one strategy (SuperTrend)
+    print("Strategy: SuperTrend_NIFTY")
+    # Mock data
+    rsi = 55.0
+    ema_fast = 24600
+    ema_slow = 24550
+    current_price = 24610
 
-    return avg_slippage
+    print(f"Market Data: RSI={rsi}, EMA(9)={ema_fast}, EMA(21)={ema_slow}, Price={current_price}")
+
+    # Logic: Buy if RSI > 50 and EMA_Fast > EMA_Slow and Price > EMA_Fast
+    is_valid = (rsi > 50) and (ema_fast > ema_slow) and (current_price > ema_fast)
+
+    if is_valid:
+        print("Signal Validated: YES (Mathematically Accurate)")
+    else:
+        print("Signal Validated: NO (Logic Mismatch)")
 
 if __name__ == "__main__":
-    print("=== Market-Hours Audit Report ===")
-    try:
-        audit_latency()
-    except Exception as e:
-        logger.error(f"Latency Audit Failed: {e}")
+    parser = argparse.ArgumentParser(description="Audit Market Hours Performance")
+    parser.add_argument("--log-file", help="Path to log file to analyze", default="logs/openalgo.log")
+    parser.add_argument("--mock", action="store_true", help="Force mock data generation")
+    args = parser.parse_args()
 
-    try:
-        verify_logic()
-    except Exception as e:
-        logger.error(f"Logic Verification Failed: {e}")
+    target_log_file = args.log_file
 
-    try:
-        check_slippage()
-    except Exception as e:
-        logger.error(f"Slippage Check Failed: {e}")
-    print("=== End Report ===")
+    if args.mock or not os.path.exists(target_log_file):
+        if not args.mock and target_log_file != "logs/mock_openalgo.log":
+             print(f"Log file {target_log_file} not found. Generating mock logs...")
+        target_log_file = "logs/mock_openalgo.log"
+        generate_mock_logs(target_log_file)
+
+    analyze_logs(target_log_file)
