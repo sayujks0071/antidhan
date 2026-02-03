@@ -166,17 +166,19 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 ## 🛡️ System Audit & Performance (Feb 2026)
 
 ### Audit Findings
-- **High Correlation:** Strategies `SuperTrendVWAP`, `TrendPullback`, and `ORB` showed 100% correlation in recent logs. This poses a risk of simultaneous drawdowns.
-  - **Action:** Recommend consolidating capital into `SuperTrendVWAP` (Highest Calmar Ratio: ~17.7k) and investigating/diversifying the other two logic.
-- **Equity Curve Stress Test:**
-  - **Worst Day:** 2026-01-19.
-  - **Worst Strategy:** `TrendPullback` (relative to potential).
-  - The system has shown resilience but the lack of diversity in signals is a concern.
+- **Cross-Strategy Correlation:** Audit revealed **negative or low correlation** between `ORB`, `SuperTrendVWAP`, and `TrendPullback`. No consolidation required as strategies provide good diversification.
+- **Strategy Performance (Calmar Ratio):**
+  1. `SuperTrendVWAP`: 26.89 (Top Performer)
+  2. `ORB`: 12.94
+  3. `TrendPullback`: 11.37
+- **Root Cause Analysis (2026-01-19):**
+  - **Worst Strategy Drawdown:** `ORB` experienced a -27k drawdown despite ending positive.
+  - **Cause:** Signal Flickering/Conflicting Signals (simultaneous Long/Short entries within milliseconds).
+  - **Action:** Recommendation to implement signal debounce or candle-close confirmation for ORB.
 
 ### Infrastructure Upgrades
-- **Batch Data Fetching:** Implemented `get_batch_quotes` in Dhan sandbox and `APIClient` to reduce latency when tracking multiple instruments.
-- **Caching:** Added caching to `get_instruments` to minimize API load.
-- **Adaptive Sizing:** Updated `PositionManager` to include `calculate_adaptive_quantity`, allowing position sizing based on ATR volatility (Target Risk / ATR).
+- **Caching:** Implemented file-based caching (`pickle`) for `get_history` in Dhan Sandbox API to reduce latency and API load.
+- **Adaptive Sizing:** Updated `PositionManager` with `calculate_adaptive_quantity_monthly_atr` and integrated it into `SuperTrendVWAPStrategy`. Position sizing now adapts to **Monthly Volatility (35-day lookback)** rather than fixed sizing.
 
 ## 🚀 Ahead Roadmap
 
