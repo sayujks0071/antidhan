@@ -10,9 +10,10 @@ down_revision = '20251113_add_audit_action_enum'
 branch_labels = None
 depends_on = None
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # ⚠️ Must exactly match your models.AuditActionEnum values
 ENUM_NAME = "auditactionenum"
@@ -54,11 +55,11 @@ def upgrade():
         # Check if action is already enum type
         action_col = next((c for c in insp.get_columns("audit_logs") if c["name"] == "action"), None)
         is_enum = action_col and "enum" in str(action_col.get("type", "")).lower()
-        
+
         if not is_enum:
             # Create temp enum column
             op.add_column("audit_logs", sa.Column("action_enum_tmp", audit_enum, nullable=True))
-            
+
             # Map text->enum 1:1 (assumes values already match exactly; otherwise add CASE mapping)
             cases = "\n".join([f"WHEN action = '{v}' THEN '{v}'::" + ENUM_NAME for v in AUDIT_VALUES])
             op.execute(f"""
@@ -68,11 +69,11 @@ def upgrade():
                     ELSE NULL
                 END
             """)
-            
+
             # Drop old column and rename temp
             op.drop_column("audit_logs", "action")
             op.alter_column("audit_logs", "action_enum_tmp", new_column_name="action", existing_type=audit_enum, nullable=True)
-            
+
             # Create index if it doesn't exist
             try:
                 op.create_index("ix_audit_logs_action", "audit_logs", ["action"], unique=False)
@@ -116,7 +117,7 @@ def downgrade():
     if "action" in cols:
         action_col = next((c for c in insp.get_columns("audit_logs") if c["name"] == "action"), None)
         is_enum = action_col and "enum" in str(action_col.get("type", "")).lower()
-        
+
         if is_enum:
             op.add_column("audit_logs", sa.Column("action_text_tmp", sa.Text(), nullable=True))
             op.execute("UPDATE audit_logs SET action_text_tmp = action::text")

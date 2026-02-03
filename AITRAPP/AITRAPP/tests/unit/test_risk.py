@@ -1,6 +1,7 @@
 """Unit tests for risk management"""
-import pytest
 from datetime import datetime
+
+import pytest
 
 from packages.core.config import RiskConfig
 from packages.core.models import Instrument, InstrumentType, Signal, SignalSide
@@ -60,7 +61,7 @@ def sample_signal(sample_instrument):
 def test_position_sizing_basic(risk_manager, sample_signal, sample_instrument):
     """Test basic position sizing calculation"""
     net_liquid = 1000000  # 10 lakh
-    
+
     # Expected: (1000000 * 0.5%) / 100 = 50 quantity
     # With lot size 50, should be 1 lot = 50
     position_size = risk_manager.calculate_position_size(
@@ -68,7 +69,7 @@ def test_position_sizing_basic(risk_manager, sample_signal, sample_instrument):
         net_liquid=net_liquid,
         instrument=sample_instrument
     )
-    
+
     assert position_size == 50
     assert position_size % sample_instrument.lot_size == 0
 
@@ -76,16 +77,16 @@ def test_position_sizing_basic(risk_manager, sample_signal, sample_instrument):
 def test_position_sizing_lot_multiples(risk_manager, sample_signal, sample_instrument):
     """Test position sizing respects lot sizes"""
     net_liquid = 5000000  # 50 lakh
-    
+
     position_size = risk_manager.calculate_position_size(
         signal=sample_signal,
         net_liquid=net_liquid,
         instrument=sample_instrument
     )
-    
+
     # Should be multiple of lot size
     assert position_size % sample_instrument.lot_size == 0
-    
+
     # Should not exceed max multiplier (3 lots)
     assert position_size <= sample_instrument.lot_size * 3
 
@@ -104,9 +105,9 @@ def test_risk_check_passes(risk_manager, sample_signal):
         daily_loss_limit=-25000,
         max_portfolio_heat=20000
     )
-    
+
     result = risk_manager.check_signal(sample_signal, portfolio_risk)
-    
+
     assert result.approved is True
     assert result.position_size > 0
 
@@ -125,9 +126,9 @@ def test_risk_check_daily_loss_breach(risk_manager, sample_signal):
         daily_loss_limit=-25000,
         max_portfolio_heat=20000
     )
-    
+
     result = risk_manager.check_signal(sample_signal, portfolio_risk)
-    
+
     assert result.approved is False
     assert "Daily loss limit breached" in result.reasons[0]
 
@@ -146,9 +147,9 @@ def test_risk_check_portfolio_heat_breach(risk_manager, sample_signal):
         daily_loss_limit=-25000,
         max_portfolio_heat=20000  # Max 2% heat
     )
-    
+
     result = risk_manager.check_signal(sample_signal, portfolio_risk)
-    
+
     assert result.approved is False
     assert "Portfolio heat limit breached" in result.reasons[0]
 
@@ -158,14 +159,14 @@ def test_fee_estimation(risk_manager, sample_instrument):
     quantity = 50
     entry_price = 22000.0
     exit_price = 22200.0
-    
+
     fees = risk_manager.estimate_fees(
         instrument=sample_instrument,
         quantity=quantity,
         entry_price=entry_price,
         exit_price=exit_price
     )
-    
+
     assert fees > 0
     assert fees < 1000  # Reasonable fee range
 
@@ -174,13 +175,13 @@ def test_margin_estimation(risk_manager, sample_instrument):
     """Test margin estimation"""
     quantity = 50
     price = 22000.0
-    
+
     margin = risk_manager.estimate_margin_required(
         instrument=sample_instrument,
         quantity=quantity,
         price=price
     )
-    
+
     # For futures, should be roughly 25% of notional
     notional = quantity * price
     assert margin > 0

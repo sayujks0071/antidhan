@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-import os
-import sys
+import glob
 import json
 import logging
-import subprocess
+import os
 import shutil
-import glob
+import subprocess
+import sys
 from datetime import datetime, timedelta
+
 import httpx
 import pandas as pd
 
@@ -190,7 +191,7 @@ def validate_symbols():
         return
 
     try:
-        with open(CONFIG_FILE, 'r') as f:
+        with open(CONFIG_FILE) as f:
             content = f.read()
             if not content.strip():
                 configs = {}

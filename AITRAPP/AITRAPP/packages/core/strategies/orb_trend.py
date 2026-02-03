@@ -1,7 +1,8 @@
 """Opening Range Breakout (ORB) Strategy with Trend Filter"""
-import structlog
-import pandas as pd
 from typing import List
+
+import pandas as pd
+import structlog
 
 from packages.core.models import Signal, SignalSide
 from packages.core.strategies.base import StrategyContext

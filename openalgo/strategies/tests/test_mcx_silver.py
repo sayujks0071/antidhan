@@ -1,8 +1,9 @@
-import sys
 import os
-import pandas as pd
+import sys
 import unittest
 from unittest.mock import MagicMock
+
+import pandas as pd
 
 # Add scripts directory to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +19,7 @@ sys.path.insert(0, openalgo_dir)
 sys.path.insert(0, strategies_dir)
 
 import mcx_silver_momentum
+
 
 class TestMCXSilverMomentum(unittest.TestCase):
     def test_import(self):

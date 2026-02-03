@@ -1,7 +1,6 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import httpx
-import time
 import sys
 import os
 

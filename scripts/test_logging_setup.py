@@ -1,7 +1,6 @@
 import os
 import logging
 import sys
-import shutil
 
 # Ensure repo root is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))

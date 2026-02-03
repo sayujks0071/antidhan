@@ -1,13 +1,14 @@
-import unittest
 import asyncio
 import os
 import sys
+import unittest
 from datetime import datetime
 
 # Add repo root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from packages.core.runner import Runner
+
 
 class TestRunnerPaper(unittest.TestCase):
     def test_paper_local_fills(self):
@@ -16,7 +17,7 @@ class TestRunnerPaper(unittest.TestCase):
         runner = Runner("paper-local", "ORB", "NIFTY", data_dir="tests/fixtures")
 
         # Let's rewrite the test to use `unittest.mock` to verifying interactions
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         with patch('packages.core.runner.PaperSimulator') as MockSim:
             # Setup mock
@@ -38,7 +39,7 @@ class TestRunnerPaper(unittest.TestCase):
             mock_signal = MagicMock()
             mock_signal.side = "LONG" # Enums might be needed
             # Mock the StrategyContext and Signal
-            from packages.core.models import Signal, SignalSide, Instrument, InstrumentType
+            from packages.core.models import Instrument, InstrumentType, Signal, SignalSide
 
             inst = Instrument(
                 token=1, symbol="NIFTY", tradingsymbol="NIFTY25000CE",

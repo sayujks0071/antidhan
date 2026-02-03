@@ -1,9 +1,13 @@
 """Prometheus metrics for observability"""
+
 from prometheus_client import (
-    Counter, Histogram, Gauge, CollectorRegistry, 
-    generate_latest, CONTENT_TYPE_LATEST
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
 )
-from typing import Optional
 from starlette.responses import Response
 
 REGISTRY = CollectorRegistry()

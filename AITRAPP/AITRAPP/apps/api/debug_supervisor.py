@@ -1,12 +1,12 @@
 """Debug endpoints for supervisor control and inspection"""
-from fastapi import APIRouter, HTTPException
 import structlog
+from fastapi import APIRouter, HTTPException
 
 from apps.api.main import app_state
 from packages.core.metrics import (
+    scan_interval_seconds,
     scan_supervisor_state,
     scan_ticks_total,
-    scan_interval_seconds,
 )
 
 logger = structlog.get_logger(__name__)
@@ -43,7 +43,7 @@ async def supervisor_start():
     """Manually start the supervisor"""
     if not app_state.orchestrator:
         raise HTTPException(status_code=503, detail="Orchestrator not initialized")
-    
+
     try:
         await app_state.orchestrator.start()
         return await supervisor_status()
@@ -57,7 +57,7 @@ async def supervisor_stop():
     """Manually stop the supervisor"""
     if not app_state.orchestrator:
         raise HTTPException(status_code=503, detail="Orchestrator not initialized")
-    
+
     try:
         await app_state.orchestrator.stop()
         return await supervisor_status()

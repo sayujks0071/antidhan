@@ -3,10 +3,10 @@
 Monitor running strategies and their logs.
 """
 import os
+import re
+import subprocess
 import sys
 import time
-import subprocess
-import re
 from datetime import datetime
 
 # Adjust paths

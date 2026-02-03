@@ -5,19 +5,20 @@ Implements Walk-Forward Analysis (WFA) to validate strategy robustness
 and detect overfitting by testing on out-of-sample data.
 """
 import logging
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 # Add utils to path
 utils_path = Path(__file__).parent
 if str(utils_path) not in sys.path:
     sys.path.insert(0, str(utils_path))
 
+from optimization_engine import BayesianOptimizer, GridSearchOptimizer, calculate_composite_score
 from simple_backtest_engine import SimpleBacktestEngine
-from optimization_engine import GridSearchOptimizer, BayesianOptimizer, calculate_composite_score
 from strategy_param_injector import create_strategy_with_params
 
 logger = logging.getLogger("WalkForwardEngine")
@@ -58,7 +59,7 @@ class WalkForwardOptimizer:
         self.aggregated_trades = []
         self.equity_curve = []
 
-    def generate_windows(self) -> List[Dict[str, datetime]]:
+    def generate_windows(self) -> list[dict[str, datetime]]:
         """Generate (Train Start, Train End, Test Start, Test End) tuples"""
         windows = []
         current_train_start = self.start_date
@@ -83,7 +84,7 @@ class WalkForwardOptimizer:
 
         return windows
 
-    def run(self, optimization_method: str = 'grid', max_evals: int = 20) -> Dict[str, Any]:
+    def run(self, optimization_method: str = 'grid', max_evals: int = 20) -> dict[str, Any]:
         """
         Run the Walk-Forward Analysis.
 

@@ -1,9 +1,9 @@
-import requests
-import pandas as pd
+import logging
 from datetime import datetime, timedelta
 from io import StringIO
-import logging
-import time
+
+import pandas as pd
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class YahooSource:
                 return None
 
             if response.status_code == 429:
-                logger.warning(f"Rate limited by Yahoo.")
+                logger.warning("Rate limited by Yahoo.")
                 return None
 
             response.raise_for_status()

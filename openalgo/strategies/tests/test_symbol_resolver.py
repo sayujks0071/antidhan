@@ -1,8 +1,10 @@
-import unittest
 import os
-import pandas as pd
+import unittest
 from datetime import datetime, timedelta
+
+import pandas as pd
 from openalgo.strategies.utils.symbol_resolver import SymbolResolver
+
 
 class TestSymbolResolver(unittest.TestCase):
     def setUp(self):

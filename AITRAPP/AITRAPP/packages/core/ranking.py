@@ -4,9 +4,10 @@ import logging
 from decimal import Decimal
 from typing import Dict, List
 
-from packages.core.models import RankedCandidate, Signal, TechnicalIndicators
-from scipy import stats
 import numpy as np
+from scipy import stats
+
+from packages.core.models import RankedCandidate, Signal, TechnicalIndicators
 
 logger = logging.getLogger(__name__)
 
@@ -40,25 +41,25 @@ class RankingEngine:
         """
         if not signals:
             return []
-        
+
         candidates = []
-        
+
         for signal in signals:
             indicators = indicators_map.get(signal.instrument_token)
             liquidity = liquidity_scores.get(signal.instrument_token, 0.5)
-            
+
             # Calculate feature scores
             feature_scores = self._calculate_feature_scores(signal, indicators, liquidity)
-            
+
             # Calculate penalties
             penalty_scores = self._calculate_penalties(signal, indicators, liquidity)
-            
+
             # Calculate total score
             total_score = self._calculate_total_score(feature_scores, penalty_scores)
-            
+
             # Ensure score is between 0 and 1
             total_score = max(Decimal("0"), min(Decimal("1"), total_score))
-            
+
             candidate = RankedCandidate(
                 signal=signal,
                 score=total_score,
@@ -69,16 +70,16 @@ class RankingEngine:
                 liquidity_score=Decimal(str(liquidity)),
                 timestamp=signal.timestamp,
             )
-            
+
             candidates.append(candidate)
-        
+
         # Sort by score (descending)
         candidates.sort(key=lambda x: x.score, reverse=True)
-        
+
         # Assign ranks
         for i, candidate in enumerate(candidates):
             candidate.rank = i + 1
-        
+
         # Return top N
         return candidates[: self.top_n]
 
@@ -90,27 +91,27 @@ class RankingEngine:
     ) -> Dict[str, Decimal]:
         """Calculate normalized feature scores"""
         scores = {}
-        
+
         # Momentum score
         momentum_score = self._calculate_momentum_score(signal, indicators)
         scores["momentum"] = momentum_score * Decimal(str(self.weights.get("momentum", 0.25)))
-        
+
         # Trend score
         trend_score = self._calculate_trend_score(signal, indicators)
         scores["trend"] = trend_score * Decimal(str(self.weights.get("trend", 0.25)))
-        
+
         # Liquidity score
         liquidity_score = Decimal(str(liquidity))
         scores["liquidity"] = liquidity_score * Decimal(str(self.weights.get("liquidity", 0.20)))
-        
+
         # Regime score
         regime_score = self._calculate_regime_score(signal, indicators)
         scores["regime"] = regime_score * Decimal(str(self.weights.get("regime", 0.15)))
-        
+
         # R:R score
         rr_score = self._calculate_rr_score(signal)
         scores["rr"] = rr_score * Decimal(str(self.weights.get("rr", 0.15)))
-        
+
         return scores
 
     def _calculate_momentum_score(
@@ -119,9 +120,9 @@ class RankingEngine:
         """Calculate momentum score (0-1)"""
         if not indicators or not indicators.rsi:
             return Decimal("0.5")
-        
+
         rsi = float(indicators.rsi)
-        
+
         # Normalize RSI to 0-1 scale
         # RSI 30-70 is normal range, outside is extreme
         if 30 <= rsi <= 70:
@@ -139,7 +140,7 @@ class RankingEngine:
                 score = 0.7 + ((rsi - 70) / 30) * 0.3
             else:
                 score = 0.3
-        
+
         return Decimal(str(score))
 
     def _calculate_trend_score(
@@ -148,9 +149,9 @@ class RankingEngine:
         """Calculate trend alignment score (0-1)"""
         if not indicators:
             return Decimal("0.5")
-        
+
         score = 0.5
-        
+
         # Check EMA alignment
         if indicators.ema_34 and indicators.ema_89:
             if "LONG" in signal.signal_type.value:
@@ -159,7 +160,7 @@ class RankingEngine:
             elif "SHORT" in signal.signal_type.value:
                 if indicators.ema_34 < indicators.ema_89:
                     score += 0.2
-        
+
         # Check Supertrend alignment
         if indicators.supertrend_direction:
             if "LONG" in signal.signal_type.value:
@@ -168,13 +169,13 @@ class RankingEngine:
             elif "SHORT" in signal.signal_type.value:
                 if indicators.supertrend_direction < 0:
                     score += 0.2
-        
+
         # Check ADX for trend strength
         if indicators.adx:
             adx = float(indicators.adx)
             if adx > 25:
                 score += min(0.1, (adx - 25) / 100)
-        
+
         return Decimal(str(min(1.0, score)))
 
     def _calculate_regime_score(
@@ -189,7 +190,7 @@ class RankingEngine:
             return Decimal("0.5")
 
         score = 0.5
-        
+
         # 1. Historical Volatility Component (0.0 - 0.5)
         # Using annualized volatility (approx range 0.1 to 0.5 for normal markets)
         # We favor higher volatility (up to a point)
@@ -259,7 +260,7 @@ class RankingEngine:
     def _calculate_rr_score(self, signal: Signal) -> Decimal:
         """Calculate risk:reward score (0-1)"""
         rr = float(signal.expected_rr)
-        
+
         # Normalize R:R ratio
         # R:R >= 2.0 is excellent (score 1.0)
         # R:R = 1.0 is minimum (score 0.3)
@@ -269,7 +270,7 @@ class RankingEngine:
             score = 0.3 + ((rr - 1.0) / 1.0) * 0.7
         else:
             score = 0.1
-        
+
         return Decimal(str(score))
 
     def _calculate_penalties(
@@ -280,11 +281,11 @@ class RankingEngine:
     ) -> Dict[str, Decimal]:
         """Calculate penalty scores"""
         penalties_dict = {}
-        
+
         # Illiquidity penalty
         if liquidity < 0.3:
             penalties_dict["illiquid"] = Decimal(str(self.penalties.get("illiquid", -0.3)))
-        
+
         # Far from VWAP penalty
         if indicators and indicators.vwap and signal.entry_price:
             vwap_deviation = abs(
@@ -294,9 +295,9 @@ class RankingEngine:
                 penalties_dict["far_from_vwap"] = Decimal(
                     str(self.penalties.get("far_from_vwap", -0.2))
                 )
-        
+
         # TODO: Add "into_news" penalty when event calendar is integrated
-        
+
         return penalties_dict
 
     def _calculate_total_score(
@@ -305,10 +306,10 @@ class RankingEngine:
         """Calculate total score from features and penalties"""
         # Sum feature scores
         total = sum(feature_scores.values())
-        
+
         # Apply penalties
         total += sum(penalties.values())
-        
+
         return total
 
 
@@ -327,23 +328,23 @@ class FeatureNormalizer:
         """
         if feature_name not in self.feature_history:
             self.feature_history[feature_name] = []
-        
+
         history = self.feature_history[feature_name]
         history.append(value)
-        
+
         # Keep only recent history
         if len(history) > self.max_history:
             history.pop(0)
-        
+
         if len(history) < 2:
             return 0.0
-        
+
         mean = np.mean(history)
         std = np.std(history)
-        
+
         if std == 0:
             return 0.0
-        
+
         z_score = (value - mean) / std
         return float(z_score)
 
@@ -355,16 +356,16 @@ class FeatureNormalizer:
         """
         if feature_name not in self.feature_history:
             self.feature_history[feature_name] = []
-        
+
         history = self.feature_history[feature_name]
         history.append(value)
-        
+
         if len(history) > self.max_history:
             history.pop(0)
-        
+
         if len(history) < 2:
             return 0.5
-        
+
         percentile = stats.percentileofscore(history, value) / 100.0
         return percentile
 

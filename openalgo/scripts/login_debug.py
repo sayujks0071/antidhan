@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-import sys
-import os
-import time
-import requests
-import socket
-import logging
 import json
+import logging
+import os
+import socket
+import sys
+import time
+
+import requests
 
 # Add repo root to path
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
@@ -27,7 +28,7 @@ from openalgo.utils.env_check import load_and_check_env_variables
 load_and_check_env_variables()
 
 try:
-    from openalgo.database.auth_db import get_auth_token_dbquery, Auth, db_session, decrypt_token
+    from openalgo.database.auth_db import Auth, db_session, decrypt_token, get_auth_token_dbquery
     DB_AVAILABLE = True
 except ImportError:
     logger.error("DB Module Import Failed")
@@ -151,7 +152,7 @@ def check_strategy_auth():
         return
 
     try:
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             strategies = json.load(f)
 
         count = len(strategies)

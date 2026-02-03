@@ -12,21 +12,21 @@ Usage:
   python scripts/kite_auth_bootstrap.py [--check-only] [--port PORT]
 """
 
-import sys
-import os
 import argparse
 import logging
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+import os
+import sys
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
+
 from dotenv import load_dotenv
 
 # Ensure src is in python path
 sys.path.insert(0, os.getcwd())
 
 from src.auth.kite_auth import KiteAuth
-from packages.core.config import AppMode
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

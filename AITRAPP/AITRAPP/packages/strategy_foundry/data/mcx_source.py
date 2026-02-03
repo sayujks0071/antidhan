@@ -1,8 +1,9 @@
-import requests
-import pandas as pd
-from datetime import datetime, timedelta
 import logging
 import time
+from datetime import datetime, timedelta
+
+import pandas as pd
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -79,11 +80,11 @@ class MCXSource:
                 return None
 
             if response.status_code == 403:
-                logger.error(f"API key invalid or insufficient permissions.")
+                logger.error("API key invalid or insufficient permissions.")
                 return None
 
             if response.status_code == 429:
-                logger.warning(f"Rate limited by OpenAlgo.")
+                logger.warning("Rate limited by OpenAlgo.")
                 time.sleep(2)
                 return None
 

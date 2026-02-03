@@ -1,7 +1,10 @@
-import unittest
 import os
+import unittest
+
 import pandas as pd
+
 from packages.strategy_foundry.data.loader import DataLoader
+
 
 class TestLoader(unittest.TestCase):
     def test_cache_path(self):

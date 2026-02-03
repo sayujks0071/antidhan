@@ -9,9 +9,10 @@ revision = '20251113_add_audit_action_enum'
 down_revision = None
 branch_labels = None
 depends_on = None
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # Keep the enum name EXACTLY as in models.py to avoid type drift
 AUDIT_ENUM_NAME = "auditactionenum"
