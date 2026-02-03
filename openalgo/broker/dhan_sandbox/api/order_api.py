@@ -272,6 +272,12 @@ def place_smartorder_api(data, auth):
         tuple: (response_object, response_dict, order_id)
     """
     AUTH_TOKEN = auth
+
+    # 1. Error handling for Invalid Token (Auth Token)
+    if not auth:
+        logger.error("Invalid Token: Authentication token is missing or empty")
+        return None, {"status": "error", "message": "Invalid Token"}, None
+
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
     # If no API call is made in this function then res will return None
     res = None
@@ -282,10 +288,40 @@ def place_smartorder_api(data, auth):
     product = data.get("product")
     position_size = int(data.get("position_size", "0"))
 
-    # Get current open position for the symbol
-    current_position = int(
-        get_open_position(symbol, exchange, map_product_type(product), AUTH_TOKEN)
-    )
+    # 2. Error handling for SecurityId Required
+    token = get_token(symbol, exchange)
+    if not token:
+        logger.error(f"SecurityId Required: Token not found for {symbol} {exchange}")
+        return None, {"status": "error", "message": "SecurityId Required"}, None
+
+    # Get current open position for the symbol with robust error handling
+    # Instead of calling get_open_position which swallows errors, we implement logic here
+    tradingsymbol = get_br_symbol(symbol, exchange)
+    positions_data = get_positions(AUTH_TOKEN)
+
+    # Check if positions_data is an error response
+    if isinstance(positions_data, dict) and (
+        positions_data.get("errorType")
+        or positions_data.get("status") == "failed"
+        or positions_data.get("status") == "error"
+    ):
+        error_msg = positions_data.get("errorMessage", "API Error fetching positions")
+        logger.error(f"Error getting positions for {symbol}: {error_msg}")
+        return None, {"status": "error", "message": error_msg}, None
+
+    current_position = 0
+    # Only process if positions_data is valid and not an error
+    if positions_data and isinstance(positions_data, list):
+        mapped_product = map_product_type(product)
+        mapped_exchange = map_exchange_type(exchange)
+        for position in positions_data:
+            if (
+                position.get("tradingSymbol") == tradingsymbol
+                and position.get("exchangeSegment") == mapped_exchange
+                and position.get("productType") == mapped_product
+            ):
+                current_position = int(position.get("netQty", "0"))
+                break
 
     logger.info(f"position_size : {position_size}")
     logger.info(f"Open Position : {current_position}")
