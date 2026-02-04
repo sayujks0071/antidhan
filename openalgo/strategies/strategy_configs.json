@@ -25,7 +25,7 @@
     "id": "NSE_MOMENTUM_BREAKOUT",
     "name": "NSE Momentum Breakout",
     "description": "Trend following strategy using SuperTrend and RSI",
-    "file_path": "strategies/scripts/nse_momentum_breakout.py",
+    "file_path": "strategies/scripts/mcx_silver_momentum.py",
     "user_id": "system",
     "created_at": "2026-02-03T10:00:00",
     "symbol": "RELIANCE",
