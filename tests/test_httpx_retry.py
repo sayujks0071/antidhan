@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 import httpx
 import sys
+# Test suite for httpx retry logic
 import os
 
 # Add openalgo to sys.path so 'utils' can be imported as expected by the module

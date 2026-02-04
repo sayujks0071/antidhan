@@ -3,6 +3,7 @@ import re
 import logging
 import argparse
 from datetime import datetime, timedelta
+# Audit script for market hours performance verification
 import random
 
 # Ensure logs directory exists
