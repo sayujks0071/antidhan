@@ -25,7 +25,8 @@ sys.path.insert(0, utils_dir)
 try:
     from trading_utils import (
         APIClient, PositionManager, is_market_open, normalize_symbol,
-        calculate_rsi, calculate_atr, calculate_bollinger_bands
+        calculate_rsi, calculate_atr, calculate_bollinger_bands,
+        get_vix_value, fetch_sector_data
     )
 except ImportError:
     try:
@@ -33,13 +34,15 @@ except ImportError:
         sys.path.insert(0, strategies_dir)
         from utils.trading_utils import (
             APIClient, PositionManager, is_market_open, normalize_symbol,
-            calculate_rsi, calculate_atr, calculate_bollinger_bands
+            calculate_rsi, calculate_atr, calculate_bollinger_bands,
+            get_vix_value, fetch_sector_data
         )
     except ImportError:
         try:
             from openalgo.strategies.utils.trading_utils import (
                 APIClient, PositionManager, is_market_open, normalize_symbol,
-                calculate_rsi, calculate_atr, calculate_bollinger_bands
+                calculate_rsi, calculate_atr, calculate_bollinger_bands,
+                get_vix_value, fetch_sector_data
             )
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
@@ -140,15 +143,7 @@ class AIHybridStrategy:
 
     def get_market_context(self):
         # Fetch VIX
-        vix = 15.0
-        try:
-            vix_df = self.client.history("INDIA VIX", exchange="NSE_INDEX", interval="day",
-                                       start_date=(datetime.now()-timedelta(days=5)).strftime("%Y-%m-%d"),
-                                       end_date=datetime.now().strftime("%Y-%m-%d"))
-            if not vix_df.empty:
-                vix = vix_df['close'].iloc[-1]
-        except Exception as e:
-            self.logger.warning(f"VIX fetch failed: {e}")
+        vix = get_vix_value(self.client)
 
         # Fetch Breadth (Placeholder for now, usually requires full market scan or index internals)
         # We can use NIFTY Trend as a proxy for breadth health
@@ -196,14 +191,9 @@ class AIHybridStrategy:
 
     def check_sector_strength(self):
         try:
-            sector_symbol = normalize_symbol(self.sector)
-            
-            # Use NSE_INDEX for index symbols
-            exchange = "NSE_INDEX" if "NIFTY" in sector_symbol.upper() else "NSE"
             # Request 60 days to ensure we have at least 20 trading days (accounting for weekends/holidays)
-            df = self.client.history(symbol=sector_symbol, interval="D", exchange=exchange,
-                                start_date=(datetime.now()-timedelta(days=60)).strftime("%Y-%m-%d"),
-                                end_date=datetime.now().strftime("%Y-%m-%d"))
+            df = fetch_sector_data(self.client, self.sector, days=60)
+
             if df.empty or len(df) < 20:
                 self.logger.warning(f"Insufficient data for sector strength check ({len(df)} rows). Defaulting to allow trades.")
                 return True

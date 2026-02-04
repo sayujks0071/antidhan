@@ -33,6 +33,7 @@ try:
         calculate_atr,
         calculate_intraday_vwap,
         calculate_rsi,
+        get_vix_value,
         is_market_open,
         normalize_symbol,
     )
@@ -49,6 +50,7 @@ except ImportError:
             calculate_atr,
             calculate_intraday_vwap,
             calculate_rsi,
+            get_vix_value,
             is_market_open,
             normalize_symbol,
         )
@@ -65,6 +67,7 @@ except ImportError:
             calculate_atr,
             calculate_intraday_vwap,
             calculate_rsi,
+            get_vix_value,
             is_market_open,
             normalize_symbol,
         )
@@ -280,21 +283,7 @@ class BaseStrategy:
 
     def get_vix(self):
         """Fetch real VIX or default to 15.0."""
-        try:
-            vix_df = self.client.history(
-                symbol="INDIA VIX",
-                exchange="NSE_INDEX",
-                interval="1d",
-                start_date=(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d"),
-                end_date=datetime.now().strftime("%Y-%m-%d")
-            )
-            if not vix_df.empty:
-                vix = vix_df.iloc[-1]['close']
-                self.logger.debug(f"Fetched VIX: {vix}")
-                return vix
-        except Exception as e:
-            self.logger.warning(f"Could not fetch VIX: {e}. Defaulting to 15.0.")
-        return 15.0
+        return get_vix_value(self.client)
 
     def calculate_rsi(self, series, period=14):
         """Calculate Relative Strength Index."""
