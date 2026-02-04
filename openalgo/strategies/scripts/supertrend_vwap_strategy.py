@@ -5,24 +5,24 @@
 SuperTrend VWAP Strategy
 VWAP mean reversion with volume profile analysis, Enhanced Sector RSI Filter, and Dynamic Risk.
 """
-import os
-import sys
 import logging
 import pandas as pd
 
-# Add repo root to path to allow imports (if running as script)
+# Use strategy_loader to handle paths and imports
 try:
-    from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+    from strategy_loader import BaseStrategy, normalize_symbol, analyze_volume_profile
 except ImportError:
-    # Try setting path to find utils
+    # Fallback for direct execution if loader not found (should not happen if loader is used)
+    import sys
+    import os
     script_dir = os.path.dirname(os.path.abspath(__file__))
     strategies_dir = os.path.dirname(script_dir)
     utils_dir = os.path.join(strategies_dir, 'utils')
     if utils_dir not in sys.path:
         sys.path.insert(0, utils_dir)
     from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+    from trading_utils import normalize_symbol, analyze_volume_profile
+
 
 class SuperTrendVWAPStrategy(BaseStrategy):
     def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
@@ -40,7 +40,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         self.sector_benchmark = sector_benchmark
 
         # Optimization Parameters
-        self.threshold = 150 # Note: This parameter was previously unused in logic. Keeping for compatibility but ignoring.
+        self.threshold = 150
         self.stop_pct = 1.8
         self.adx_threshold = 20
         self.adx_period = 14
@@ -60,32 +60,27 @@ class SuperTrendVWAPStrategy(BaseStrategy):
     def parse_arguments(cls, args):
         kwargs = super().parse_arguments(args)
         kwargs['sector_benchmark'] = args.sector
-        # BaseStrategy already extracts log_file from args.logfile
         return kwargs
 
     def cycle(self):
         """
         Main Strategy Logic Execution Cycle
         """
-        exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper() else "NSE"
+        # Fetch data and calculate indicators in one go
+        # Note: fetch_history is called internally by prepare_data
+        df = self.prepare_data(days=30, indicators=['vwap', 'atr'])
 
-        # Increased lookback to 30 days to handle weekends/data gaps better
-        df = self.fetch_history(days=30, exchange=exchange)
         if df.empty or len(df) < 50:
             self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows. Need at least 50.")
             return
 
-        # Pre-process
-        try:
-            df = self.calculate_intraday_vwap(df)
-            if 'vwap' not in df.columns or 'vwap_dev' not in df.columns:
-                self.logger.error("VWAP calculation failed - missing required columns")
-                return
-        except Exception as e:
-            self.logger.error(f"VWAP calc failed: {e}", exc_info=True)
+        if 'vwap' not in df.columns or 'vwap_dev' not in df.columns:
+            self.logger.error("VWAP calculation failed - missing required columns")
             return
 
-        self.atr = self.calculate_atr(df)
+        # ATR is now a Series in df['atr'] if added by prepare_data, or we can get scalar
+        # prepare_data adds 'atr' column as rolling ATR
+        self.atr = df['atr'].iloc[-1]
         last = df.iloc[-1]
 
         # Volume Profile
@@ -93,17 +88,16 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Dynamic Deviation based on VIX
         vix = self.get_vix()
-        dev_threshold = 0.03 # Increased from 0.02 to allow more entries
+        dev_threshold = 0.03
         size_multiplier = 1.0
 
-        # Relaxed VIX thresholds to prevent total rejection
         if vix > 25:
-            dev_threshold = 0.012 # Increased from 0.008
+            dev_threshold = 0.012
             size_multiplier = 0.5
         elif vix > 20:
-            dev_threshold = 0.025 # Increased from 0.015
+            dev_threshold = 0.025
         elif vix < 12:
-            dev_threshold = 0.04 # Increased from 0.03
+            dev_threshold = 0.04
 
         # Indicators
         is_above_vwap = last['close'] > last['vwap']
@@ -138,7 +132,8 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 self.trailing_stop = 0.0
         else:
             # Entry Logic
-            sector_bullish = self.check_sector_correlation()
+            # Use BaseStrategy's check_sector_correlation
+            sector_bullish = self.check_sector_correlation(self.sector_benchmark)
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
                 adj_qty = int(self.quantity * size_multiplier)
@@ -148,22 +143,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 self.execute_trade('BUY', adj_qty, last['close'])
                 sl_mult = getattr(self, 'ATR_SL_MULTIPLIER', 3.0)
                 self.trailing_stop = last['close'] - (sl_mult * self.atr)
-
-    def check_sector_correlation(self):
-        try:
-            sector_symbol = normalize_symbol(self.sector_benchmark)
-
-            df = self.fetch_history(days=30, symbol=sector_symbol, interval="D", exchange="NSE_INDEX")
-
-            if not df.empty and len(df) > 15:
-                rsi = self.calculate_rsi(df['close'])
-                last_rsi = rsi.iloc[-1]
-                self.logger.info(f"Sector {self.sector_benchmark} RSI: {last_rsi:.2f}")
-                return last_rsi > 50
-            return False
-        except Exception as e:
-            self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True (Allow) to prevent blocking on data issues.")
-            return True
 
     def generate_signal(self, df):
         """
@@ -177,14 +156,12 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         except:
             return 'HOLD', {}, {}
 
+        # calculate_atr is now on BaseStrategy
         self.atr = self.calculate_atr(df)
         last = df.iloc[-1]
 
         poc_price, poc_vol = self.analyze_volume_profile(df)
 
-        # Mock VIX for backtest if not available
-        vix = 15.0
-        # Relaxed dev_threshold for backtest as well
         dev_threshold = 0.03
 
         # Logic
@@ -206,7 +183,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         adx = self.calculate_adx(df, period=self.adx_period)
         is_strong_trend = adx > self.adx_threshold
 
-        sector_bullish = True # Assumed for backtest
+        sector_bullish = True
 
         details = {
             'close': last['close'],

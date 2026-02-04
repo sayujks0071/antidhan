@@ -135,6 +135,15 @@ class BaseStrategy:
 
         # 2. Try database
         try:
+            # Ensure path is set before importing database
+            self._add_project_root_to_path()
+
+            # Check if API_KEY_PEPPER is set, otherwise DB init might fail
+            if not os.getenv('API_KEY_PEPPER'):
+                 if hasattr(self, 'logger'):
+                    self.logger.warning("API_KEY_PEPPER not set. Skipping DB key resolution.")
+                 return None
+
             from database.auth_db import get_first_available_api_key
             key = get_first_available_api_key()
             if key:
@@ -145,10 +154,11 @@ class BaseStrategy:
             # Database module not available or path issue
             pass
         except Exception as e:
+            msg = f"Failed to fetch API key from DB: {e}"
             if hasattr(self, 'logger'):
-                self.logger.warning(f"Failed to fetch API key from DB: {e}")
+                self.logger.warning(msg)
             else:
-                print(f"Warning: Failed to fetch API key from DB: {e}")
+                print(f"Warning: {msg}")
 
         return None
 
@@ -277,6 +287,92 @@ class BaseStrategy:
         except Exception as e:
             self.logger.error(f"Failed to fetch history for {target_symbol}: {e}")
             return pd.DataFrame()
+
+    def prepare_data(self, days=30, indicators=None):
+        """
+        Fetch history and calculate standard indicators in one go.
+
+        Args:
+            days (int): Number of days of history to fetch.
+            indicators (list): List of indicators to calculate: ['vwap', 'atr', 'rsi', 'adx', 'poc']
+
+        Returns:
+            pd.DataFrame: DataFrame with indicators, or empty if fetch failed.
+        """
+        # Determine exchange - NIFTY indices often need NSE_INDEX
+        exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper() else self.exchange
+
+        df = self.fetch_history(days=days, exchange=exchange)
+        if df.empty:
+            self.logger.warning(f"No data fetched for {self.symbol}")
+            return df
+
+        if not indicators:
+            return df
+
+        try:
+            if 'vwap' in indicators:
+                df = self.calculate_intraday_vwap(df)
+
+            if 'atr' in indicators:
+                # Add atr column? calculate_atr returns a Series (scalar for last value in existing method)
+                # We need a rolling ATR series
+                # Existing calculate_atr(df) returns only the last scalar value!
+                # We need to use the util function directly if we want the series
+                try:
+                     # Attempt relative import if in package
+                     from .trading_utils import calculate_atr
+                except ImportError:
+                     from trading_utils import calculate_atr
+
+                df['atr'] = calculate_atr(df)
+
+            if 'rsi' in indicators:
+                df['rsi'] = self.calculate_rsi(df['close'])
+
+            if 'adx' in indicators:
+                try:
+                     from .trading_utils import calculate_adx
+                except ImportError:
+                     from trading_utils import calculate_adx
+
+                df['adx'] = calculate_adx(df)
+
+            if 'poc' in indicators:
+                # POC is a single value, not a series usually.
+                # Just store it as a property or return it?
+                # prepare_data returns a DF.
+                # Maybe just skip POC here as it's an analysis step.
+                pass
+
+        except Exception as e:
+            self.logger.error(f"Error calculating indicators: {e}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
+
+        return df
+
+    def check_sector_correlation(self, sector_benchmark=None, threshold=50):
+        """
+        Check if sector is bullish (RSI > threshold).
+        """
+        if not sector_benchmark:
+            return True # No sector check requested
+
+        try:
+            sector_symbol = normalize_symbol(sector_benchmark)
+            # Use separate client or same?
+            df = self.fetch_history(days=30, symbol=sector_symbol, interval="D", exchange="NSE_INDEX")
+
+            if not df.empty and len(df) > 15:
+                rsi = self.calculate_rsi(df['close'])
+                last_rsi = rsi.iloc[-1]
+                self.logger.info(f"Sector {sector_benchmark} RSI: {last_rsi:.2f}")
+                return last_rsi > threshold
+            return False
+        except Exception as e:
+            self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True.")
+            return True
 
     def get_vix(self):
         """Fetch real VIX or default to 15.0."""
