@@ -50,11 +50,17 @@ def generate_mock_logs(filepath):
             fill_time = order_time + timedelta(milliseconds=200) # Execution time
             f.write(f"{fill_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO Order Filled: BUY {symbol} @ {fill_price:.2f}\n")
 
+            # Simulate an occasional API error (for testing detection)
+            if i == 1: # Inject error for BANKNIFTY cycle
+                error_time = current_time + timedelta(seconds=5)
+                f.write(f"{error_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} ERROR Request to https://api.dhan.co/orders failed (HTTP 429). Retrying...\n")
+
 def analyze_logs(filepath):
     print(f"\nAnalyzing logs from {filepath}...")
 
     latency_records = []
     slippage_records = []
+    error_counts = {"429": 0, "500": 0, "timeout": 0, "other": 0}
 
     try:
         with open(filepath, "r") as f:
@@ -69,6 +75,9 @@ def analyze_logs(filepath):
     signal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Signal Generated: BUY (\w+) @ ([\d\.]+)")
     order_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Order Placed: BUY (\w+)")
     fill_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Order Filled: BUY (\w+) @ ([\d\.]+)")
+
+    # Error patterns
+    error_pattern = re.compile(r"ERROR.*(HTTP (\d{3})|timeout|failed)")
 
     for line in lines:
         # Check Signal
@@ -99,6 +108,22 @@ def analyze_logs(filepath):
                 sig_price = signal_map[symbol]['signal_price']
                 slippage = fill_price - sig_price
                 slippage_records.append({'symbol': symbol, 'slippage': slippage})
+            continue
+
+        # Check Errors
+        m_err = error_pattern.search(line)
+        if m_err:
+            error_cause = m_err.group(1)
+            status_code = m_err.group(2)
+
+            if status_code == "429":
+                error_counts["429"] += 1
+            elif status_code and status_code.startswith("5"):
+                error_counts["500"] += 1
+            elif "timeout" in line.lower():
+                error_counts["timeout"] += 1
+            else:
+                error_counts["other"] += 1
 
     # Report Latency
     print("\n--- Latency Audit ---")
@@ -115,14 +140,36 @@ def analyze_logs(filepath):
 
     # Report Slippage
     print("\n--- Slippage Check ---")
-    total_slippage = 0
+    slippage_by_symbol = {}
+
     for rec in slippage_records:
-        print(f"Symbol: {rec['symbol']}, Slippage: {rec['slippage']:.2f} pts")
-        total_slippage += rec['slippage']
+        sym = rec['symbol']
+        if sym not in slippage_by_symbol:
+            slippage_by_symbol[sym] = []
+        slippage_by_symbol[sym].append(rec['slippage'])
+
+    for sym, slips in slippage_by_symbol.items():
+        avg_sym_slippage = sum(slips) / len(slips)
+        print(f"Symbol: {sym}, Avg Slippage: {avg_sym_slippage:.2f} pts")
 
     if slippage_records:
+        total_slippage = sum(rec['slippage'] for rec in slippage_records)
         avg_slippage = total_slippage / len(slippage_records)
-        print(f"Average Slippage: {avg_slippage:.2f} pts")
+        print(f"Overall Average Slippage: {avg_slippage:.2f} pts")
+
+    # Report Errors
+    print("\n--- Error Handling Monitor ---")
+    print(f"HTTP 429 (Rate Limit): {error_counts['429']}")
+    print(f"HTTP 5xx (Server Error): {error_counts['500']}")
+    print(f"Timeouts: {error_counts['timeout']}")
+    print(f"Other Errors: {error_counts['other']}")
+
+    total_errors = sum(error_counts.values())
+    if total_errors > 0:
+         print(f"Total API Errors Detected: {total_errors}")
+         print("Recommendation: Ensure 'Retry-with-Backoff' is active in utils/httpx_client.py")
+    else:
+         print("No API errors detected.")
 
     # Logic Verification (Mock)
     print("\n--- Logic Verification ---")
