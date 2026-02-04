@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-import sys
-import os
-import requests
-import socket
 import datetime
-import logging
 import json
+import logging
+import os
+import socket
+import sys
+
+import requests
 
 # Add repo root to path
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
@@ -32,7 +33,7 @@ except Exception as e:
 
 # Import DB stuff
 try:
-    from openalgo.database.auth_db import get_auth_token_dbquery, Auth, db_session, decrypt_token
+    from openalgo.database.auth_db import Auth, db_session, decrypt_token, get_auth_token_dbquery
     from openalgo.database.user_db import User
     DB_AVAILABLE = True
 except ImportError as e:
@@ -70,7 +71,7 @@ def generate_auth_url(broker, api_key=None):
     elif broker == 'dhan':
         # Dhan usually uses a client ID based login or web flow
         client_id = os.getenv("BROKER_API_KEY", "").split(":::")[0] if ":::" in os.getenv("BROKER_API_KEY", "") else "YOUR_CLIENT_ID"
-        return f"https://auth.dhan.co/login"  # Generic login page as specific OAuth requires client setup
+        return "https://auth.dhan.co/login"  # Generic login page as specific OAuth requires client setup
     return "https://openalgo.in/brokers" # Fallback
 
 def get_db_token_status(broker_name):
@@ -140,7 +141,7 @@ def get_strategy_auth_status():
         return 0, 0, []
 
     try:
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             strategies = json.load(f)
 
         total = len(strategies)
@@ -162,12 +163,12 @@ def main():
     kite_api_up = check_url("http://127.0.0.1:5001/api/v1/user/profile") if kite_port_up else False
     kite_token_status, kite_expiry = get_db_token_status('zerodha')
 
-    print(f"✅ KITE CONNECT (Port 5001):")
+    print("✅ KITE CONNECT (Port 5001):")
     print(f"- Server Status: {'✅ Running' if kite_port_up else '🔴 Down'}")
     print(f"- Auth Token: {kite_token_status}")
     print(f"- Token Expiry: {kite_expiry}")
     print(f"- API Test: {'✅ Connected' if kite_api_up else ('⚠️ Failed' if kite_port_up else '🔴 Failed')}")
-    print(f"- Last Refresh: Unknown")
+    print("- Last Refresh: Unknown")
     print("")
 
     # DHAN (5002)
@@ -175,22 +176,22 @@ def main():
     dhan_api_up = check_url("http://127.0.0.1:5002/api/v1/user/profile") if dhan_port_up else False
     dhan_token_status, dhan_expiry = get_db_token_status('dhan')
 
-    print(f"✅ DHAN API (Port 5002):")
+    print("✅ DHAN API (Port 5002):")
     print(f"- Server Status: {'✅ Running' if dhan_port_up else '🔴 Down'}")
     print(f"- Access Token: {dhan_token_status}")
-    print(f"- Client ID: ✅ Configured")
+    print("- Client ID: ✅ Configured")
     print(f"- API Test: {'✅ Connected' if dhan_api_up else ('⚠️ Failed' if dhan_port_up else '🔴 Failed')}")
-    print(f"- Last Refresh: Unknown")
+    print("- Last Refresh: Unknown")
     print("")
 
     # OPENALGO AUTH
     oa_auth_status = check_openalgo_auth()
     strat_total, strat_valid, strat_errors = get_strategy_auth_status()
 
-    print(f"✅ OPENALGO AUTH:")
+    print("✅ OPENALGO AUTH:")
     print(f"- Login Status: {oa_auth_status}")
     print(f"- API Keys: {strat_valid}/{strat_total} strategies configured")
-    print(f"- CSRF Handling: ✅ Working")
+    print("- CSRF Handling: ✅ Working")
     print("")
 
     # ISSUES
@@ -207,19 +208,19 @@ def main():
 
     if "Valid" not in kite_token_status:
         issues.append("Kite Token Invalid -> Expired/Missing")
-        actions_taken.append(f"Generated Kite Auth URL")
+        actions_taken.append("Generated Kite Auth URL")
         manual_actions.append(f"Kite token expired. Visit: {generate_auth_url('zerodha')} to re-authenticate")
 
     if "Valid" not in dhan_token_status:
         issues.append("Dhan Token Invalid -> Expired/Missing")
-        actions_taken.append(f"Generated Dhan Auth URL")
+        actions_taken.append("Generated Dhan Auth URL")
         manual_actions.append(f"Dhan token expired. Visit: {generate_auth_url('dhan')} to re-authenticate")
 
     if "Unknown (DB Error)" in kite_token_status or "Unknown (DB Error)" in dhan_token_status:
          issues.append("DB Connectivity Error")
          manual_actions.append("Check Database configuration in .env")
 
-    print(f"⚠️ ISSUES DETECTED:")
+    print("⚠️ ISSUES DETECTED:")
     if issues:
         for i, issue in enumerate(issues, 1):
              print(f"{i}. {issue}")

@@ -1,6 +1,8 @@
-import pandas as pd
+from typing import Dict, List
+
 import numpy as np
-from typing import List, Dict
+import pandas as pd
+
 
 class Ranker:
     @staticmethod

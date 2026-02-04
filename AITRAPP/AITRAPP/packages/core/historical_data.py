@@ -1,15 +1,14 @@
 """Historical data loader for NSE options CSV files"""
-import csv
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 import structlog
 
-from packages.core.models import Bar, Instrument, InstrumentType, Tick
+from packages.core.models import Bar, Tick
 
 logger = structlog.get_logger(__name__)
 
@@ -23,7 +22,7 @@ class HistoricalDataLoader:
     LTP, Settle Price, No. of contracts, Turnover, Premium Turnover,
     Open Int, Change in OI, Underlying Value
     """
-    
+
     def __init__(self, data_dir: str = "docs/NSE OPINONS DATA"):
         self.data_dir = Path(data_dir)
         self._cache: Dict[str, pd.DataFrame] = {}
@@ -34,7 +33,7 @@ class HistoricalDataLoader:
             if fixtures_path.exists():
                 logger.warning(f"Data dir {self.data_dir} not found, falling back to {fixtures_path}")
                 self.data_dir = fixtures_path
-    
+
     def _validate_input(self, text: str):
         """Validate input to prevent path traversal"""
         if not re.match(r"^[a-zA-Z0-9_-]+$", text):
@@ -119,7 +118,7 @@ class HistoricalDataLoader:
         # Allow flexible filename matching in future, but stick to pattern for now
         filename = f"OPTIDX_{symbol}_{option_type}_12-Aug-2025_TO_12-Nov-2025.csv"
         filepath = self.data_dir / filename
-        
+
         if not filepath.exists():
             # Try finding any matching file if exact match fails
             pattern = f"OPTIDX_{symbol}_{option_type}*.csv"
@@ -129,7 +128,7 @@ class HistoricalDataLoader:
                 logger.info(f"Exact match not found, using {filepath.name}")
             else:
                 raise FileNotFoundError(f"Historical data file not found: {filepath}")
-        
+
         # Check cache
         cache_key = f"{filepath.name}"
         if cache_key in self._cache:
@@ -145,16 +144,16 @@ class HistoricalDataLoader:
             # Map common variations
             date_col = next((c for c in columns if c.lower() == 'date'), 'Date')
             expiry_col = next((c for c in columns if c.lower() == 'expiry'), 'Expiry')
-            
+
             # Load full CSV
             df = pd.read_csv(
                 filepath,
                 skipinitialspace=True,
             )
-            
+
             # Clean column names
             df.columns = df.columns.str.strip()
-            
+
             # Handle date parsing manually to be more robust
             if date_col in df.columns:
                 df['Date'] = pd.to_datetime(df[date_col], format='%d-%b-%Y', errors='coerce')
@@ -180,7 +179,7 @@ class HistoricalDataLoader:
                 'Open Int': ['Open Int', 'OI'],
                 'Underlying Value': ['Underlying Value', 'Spot']
             }
-            
+
             for standard_name, variations in numeric_mapping.items():
                 found_col = next((c for c in df.columns if c in variations), None)
                 if found_col:
@@ -190,29 +189,29 @@ class HistoricalDataLoader:
 
             # Drop rows with invalid dates
             df = df.dropna(subset=['Date'])
-            
+
             # Validate Data
             df = self.validate_data(df, filepath.name)
 
             # Cache
             self._cache[cache_key] = df
-        
+
         # Filter by date range
         if start_date:
             df = df[df['Date'] >= start_date]
         if end_date:
             df = df[df['Date'] <= end_date]
-        
+
         # Sort by date
         df = df.sort_values('Date')
-        
+
         logger.info(
             f"Loaded {len(df)} records for {symbol} {option_type}",
             date_range=(df['Date'].min(), df['Date'].max()) if len(df) > 0 else None
         )
-        
+
         return df
-    
+
     def get_options_chain(
         self,
         symbol: str,
@@ -233,26 +232,26 @@ class HistoricalDataLoader:
         # Load both CE and PE
         ce_df = self.load_file(symbol, "CE")
         pe_df = self.load_file(symbol, "PE")
-        
+
         # Filter by date
         ce_df = ce_df[ce_df['Date'] == date]
         pe_df = pe_df[pe_df['Date'] == date]
-        
+
         # Filter by expiry if specified
         if expiry:
             ce_df = ce_df[ce_df['Expiry'] == expiry]
             pe_df = pe_df[pe_df['Expiry'] == expiry]
-        
+
         # Combine
         ce_df['Option type'] = 'CE'
         pe_df['Option type'] = 'PE'
-        
+
         chain = pd.concat([ce_df, pe_df], ignore_index=True)
         if not chain.empty:
             chain = chain.sort_values(['Strike Price', 'Option type'])
-        
+
         return chain
-    
+
     def get_strike_data(
         self,
         symbol: str,
@@ -275,12 +274,12 @@ class HistoricalDataLoader:
             DataFrame with time series for the strike
         """
         df = self.load_file(symbol, option_type, start_date, end_date)
-        
+
         # Filter by strike
         df = df[df['Strike Price'] == strike]
-        
+
         return df.sort_values('Date')
-    
+
     def convert_to_bars(
         self,
         df: pd.DataFrame,
@@ -311,13 +310,13 @@ class HistoricalDataLoader:
         highs = df['High'].to_numpy()
         lows = df['Low'].to_numpy()
         closes = df['Close'].to_numpy()
-        
+
         # Handle volume and OI with fallbacks
         if 'No. of contracts' in df.columns:
             volumes = df['No. of contracts'].fillna(0).astype(int).to_numpy()
         else:
             volumes = np.zeros(len(df), dtype=int)
-            
+
         if 'Open Int' in df.columns:
             # Replace NaN with None safely
             ois = df['Open Int'].astype(object).where(pd.notna(df['Open Int']), None).to_numpy()
@@ -340,7 +339,7 @@ class HistoricalDataLoader:
             )
             for ts, o, h, l, c, v, oi in zip(dates, opens, highs, lows, closes, volumes, ois)
         ]
-    
+
     def convert_to_ticks(
         self,
         df: pd.DataFrame,
@@ -372,7 +371,7 @@ class HistoricalDataLoader:
         highs = df['High'].to_numpy()
         lows = df['Low'].to_numpy()
         closes = df['Close'].to_numpy()
-        
+
         # LTP with fallback to Close
         if 'LTP' in df.columns:
             # Use where to handle NaNs in LTP
@@ -416,7 +415,7 @@ class HistoricalDataLoader:
             )
             for ts, lp, v, o, h, l, c, oi in zip(dates, last_prices, volumes, opens, highs, lows, closes, ois)
         ]
-    
+
     def get_atm_strikes(
         self,
         symbol: str,
@@ -435,33 +434,33 @@ class HistoricalDataLoader:
             List of strike prices around ATM
         """
         chain = self.get_options_chain(symbol, date)
-        
+
         if chain.empty:
             return []
-        
+
         # Get underlying value (spot)
         underlying_value = chain['Underlying Value'].iloc[0] if 'Underlying Value' in chain.columns else None
-        
+
         if not underlying_value or pd.isna(underlying_value):
             # Estimate from strike prices if underlying is missing
             strikes = sorted(chain['Strike Price'].unique())
             if not strikes:
                 return []
             underlying_value = strikes[len(strikes) // 2]
-        
+
         # Find ATM strike (closest to underlying)
         strikes = sorted(chain['Strike Price'].unique())
         if not strikes:
             return []
 
         atm_idx = min(range(len(strikes)), key=lambda i: abs(strikes[i] - underlying_value))
-        
+
         # Get strikes around ATM
         start_idx = max(0, atm_idx - num_strikes)
         end_idx = min(len(strikes), atm_idx + num_strikes + 1)
-        
+
         return strikes[start_idx:end_idx]
-    
+
     def calculate_iv(
         self,
         symbol: str,
@@ -476,32 +475,32 @@ class HistoricalDataLoader:
         """
         df = self.get_strike_data(symbol, option_type, strike)
         row = df[df['Date'] == date]
-        
+
         if row.empty:
             return None
-        
+
         row = row.iloc[0]
         spot = row['Underlying Value']
         premium = row['LTP'] if pd.notna(row['LTP']) else row['Close']
         time_to_expiry = (expiry - date).days / 365.0
-        
+
         if time_to_expiry <= 0 or premium <= 0:
             return None
-        
+
         # Simplified IV calculation (placeholder)
         iv_estimate = abs(premium / spot) / (time_to_expiry ** 0.5) * 2
-        
+
         return min(max(iv_estimate, 0.05), 2.0)  # Clamp between 5% and 200%
-    
+
     def get_date_range(self, symbol: str, option_type: str) -> tuple[datetime, datetime]:
         """Get available date range for a symbol/type"""
         df = self.load_file(symbol, option_type)
-        
+
         if df.empty:
             return None, None
-        
+
         return df['Date'].min(), df['Date'].max()
-    
+
     def clear_cache(self):
         """Clear the data cache"""
         self._cache.clear()

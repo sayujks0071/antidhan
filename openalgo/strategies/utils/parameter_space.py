@@ -3,7 +3,8 @@ Parameter Space Definitions for Strategy Optimization
 ------------------------------------------------------
 Defines parameter ranges and constraints for optimizing MCX strategies.
 """
-from typing import Dict, List, Tuple, Any
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 
 # Parameter space definitions for each strategy
@@ -142,26 +143,26 @@ GRID_SEARCH_PARAMS = {
     }
 }
 
-def get_parameter_ranges(strategy_name: str) -> Dict[str, Dict[str, List]]:
+def get_parameter_ranges(strategy_name: str) -> dict[str, dict[str, list]]:
     """Get parameter ranges for a strategy"""
     return PARAMETER_SPACES.get(strategy_name, {})
 
-def get_grid_search_params(strategy_name: str) -> Dict[str, List]:
+def get_grid_search_params(strategy_name: str) -> dict[str, list]:
     """Get key parameters for grid search"""
     return GRID_SEARCH_PARAMS.get(strategy_name, {})
 
-def normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
+def normalize_weights(weights: dict[str, float]) -> dict[str, float]:
     """Normalize weights to sum to 1.0"""
     total = sum(weights.values())
     if total == 0:
         return weights
     return {k: v / total for k, v in weights.items()}
 
-def normalize_timeframe_weights(weights: Dict[str, float]) -> Dict[str, float]:
+def normalize_timeframe_weights(weights: dict[str, float]) -> dict[str, float]:
     """Normalize timeframe weights to sum to 1.0"""
     return normalize_weights(weights)
 
-def get_continuous_ranges(strategy_name: str) -> Dict[str, Tuple[float, float]]:
+def get_continuous_ranges(strategy_name: str) -> dict[str, tuple[float, float]]:
     """Get continuous parameter ranges for Bayesian optimization"""
     spaces = {
         'natural_gas_clawdbot': {

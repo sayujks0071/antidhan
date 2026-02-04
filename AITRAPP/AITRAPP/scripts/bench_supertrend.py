@@ -1,8 +1,11 @@
 
 import time
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+
 from packages.strategy_foundry.adapters.core_indicators import VectorIndicatorCalculator
+
 
 def run_benchmark():
     # Setup Data

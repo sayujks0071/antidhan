@@ -10,8 +10,9 @@ Shared utilities based on AITRAPP production-grade patterns:
 """
 import math
 from typing import Dict, Optional, Tuple
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 
 class ExitManager:
@@ -19,13 +20,13 @@ class ExitManager:
     Advanced exit management with multiple stop types.
     Based on AITRAPP packages/core/exits.py
     """
-    
+
     @staticmethod
     def check_volatility_stop(
         current_atr: float,
         baseline_atr: float,
         spike_multiplier: float = 2.0
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Check if volatility spike requires exit.
         
@@ -39,19 +40,19 @@ class ExitManager:
         """
         if baseline_atr <= 0:
             return False, ""
-        
+
         if current_atr > baseline_atr * spike_multiplier:
             return True, f"Volatility spike: ATR {current_atr:.2f} > {baseline_atr * spike_multiplier:.2f}"
-        
+
         return False, ""
-    
+
     @staticmethod
     def check_mae_stop(
         current_pnl: float,
         max_adverse: float,
         account_size: float,
         mae_limit_pct: float = 1.5
-    ) -> Tuple[bool, str, float]:
+    ) -> tuple[bool, str, float]:
         """
         Check Maximum Adverse Excursion (MAE) stop.
         
@@ -65,23 +66,23 @@ class ExitManager:
             (should_exit, reason, updated_max_adverse)
         """
         mae_limit = account_size * (mae_limit_pct / 100)
-        
+
         # Update max adverse if current loss is worse
         if current_pnl < max_adverse:
             max_adverse = current_pnl
-        
+
         # Check if MAE limit breached
         if abs(max_adverse) > mae_limit:
             return True, f"MAE stop: {max_adverse:.2f} exceeds limit {mae_limit:.2f}", max_adverse
-        
+
         return False, "", max_adverse
-    
+
     @staticmethod
     def check_time_stop(
         entry_time,
         current_time,
         max_hold_minutes: int
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Check if position should exit due to time limit.
         
@@ -94,12 +95,12 @@ class ExitManager:
             (should_exit, reason)
         """
         hold_minutes = (current_time - entry_time).total_seconds() / 60
-        
+
         if hold_minutes >= max_hold_minutes:
             return True, f"Time stop: held {hold_minutes:.1f} min (max {max_hold_minutes})"
-        
+
         return False, ""
-    
+
     @staticmethod
     def move_stop_to_breakeven(
         entry_price: float,
@@ -134,7 +135,7 @@ class PositionSizer:
     Better position sizing based on AITRAPP patterns.
     Based on AITRAPP packages/core/risk.py
     """
-    
+
     @staticmethod
     def calculate_position_size(
         option_ltp: float,
@@ -162,26 +163,26 @@ class PositionSizer:
         """
         if stop_distance <= 0:
             return 0
-        
+
         # Calculate risk amount
         risk_amount = net_liquid * (risk_pct / 100)
-        
+
         # Calculate quantity
         quantity = risk_amount / stop_distance
-        
+
         # Apply max position size multiplier
         max_quantity = lotsize * max_position_multiplier
         quantity = min(quantity, max_quantity)
-        
+
         # Round to lot size for F&O
         if lotsize > 1:
             lots = int(quantity / lotsize)
             lots = max(1, lots)  # At least 1 lot
             return lots * lotsize
-        
+
         # For non-F&O, round to integer
         return max(1, int(quantity))
-    
+
     @staticmethod
     def calculate_stop_distance(
         entry_price: float,
@@ -210,12 +211,12 @@ class PortfolioHeatTracker:
     Portfolio heat tracking - aggregate risk across all positions.
     Based on AITRAPP packages/core/risk.py
     """
-    
+
     def __init__(self, account_size: float, max_heat_pct: float = 2.0):
         self.account_size = account_size
         self.max_heat_pct = max_heat_pct
-        self.positions: Dict[str, Dict] = {}
-    
+        self.positions: dict[str, dict] = {}
+
     def add_position(
         self,
         position_id: str,
@@ -227,24 +228,24 @@ class PortfolioHeatTracker:
             'risk_amount': risk_amount,
             'entry_time': entry_time
         }
-    
+
     def remove_position(self, position_id: str):
         """Remove position from heat tracking"""
         if position_id in self.positions:
             del self.positions[position_id]
-    
+
     def get_total_risk(self) -> float:
         """Get total risk across all positions"""
         return sum(pos['risk_amount'] for pos in self.positions.values())
-    
+
     def get_portfolio_heat_pct(self) -> float:
         """Get portfolio heat as percentage of account"""
         total_risk = self.get_total_risk()
         if self.account_size > 0:
             return (total_risk / self.account_size) * 100
         return 0.0
-    
-    def can_take_new_position(self, new_risk_amount: float) -> Tuple[bool, str]:
+
+    def can_take_new_position(self, new_risk_amount: float) -> tuple[bool, str]:
         """
         Check if new position can be taken based on portfolio heat.
         
@@ -256,10 +257,10 @@ class PortfolioHeatTracker:
         """
         current_heat = self.get_portfolio_heat_pct()
         new_heat = ((self.get_total_risk() + new_risk_amount) / self.account_size) * 100
-        
+
         if new_heat > self.max_heat_pct:
             return False, f"Portfolio heat limit: {new_heat:.2f}% > {self.max_heat_pct}%"
-        
+
         return True, f"Heat OK: {new_heat:.2f}%"
 
 
@@ -268,7 +269,7 @@ class OptimizedIndicators:
     Optimized indicator calculations.
     Based on AITRAPP packages/core/indicators.py
     """
-    
+
     @staticmethod
     def calculate_tr(df: pd.DataFrame) -> pd.Series:
         """Calculate True Range (reused for ATR, ADX, Supertrend)"""
@@ -276,14 +277,14 @@ class OptimizedIndicators:
         high_close = (df["high"] - df["close"].shift()).abs()
         low_close = (df["low"] - df["close"].shift()).abs()
         return pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-    
+
     @staticmethod
     def calculate_atr(df: pd.DataFrame, period: int = 14, tr: pd.Series = None) -> pd.Series:
         """Calculate ATR (reuse TR if provided)"""
         if tr is None:
             tr = OptimizedIndicators.calculate_tr(df)
         return tr.rolling(window=period).mean()
-    
+
     @staticmethod
     def calculate_baseline_atr(df: pd.DataFrame, period: int = 14, lookback: int = 20) -> float:
         """
@@ -313,7 +314,7 @@ def calculate_iv_percentile_simplified(current_vix: float, vix_min: float = 10.0
     """
     if vix_max <= vix_min:
         return 50.0
-    
+
     iv_rank = ((current_vix - vix_min) / (vix_max - vix_min)) * 100
     return max(0.0, min(100.0, iv_rank))
 
@@ -341,18 +342,18 @@ def calculate_liquidity_score(
     """
     if ltp <= 0:
         return 0.0
-    
+
     # OI score (normalized)
     oi_score = min(1.0, oi / 1000000)  # 1M OI = max score
-    
+
     # Volume score (normalized)
     volume_score = min(1.0, volume / 100000)  # 100K volume = max score
-    
+
     # Spread score (lower spread = better)
     spread_pct = (ask - bid) / ltp if ltp > 0 else 1.0
     spread_score = max(0.0, 1.0 - (spread_pct * 10))  # 10% spread = 0 score
-    
+
     # Weighted average
     liquidity_score = (oi_score * 0.4) + (volume_score * 0.4) + (spread_score * 0.2)
-    
+
     return liquidity_score

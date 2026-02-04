@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Verify environment and connectivity before starting"""
 import os
-import sys
 import socket
+import sys
 from typing import List, Tuple
 
 required_env = [
     "KITE_API_KEY",
-    "KITE_API_SECRET", 
+    "KITE_API_SECRET",
     "KITE_ACCESS_TOKEN",
     "DATABASE_URL",
     "REDIS_URL",
@@ -48,14 +48,14 @@ def check_ports() -> bool:
 def main():
     """Run all checks"""
     print("🔍 Verifying environment and connectivity...\n")
-    
+
     env_ok = check_env()
     ports_ok = check_ports()
-    
+
     if not env_ok or not ports_ok:
         print("\n❌ Verification failed")
         sys.exit(1)
-    
+
     print("\n✅ All checks passed")
     sys.exit(0)
 

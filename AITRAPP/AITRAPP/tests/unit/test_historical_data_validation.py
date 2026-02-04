@@ -1,6 +1,8 @@
 import pandas as pd
 import pytest
+
 from packages.core.historical_data import HistoricalDataLoader
+
 
 class TestHistoricalDataValidation:
 

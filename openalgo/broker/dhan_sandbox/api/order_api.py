@@ -250,7 +250,27 @@ def place_order_api(data, auth):
     orderid = None
     if res.status_code == 200 or res.status_code == 201:
         if response_data and "orderId" in response_data:
-            orderid = response_data["orderId"]
+            # Check for immediate rejection in status
+            order_status = response_data.get("orderStatus")
+            if order_status in ["REJECTED", "FAILED"]:
+                logger.error(
+                    f"Order Rejected with ID {response_data['orderId']}: {response_data}"
+                )
+                orderid = None
+                # Ensure failure reason is propagated
+                if "message" not in response_data:
+                    reason = response_data.get("remarks") or response_data.get(
+                        "rejectReason"
+                    )
+                    if not reason and "data" in response_data:
+                        reason = response_data["data"].get("rejectReason")
+
+                    if reason:
+                        response_data["message"] = f"Order Rejected: {reason}"
+                    else:
+                        response_data["message"] = "Order Rejected by Broker"
+            else:
+                orderid = response_data["orderId"]
         else:
             logger.error(f"orderId not found in response: {response_data}")
     else:

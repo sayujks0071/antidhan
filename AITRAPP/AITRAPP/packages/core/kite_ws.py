@@ -1,8 +1,7 @@
 """Safe KiteTicker wrapper for graceful shutdown and reconnection"""
 import asyncio
-from typing import Optional
-import structlog
 
+import structlog
 from kiteconnect import KiteTicker
 
 logger = structlog.get_logger(__name__)
@@ -10,17 +9,17 @@ logger = structlog.get_logger(__name__)
 
 class SafeKiteTicker:
     """Wrapper around KiteTicker with defensive error handling"""
-    
+
     def __init__(self, ticker: KiteTicker):
         self.ticker = ticker
-    
+
     def stop(self) -> None:
         """Safely stop the ticker, handling missing attributes gracefully"""
         try:
             # Newer libs: .close() exists; older: .stop()
             close_fn = getattr(self.ticker, "close", None)
             stop_fn = getattr(self.ticker, "stop", None)
-            
+
             if callable(close_fn):
                 close_fn()
             elif callable(stop_fn):
@@ -32,12 +31,12 @@ class SafeKiteTicker:
             logger.warning(f"KiteTicker stop error (ignored): {e}", exc_info=False)
         except Exception as e:
             logger.warning(f"KiteTicker stop error: {e}", exc_info=False)
-    
+
     async def reconnect(self, delay: float = 1.0) -> None:
         """Stop and reconnect the ticker after a delay"""
         self.stop()
         await asyncio.sleep(delay)
-        
+
         try:
             start_fn = getattr(self.ticker, "connect", None) or getattr(self.ticker, "start", None)
             if callable(start_fn):

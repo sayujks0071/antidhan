@@ -1,8 +1,8 @@
-import os
 import logging
-from typing import Optional
-from kiteconnect import KiteConnect, exceptions
+import os
+
 import dotenv
+from kiteconnect import KiteConnect, exceptions
 
 logger = logging.getLogger(__name__)
 

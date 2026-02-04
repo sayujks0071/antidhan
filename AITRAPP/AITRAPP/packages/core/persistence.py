@@ -2,15 +2,22 @@
 import hashlib
 from datetime import datetime
 from typing import Optional
+
 import structlog
 
-from packages.storage.models import (
-    Signal, Decision, Order, OrderStatusEnum, OrderTypeEnum, OrderSideEnum,
-    DecisionStatusEnum, SideEnum
-)
-from packages.storage.database import get_db_session
-from packages.core.models import Signal as CoreSignal
 from packages.core.config import app_config
+from packages.core.models import Signal as CoreSignal
+from packages.storage.database import get_db_session
+from packages.storage.models import (
+    Decision,
+    DecisionStatusEnum,
+    Order,
+    OrderSideEnum,
+    OrderStatusEnum,
+    OrderTypeEnum,
+    SideEnum,
+    Signal,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -53,7 +60,7 @@ def persist_signal(
         db.add(signal_model)
         db.commit()
         db.refresh(signal_model)
-        
+
         logger.debug("Signal persisted", signal_id=signal_model.id, strategy=signal.strategy_name)
         return signal_model
 
@@ -73,7 +80,7 @@ def persist_decision(
     with get_db_session() as db:
         # Generate deterministic client_plan_id
         client_plan_id = f"PLAN_{signal_model.id}_{datetime.utcnow().isoformat()}"
-        
+
         decision_model = Decision(
             ts=datetime.utcnow(),
             signal_id=signal_model.id,
@@ -91,8 +98,8 @@ def persist_decision(
         db.add(decision_model)
         db.commit()
         db.refresh(decision_model)
-        
-        logger.debug("Decision persisted", 
+
+        logger.debug("Decision persisted",
                     decision_id=decision_model.id,
                     approved=approved,
                     client_plan_id=client_plan_id)
@@ -117,7 +124,7 @@ def persist_order(
     with get_db_session() as db:
         # Generate deterministic client_order_id
         client_order_id = f"{decision_model.client_plan_id}_{tag}_{datetime.utcnow().timestamp()}"
-        
+
         order_model = Order(
             ts=datetime.utcnow(),
             decision_id=decision_model.id,
@@ -140,8 +147,8 @@ def persist_order(
         db.add(order_model)
         db.commit()
         db.refresh(order_model)
-        
-        logger.debug("Order persisted", 
+
+        logger.debug("Order persisted",
                     order_id=order_model.id,
                     client_order_id=client_order_id,
                     tag=tag)
@@ -161,7 +168,7 @@ def update_order_status(
         if not order:
             logger.warning("Order not found for update", client_order_id=client_order_id)
             return None
-        
+
         if broker_order_id:
             order.broker_order_id = broker_order_id
         if status:
@@ -170,11 +177,11 @@ def update_order_status(
             order.filled_qty = filled_qty
         if average_price is not None:
             order.average_price = average_price
-        
+
         db.commit()
         db.refresh(order)
-        
-        logger.debug("Order updated", 
+
+        logger.debug("Order updated",
                     client_order_id=client_order_id,
                     status=status.value if status else None)
         return order

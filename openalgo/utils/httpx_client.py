@@ -4,9 +4,9 @@ with automatic protocol negotiation (HTTP/2 when available, HTTP/1.1 fallback).
 Includes Retry-with-Backoff logic for robust error handling.
 """
 
-from typing import Optional
 import os
 import time
+from typing import Optional
 
 import httpx
 

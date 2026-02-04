@@ -1,8 +1,13 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from packages.core.orchestrator import TradingOrchestrator
-from packages.storage.models import Position as DBPosition, PositionStatusEnum, SideEnum as DBSideEnum
+
 from packages.core.models import Instrument, InstrumentType
+from packages.core.orchestrator import TradingOrchestrator
+from packages.storage.models import Position as DBPosition
+from packages.storage.models import PositionStatusEnum
+from packages.storage.models import SideEnum as DBSideEnum
+
 
 @pytest.mark.asyncio
 async def test_recover_open_positions_populates_orchestrator_state():

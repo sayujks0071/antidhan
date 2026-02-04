@@ -1,5 +1,6 @@
 import random
 
+
 class ParameterSpace:
     INDICATORS = ['rsi', 'adx', 'ema', 'supertrend', 'bollinger', 'donchian', 'atr']
 

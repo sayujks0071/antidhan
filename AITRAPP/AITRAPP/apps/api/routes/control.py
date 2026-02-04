@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from packages.core.config import AppMode
 from packages.core.models import SystemState
-from packages.core.strategies import ORBStrategy, TrendPullbackStrategy, OptionsRankerStrategy
+from packages.core.strategies import OptionsRankerStrategy, ORBStrategy, TrendPullbackStrategy
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -46,14 +46,14 @@ async def change_mode(request: Request, mode_request: ModeChangeRequest) -> Mode
     state = request.app.state.aitrapp
     previous_mode = state.mode.value
     new_mode = mode_request.mode.upper()
-    
+
     # Validate mode
     if new_mode not in [AppMode.PAPER.value, AppMode.LIVE.value]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid mode: {new_mode}. Must be PAPER or LIVE",
         )
-    
+
     # Check if switching to LIVE
     if new_mode == AppMode.LIVE.value:
         if mode_request.confirmation != "CONFIRM LIVE TRADING":
@@ -61,15 +61,15 @@ async def change_mode(request: Request, mode_request: ModeChangeRequest) -> Mode
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="LIVE mode requires confirmation: 'CONFIRM LIVE TRADING'",
             )
-        
-        logger.critical(f"🔴 Switching to LIVE mode - real money at risk!")
-    
+
+        logger.critical("🔴 Switching to LIVE mode - real money at risk!")
+
     # Change mode
     state.mode = AppMode(new_mode)
     state.execution_engine.mode = AppMode(new_mode)
-    
+
     logger.warning(f"Mode changed: {previous_mode} → {new_mode}")
-    
+
     return ModeChangeResponse(
         previous_mode=previous_mode,
         new_mode=new_mode,
@@ -82,7 +82,7 @@ async def pause_trading(request: Request) -> Dict:
     """Pause all trading activity"""
     state = request.app.state.aitrapp
     await state.pause_trading()
-    
+
     return {
         "status": "PAUSED",
         "message": "All trading activity paused",
@@ -94,7 +94,7 @@ async def resume_trading(request: Request) -> Dict:
     """Resume trading activity"""
     state = request.app.state.aitrapp
     await state.resume_trading()
-    
+
     return {
         "status": "ACTIVE",
         "message": "Trading activity resumed",
@@ -113,9 +113,9 @@ async def activate_kill_switch(request: Request) -> Dict:
     """
     state = request.app.state.aitrapp
     result = await state.kill_switch()
-    
+
     logger.critical(f"Kill switch result: {result}")
-    
+
     return result
 
 
@@ -123,7 +123,7 @@ async def activate_kill_switch(request: Request) -> Dict:
 async def reload_universe(request: Request) -> Dict:
     """Reload trading universe"""
     state = request.app.state.aitrapp
-    
+
     # Rebuild universe
     count = await state.universe_builder.build_universe(
         indices=state.config.universe.indices,
@@ -131,12 +131,12 @@ async def reload_universe(request: Request) -> Dict:
         top_n_stocks=state.config.universe.fo_stocks_liquidity_rank_top_n,
         exclude_fo_ban=state.config.universe.exclude_fo_ban,
     )
-    
+
     # Resubscribe to WebSocket
     if state.websocket_manager:
         universe_tokens = list(state.universe_builder.get_universe_tokens())
         state.websocket_manager.subscribe(universe_tokens, mode="full")
-    
+
     return {
         "status": "SUCCESS",
         "instruments_count": len(count),
@@ -148,7 +148,7 @@ async def reload_universe(request: Request) -> Dict:
 async def reload_strategies(request: Request) -> Dict:
     """Reload strategy configurations"""
     state = request.app.state.aitrapp
-    
+
     try:
         # Reload configuration
         state.config.reload()

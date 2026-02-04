@@ -3,10 +3,11 @@ Data Quality & Validation Utilities
 -----------------------------------
 Ensures integrity of market data before use in backtesting or live trading.
 """
-import pandas as pd
-import numpy as np
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
 
 logger = logging.getLogger("DataValidator")
 
@@ -18,7 +19,7 @@ class DataValidator:
     @staticmethod
     def validate_ohlcv(df: pd.DataFrame,
                        symbol: str = "Unknown",
-                       interval_minutes: int = 15) -> Dict[str, Any]:
+                       interval_minutes: int = 15) -> dict[str, Any]:
         """
         Run comprehensive validation on OHLCV data.
 

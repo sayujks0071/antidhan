@@ -1,11 +1,10 @@
 """Configuration management using Pydantic"""
-import os
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -38,17 +37,17 @@ class ProductType(str, Enum):
 
 class Settings(BaseSettings):
     """Application settings from environment"""
-    
+
     # Kite Connect
     kite_api_key: str = Field(alias="KITE_API_KEY")
     kite_api_secret: str = Field(alias="KITE_API_SECRET")
     kite_access_token: str = Field(alias="KITE_ACCESS_TOKEN")
     kite_user_id: str = Field(alias="KITE_USER_ID")
-    
+
     # Application
     app_mode: AppMode = Field(default=AppMode.PAPER, alias="APP_MODE")
     app_timezone: str = Field(default="Asia/Kolkata", alias="APP_TIMEZONE")
-    
+
     # SEBI/NSE Compliance (Feb 2025)
     compliance_sebi_2025: bool = Field(default=False, alias="COMPLIANCE_SEBI_2025")
     exchange_algo_id: Optional[str] = Field(default=None, alias="EXCHANGE_ALGO_ID")
@@ -60,38 +59,38 @@ class Settings(BaseSettings):
     force_daily_logout_iso: str = Field(default="03:30", alias="FORCE_DAILY_LOGOUT_ISO")  # IST time
     audit_retention_years: int = Field(default=5, alias="AUDIT_RETENTION_YEARS")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    
+
     # Database
     database_url: str = Field(alias="DATABASE_URL")
     database_pool_size: int = Field(default=20, alias="DATABASE_POOL_SIZE")
     database_max_overflow: int = Field(default=10, alias="DATABASE_MAX_OVERFLOW")
-    
+
     # Redis
     redis_url: str = Field(alias="REDIS_URL")
     redis_max_connections: int = Field(default=50, alias="REDIS_MAX_CONNECTIONS")
-    
+
     # API Server
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
     api_workers: int = Field(default=4, alias="API_WORKERS")
     api_secret_key: str = Field(alias="API_SECRET_KEY")
     cors_origins: List[str] = Field(default=["*"], alias="CORS_ORIGINS")
-    
+
     # WebSocket
     ws_ping_interval: int = Field(default=30, alias="WS_PING_INTERVAL")
     ws_reconnect_delay: int = Field(default=5, alias="WS_RECONNECT_DELAY")
     ws_max_reconnect_attempts: int = Field(default=10, alias="WS_MAX_RECONNECT_ATTEMPTS")
-    
+
     # Risk Management
     risk_per_trade_pct: float = Field(default=0.5, alias="RISK_PER_TRADE_PCT")
     risk_max_portfolio_heat_pct: float = Field(default=2.0, alias="RISK_MAX_PORTFOLIO_HEAT_PCT")
     risk_daily_loss_stop_pct: float = Field(default=2.5, alias="RISK_DAILY_LOSS_STOP_PCT")
-    
+
     # Market Hours
     market_open_time: str = Field(default="09:15", alias="MARKET_OPEN_TIME")
     market_close_time: str = Field(default="15:30", alias="MARKET_CLOSE_TIME")
     eod_squareoff_time: str = Field(default="15:25", alias="EOD_SQUAREOFF_TIME")
-    
+
     # NSE Holidays
     nse_holiday_segment: str = Field(default="FO", alias="NSE_HOLIDAY_SEGMENT")
     nse_holiday_cache_path: str = Field(default="packages/core/data/nse_holidays_trading.json", alias="NSE_HOLIDAY_CACHE_PATH")
@@ -102,15 +101,15 @@ class Settings(BaseSettings):
     telegram_bot_token: Optional[str] = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
     telegram_chat_id: Optional[str] = Field(default=None, alias="TELEGRAM_CHAT_ID")
     slack_webhook_url: Optional[str] = Field(default=None, alias="SLACK_WEBHOOK_URL")
-    
+
     # Monitoring
     enable_metrics: bool = Field(default=True, alias="ENABLE_METRICS")
     metrics_port: int = Field(default=9090, alias="METRICS_PORT")
-    
+
     # Development
     debug: bool = Field(default=False, alias="DEBUG")
     reload: bool = Field(default=False, alias="RELOAD")
-    
+
     # TOPS Compliance (from env)
     tops_cap_per_sec: int = Field(default=8, alias="TOPS_CAP_PER_SEC")
 
@@ -228,51 +227,51 @@ class ExecutionConfig:
 
 class AppConfig:
     """Main application configuration loaded from YAML"""
-    
+
     def __init__(self, config_path: str = "configs/app.yaml"):
         self.config_path = Path(config_path)
         self._load_config()
-        
+
     def _load_config(self):
         """Load configuration from YAML file"""
         if not self.config_path.exists():
             raise FileNotFoundError(f"Config file not found: {self.config_path}")
-            
+
         with open(self.config_path, "r") as f:
             config = yaml.safe_load(f)
-        
+
         self.mode = AppMode(config.get("mode", "PAPER"))
         self.timezone = config.get("timezone", "Asia/Kolkata")
-        
+
         self.risk = RiskConfig(config.get("risk", {}))
         self.universe = UniverseConfig(config.get("universe", {}))
         self.options_filters = OptionsFiltersConfig(config.get("options_filters", {}))
-        
+
         self.strategies = [
             StrategyConfig(s) for s in config.get("strategies", [])
         ]
-        
+
         self.ranking = RankingConfig(config.get("ranking", {}))
         self.exits = ExitsConfig(config.get("exits", {}))
         self.market = MarketConfig(config.get("market", {}))
         self.execution = ExecutionConfig(config.get("execution", {}))
-        
+
         self.alerts = config.get("alerts", {})
         self.websocket = config.get("websocket", {})
         self.logging = config.get("logging", {})
         self.monitoring = config.get("monitoring", {})
-    
+
     def get_strategy_by_name(self, name: str) -> Optional[StrategyConfig]:
         """Get strategy configuration by name"""
         for strategy in self.strategies:
             if strategy.name == name:
                 return strategy
         return None
-    
+
     def get_enabled_strategies(self) -> List[StrategyConfig]:
         """Get all enabled strategies"""
         return [s for s in self.strategies if s.enabled]
-    
+
     def reload(self):
         """Reload configuration from file"""
         self._load_config()

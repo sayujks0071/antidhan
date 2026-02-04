@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import struct
 import threading
 import time
@@ -2461,6 +2462,7 @@ class DhanWebSocket:
 
     def _handle_depth_20_bid(self, message, token=None):
         """Handle 20-level bid data (message type 41)"""
+        header = None
         try:
             # For 20-level depth, we need to re-parse the entire message with the correct format
             # The message passed here is the complete message, so parse header again
@@ -2615,6 +2617,8 @@ class DhanWebSocket:
             except Exception as parse_error:
                 logger.error(f"Error parsing bid packets: {parse_error}")
                 logger.error(f"Error type: {type(parse_error).__name__}")
+                if header:
+                    logger.error(f"Header hex: {header.hex()}")
                 import traceback
 
                 logger.error(f"Traceback: {traceback.format_exc()}")

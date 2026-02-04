@@ -1,6 +1,5 @@
 """Risk management and position sizing"""
 from dataclasses import dataclass
-from datetime import datetime
 from typing import List, Optional
 
 import structlog
@@ -11,7 +10,6 @@ from packages.core.models import (
     Position,
     RiskCheckResult,
     Signal,
-    SignalSide,
 )
 
 logger = structlog.get_logger(__name__)
@@ -23,44 +21,44 @@ class PortfolioRisk:
     net_liquid: float
     used_margin: float
     available_margin: float
-    
+
     # Positions
     open_positions: List[Position]
     total_risk_amount: float  # Sum of all position risks
-    
+
     # P&L
     unrealized_pnl: float
     realized_pnl_today: float
     daily_pnl: float
-    
+
     # Limits
     daily_loss_limit: float
     max_portfolio_heat: float
-    
+
     @property
     def portfolio_heat_pct(self) -> float:
         """Portfolio heat as percentage of net liquid"""
         if self.net_liquid > 0:
             return (self.total_risk_amount / self.net_liquid) * 100
         return 0.0
-    
+
     @property
     def daily_pnl_pct(self) -> float:
         """Daily PnL as percentage of net liquid"""
         if self.net_liquid > 0:
             return (self.daily_pnl / self.net_liquid) * 100
         return 0.0
-    
+
     @property
     def is_daily_loss_breached(self) -> bool:
         """Check if daily loss limit is breached"""
         return self.daily_pnl < self.daily_loss_limit
-    
+
     @property
     def is_heat_limit_breached(self) -> bool:
         """Check if portfolio heat limit is breached"""
         return self.portfolio_heat_pct >= self.max_portfolio_heat
-    
+
     @property
     def can_take_new_position(self) -> bool:
         """Check if new position can be taken"""
@@ -78,14 +76,14 @@ class RiskManager:
     - Enforce daily loss limits
     - Handle lot sizing and freeze quantities
     """
-    
+
     def __init__(self, config: RiskConfig):
         self.config = config
-        
+
         # Daily tracking
         self.daily_start_capital: Optional[float] = None
         self.trades_today = 0
-    
+
     def check_signal(
         self,
         signal: Signal,
@@ -102,48 +100,48 @@ class RiskManager:
             RiskCheckResult with approval status and position size
         """
         reasons = []
-        
+
         # 1. Check daily loss limit
         if portfolio_risk.is_daily_loss_breached:
             reasons.append(f"Daily loss limit breached: {portfolio_risk.daily_pnl_pct:.2f}%")
             return RiskCheckResult(approved=False, reasons=reasons)
-        
+
         # 2. Check portfolio heat limit
         if portfolio_risk.is_heat_limit_breached:
             reasons.append(f"Portfolio heat limit breached: {portfolio_risk.portfolio_heat_pct:.2f}%")
             return RiskCheckResult(approved=False, reasons=reasons)
-        
+
         # 3. Calculate position size
         position_size = self.calculate_position_size(
             signal=signal,
             net_liquid=portfolio_risk.net_liquid,
             instrument=signal.instrument
         )
-        
+
         if position_size <= 0:
             reasons.append("Position size calculated as zero or negative")
             return RiskCheckResult(approved=False, reasons=reasons)
-        
+
         # 4. Check per-trade risk
         trade_risk_amount = signal.stop_distance * position_size
         trade_risk_pct = (trade_risk_amount / portfolio_risk.net_liquid) * 100
-        
+
         if trade_risk_pct > self.config.per_trade_risk_pct:
             reasons.append(
                 f"Per-trade risk {trade_risk_pct:.2f}% exceeds limit {self.config.per_trade_risk_pct}%"
             )
             return RiskCheckResult(approved=False, reasons=reasons)
-        
+
         # 5. Check if adding this risk breaches portfolio heat
         new_total_risk = portfolio_risk.total_risk_amount + trade_risk_amount
         new_heat_pct = (new_total_risk / portfolio_risk.net_liquid) * 100
-        
+
         if new_heat_pct > self.config.max_portfolio_heat_pct:
             reasons.append(
                 f"Portfolio heat limit breached: new heat {new_heat_pct:.2f}% would exceed limit {self.config.max_portfolio_heat_pct}%"
             )
             return RiskCheckResult(approved=False, reasons=reasons)
-        
+
         # 6. Check freeze quantity (for F&O)
         if signal.instrument.freeze_quantity:
             if position_size > signal.instrument.freeze_quantity:
@@ -157,20 +155,20 @@ class RiskManager:
                     instrument=signal.instrument.tradingsymbol,
                     size=position_size
                 )
-        
+
         # 7. Check available margin
         estimated_margin = self.estimate_margin_required(
             signal.instrument,
             position_size,
             signal.entry_price
         )
-        
+
         if estimated_margin > portfolio_risk.available_margin:
             reasons.append(
                 f"Insufficient margin: required {estimated_margin:.0f}, available {portfolio_risk.available_margin:.0f}"
             )
             return RiskCheckResult(approved=False, reasons=reasons)
-        
+
         # All checks passed
         logger.info(
             "Risk check passed",
@@ -179,14 +177,14 @@ class RiskManager:
             risk_pct=trade_risk_pct,
             new_heat_pct=new_heat_pct
         )
-        
+
         return RiskCheckResult(
             approved=True,
             reasons=["All risk checks passed"],
             risk_pct=trade_risk_pct,
             position_size=position_size
         )
-    
+
     def calculate_position_size(
         self,
         signal: Signal,
@@ -212,17 +210,17 @@ class RiskManager:
         if signal.stop_distance <= 0:
             logger.warning("Invalid stop distance", distance=signal.stop_distance)
             return 0
-        
+
         # Calculate risk amount
         risk_amount = net_liquid * (self.config.per_trade_risk_pct / 100)
-        
+
         # Calculate quantity
         quantity = risk_amount / signal.stop_distance
-        
+
         # Apply max position size multiplier
         max_quantity = instrument.lot_size * self.config.max_position_size_multiplier
         quantity = min(quantity, max_quantity)
-        
+
         # Round to lot size for F&O
         if instrument.lot_size > 1:
             lots = int(quantity / instrument.lot_size)
@@ -231,7 +229,7 @@ class RiskManager:
         else:
             # For equities, round down
             quantity = int(quantity)
-        
+
         logger.debug(
             "Position size calculated",
             instrument=instrument.tradingsymbol,
@@ -239,9 +237,9 @@ class RiskManager:
             lots=quantity // instrument.lot_size if instrument.lot_size > 1 else quantity,
             risk_amount=risk_amount
         )
-        
+
         return int(quantity)
-    
+
     def estimate_margin_required(
         self,
         instrument: Instrument,
@@ -265,21 +263,21 @@ class RiskManager:
         if instrument.is_equity:
             # CNC requires full capital
             return quantity * price
-        
+
         elif instrument.is_future:
             # Futures require margin (approx 10-20% for indices, higher for stocks)
             # Use conservative 25%
             return quantity * price * 0.25
-        
+
         elif instrument.is_option:
             # Options: Premium + SPAN + Exposure
             # For buying: Premium only
             # For selling: Premium + margin
             # Simplified: Premium * 5 for selling, Premium for buying
             return quantity * price * 5
-        
+
         return quantity * price
-    
+
     def estimate_fees(
         self,
         instrument: Instrument,
@@ -308,10 +306,10 @@ class RiskManager:
             Estimated total fees in INR
         """
         turnover = quantity * (entry_price + exit_price)
-        
+
         # Simplified fee calculation (Zerodha-like structure)
         fees = 0.0
-        
+
         # Brokerage: 0.03% of turnover or Rs 20 per order, whichever is lower (per side for equities)
         if instrument.is_equity:
             # Equity Intraday: 0.03% or Rs 20/executing order whichever is lower
@@ -329,7 +327,7 @@ class RiskManager:
         STT_EQUITY_INTRADAY_SELL = 0.00025  # 0.025%
         STT_FUTURES_SELL = 0.000125         # 0.0125%
         STT_OPTIONS_SELL = 0.000625         # 0.0625% (on premium)
-        
+
         TXN_NSE_EQUITY = 0.0000325          # 0.00325%
         TXN_NSE_FUTURES = 0.000019          # 0.0019%
         TXN_NSE_OPTIONS = 0.0005            # 0.05% (on premium)
@@ -345,7 +343,7 @@ class RiskManager:
                 txn_charges = turnover * TXN_NSE_OPTIONS
         else:
             txn_charges = turnover * 0.00002  # Default fallback
-        
+
         fees += txn_charges
 
         # GST on brokerage and transaction charges: 18%
@@ -363,15 +361,15 @@ class RiskManager:
             stt = (exit_price * quantity) * STT_OPTIONS_SELL
 
         fees += stt
-        
+
         # SEBI charges: Rs 10 per crore
         fees += (turnover / 10000000) * 10
-        
+
         # Stamp duty: 0.003% on buy side
         fees += (entry_price * quantity) * 0.00003
-        
+
         return fees
-    
+
     def update_portfolio_risk(
         self,
         net_liquid: float,
@@ -392,28 +390,28 @@ class RiskManager:
         # Initialize daily capital if needed
         if self.daily_start_capital is None:
             self.daily_start_capital = net_liquid
-        
+
         # Calculate total risk
         total_risk = sum([pos.risk_amount for pos in positions if pos.is_open])
-        
+
         # Calculate unrealized PnL
         unrealized_pnl = sum([pos.unrealized_pnl for pos in positions if pos.is_open])
-        
+
         # Calculate daily PnL
         daily_pnl = realized_pnl_today + unrealized_pnl
-        
+
         # Calculate limits
         daily_loss_limit = -1 * self.daily_start_capital * (self.config.daily_loss_stop_pct / 100)
         max_portfolio_heat = self.daily_start_capital * (self.config.max_portfolio_heat_pct / 100)
-        
+
         # Estimate used margin (simplified)
         used_margin = sum([
             self.estimate_margin_required(pos.instrument, pos.quantity, pos.entry_price)
             for pos in positions if pos.is_open
         ])
-        
+
         available_margin = net_liquid - used_margin
-        
+
         portfolio_risk = PortfolioRisk(
             net_liquid=net_liquid,
             used_margin=used_margin,
@@ -426,15 +424,15 @@ class RiskManager:
             daily_loss_limit=daily_loss_limit,
             max_portfolio_heat=max_portfolio_heat
         )
-        
+
         return portfolio_risk
-    
+
     def reset_daily_counters(self) -> None:
         """Reset daily counters (call at start of day)"""
         self.daily_start_capital = None
         self.trades_today = 0
         logger.info("Daily risk counters reset")
-    
+
     def can_enter(
         self,
         risk_cfg: RiskConfig,
@@ -453,12 +451,12 @@ class RiskManager:
         # 1. Per-trade risk
         rupees_risk = capital * (risk_cfg.per_trade_risk_pct / 100)
         qty = max(1, int(rupees_risk / (stop_dist * instrument.lot_size * price) * instrument.lot_size))
-        
+
         # Round to lot size
         if instrument.lot_size > 1:
             lots = max(1, int(qty / instrument.lot_size))
             qty = lots * instrument.lot_size
-        
+
         # 2. Portfolio heat check
         open_risk = portfolio.total_risk_amount
         if (open_risk + rupees_risk) > capital * (risk_cfg.max_portfolio_heat_pct / 100):
@@ -467,12 +465,12 @@ class RiskManager:
                          new_risk=rupees_risk,
                          limit=capital * (risk_cfg.max_portfolio_heat_pct / 100))
             return False, 0
-        
+
         # 3. Daily loss stop
         if portfolio.realized_pnl_today <= -capital * (risk_cfg.daily_loss_stop_pct / 100):
             logger.warning("Daily loss stop breached",
                          daily_pnl=portfolio.realized_pnl_today,
                          limit=-capital * (risk_cfg.daily_loss_stop_pct / 100))
             return False, 0
-        
+
         return True, qty

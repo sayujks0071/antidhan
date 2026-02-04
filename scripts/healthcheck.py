@@ -13,7 +13,6 @@ import time
 import urllib.request
 import urllib.parse
 import urllib.error
-from datetime import datetime, timedelta
 
 # Configuration
 LOKI_URL = "http://localhost:3100"

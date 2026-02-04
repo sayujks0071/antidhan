@@ -2,32 +2,29 @@
 import argparse
 import asyncio
 import os
-import signal
 import sys
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Optional
 
 import structlog
 
-from packages.core.backtest import BacktestEngine
-from packages.core.config import app_config, AppMode
-from packages.core.strategies import ORBStrategy, OptionsRankerStrategy, TrendPullbackStrategy
-from packages.core.strategies.iron_condor import IronCondorStrategy
-from packages.core.paper_simulator import PaperSimulator
-from packages.core.models import Instrument, Tick, Bar, Signal, SignalSide
-from packages.core.strategies.base import StrategyContext
-
 # Import components for Live Mode
 from kiteconnect import KiteConnect
-from packages.core.instruments import InstrumentManager
-from packages.core.market_data import MarketDataStream
-from packages.core.risk import RiskManager
+
+from packages.core.backtest import BacktestEngine
+from packages.core.config import app_config, settings
 from packages.core.execution import ExecutionEngine
 from packages.core.exits import ExitManager
-from packages.core.ranker import SignalRanker
-from packages.core.oco import OCOManager
+from packages.core.instruments import InstrumentManager
+from packages.core.market_data import MarketDataStream
+from packages.core.models import Instrument, SignalSide, Tick
 from packages.core.orchestrator import TradingOrchestrator
-from packages.core.config import settings
+from packages.core.paper_simulator import PaperSimulator
+from packages.core.ranker import SignalRanker
+from packages.core.risk import RiskManager
+from packages.core.strategies import OptionsRankerStrategy, ORBStrategy, TrendPullbackStrategy
+from packages.core.strategies.base import StrategyContext
+from packages.core.strategies.iron_condor import IronCondorStrategy
 
 logger = structlog.get_logger(__name__)
 

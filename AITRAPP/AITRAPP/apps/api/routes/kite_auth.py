@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
 import logging
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
+
 from src.auth.kite_auth import KiteAuth
 
 router = APIRouter()

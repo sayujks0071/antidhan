@@ -1,7 +1,10 @@
 import time
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+
 from packages.core.indicators import IndicatorCalculator
+
 
 def bench():
     # Create 500 bars data (realistic window)

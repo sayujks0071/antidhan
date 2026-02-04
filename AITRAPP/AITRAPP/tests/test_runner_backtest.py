@@ -1,15 +1,13 @@
-import unittest
-from unittest.mock import patch, MagicMock
 import os
 import sys
+import unittest
 from io import StringIO
-import pandas as pd
-from datetime import datetime
 
 # Add repo root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from packages.core.runner import Runner
+
 
 class TestRunnerBacktest(unittest.TestCase):
     def setUp(self):

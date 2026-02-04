@@ -2,12 +2,12 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+
 import structlog
 
 from packages.core.config import app_config, settings
 from packages.storage.database import get_db_session
-from packages.storage.models import AuditLog, RiskEvent, Position, Order
+from packages.storage.models import AuditLog, Position, RiskEvent
 
 logger = structlog.get_logger(__name__)
 
@@ -26,11 +26,11 @@ def snapshot_incident(incident_type: str, details: dict) -> str:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     snapshot_dir = Path(f"reports/incident-{timestamp}")
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    
-    logger.critical("Creating incident snapshot", 
+
+    logger.critical("Creating incident snapshot",
                    incident_type=incident_type,
                    snapshot_dir=str(snapshot_dir))
-    
+
     # 1. Current config
     config_data = {
         "config_sha": getattr(app_config, 'config_sha', 'unknown'),
@@ -39,7 +39,7 @@ def snapshot_incident(incident_type: str, details: dict) -> str:
     }
     with open(snapshot_dir / "config.json", "w") as f:
         json.dump(config_data, f, indent=2)
-    
+
     # 2. Current positions
     with get_db_session() as db:
         positions = db.query(Position).filter_by(status="OPEN").all()
@@ -58,7 +58,7 @@ def snapshot_incident(incident_type: str, details: dict) -> str:
         ]
         with open(snapshot_dir / "positions.json", "w") as f:
             json.dump(positions_data, f, indent=2)
-        
+
         # 3. Top 100 audit logs
         audit_logs = db.query(AuditLog).order_by(AuditLog.ts.desc()).limit(100).all()
         logs_data = [
@@ -71,7 +71,7 @@ def snapshot_incident(incident_type: str, details: dict) -> str:
         ]
         with open(snapshot_dir / "audit_logs.json", "w") as f:
             json.dump(logs_data, f, indent=2)
-        
+
         # 4. Recent risk events
         risk_events = db.query(RiskEvent).order_by(RiskEvent.ts.desc()).limit(50).all()
         events_data = [
@@ -86,7 +86,7 @@ def snapshot_incident(incident_type: str, details: dict) -> str:
         ]
         with open(snapshot_dir / "risk_events.json", "w") as f:
             json.dump(events_data, f, indent=2)
-    
+
     # 5. Incident details
     incident_data = {
         "incident_type": incident_type,
@@ -98,9 +98,9 @@ def snapshot_incident(incident_type: str, details: dict) -> str:
     }
     with open(snapshot_dir / "incident.json", "w") as f:
         json.dump(incident_data, f, indent=2)
-    
+
     logger.info("Incident snapshot created", snapshot_dir=str(snapshot_dir))
-    
+
     return str(snapshot_dir)
 
 

@@ -1,9 +1,9 @@
 
-import time
 import hashlib
+import time
 from dataclasses import dataclass
-from typing import List, Optional
 from datetime import datetime
+
 
 # Mock classes to avoid dependencies in benchmark script
 @dataclass

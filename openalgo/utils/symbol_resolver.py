@@ -1,7 +1,9 @@
-import logging
 import datetime
-from typing import Optional, Dict, Any, List
+import logging
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy import func
+
 from openalgo.database.symbol import SymToken, db_session
 
 logger = logging.getLogger(__name__)
@@ -13,7 +15,7 @@ class SymbolResolver:
     """
 
     @staticmethod
-    def parse_expiry(expiry_str: str) -> Optional[datetime.date]:
+    def parse_expiry(expiry_str: str) -> datetime.date | None:
         """Parses DD-MMM-YY expiry string to date object."""
         try:
             return datetime.datetime.strptime(expiry_str, "%d-%b-%y").date()
@@ -24,7 +26,7 @@ class SymbolResolver:
                 return None
 
     @classmethod
-    def get_valid_expiries(cls, underlying: str, exchange: str = "NFO") -> List[datetime.date]:
+    def get_valid_expiries(cls, underlying: str, exchange: str = "NFO") -> list[datetime.date]:
         """Fetches and returns sorted valid future expiries for the underlying."""
         try:
             results = db_session.query(SymToken.expiry).filter(
@@ -50,7 +52,7 @@ class SymbolResolver:
     @classmethod
     def resolve_option_symbol(cls, underlying: str, expiry_pref: str = "weekly",
                               strike_rule: str = "ATM", option_type: str = "CE",
-                              spot_price: float = None) -> Optional[Dict[str, Any]]:
+                              spot_price: float = None) -> dict[str, Any] | None:
         """
         Resolves an Option symbol.
 
@@ -168,7 +170,7 @@ class SymbolResolver:
             return None
 
     @classmethod
-    def resolve_mcx_symbol(cls, underlying: str, prefer_mini: bool = True) -> Optional[Dict[str, Any]]:
+    def resolve_mcx_symbol(cls, underlying: str, prefer_mini: bool = True) -> dict[str, Any] | None:
         """
         Resolves MCX Future symbol, preferring MINI contracts if requested.
         Fallback to smallest lot size if MINI not found.

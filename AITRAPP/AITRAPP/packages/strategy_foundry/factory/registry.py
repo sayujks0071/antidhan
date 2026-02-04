@@ -1,7 +1,9 @@
 import json
 import os
 from typing import List
-from packages.strategy_foundry.factory.grammar import StrategyConfig, Rule, Filter
+
+from packages.strategy_foundry.factory.grammar import Filter, Rule, StrategyConfig
+
 
 class CandidateRegistry:
     @staticmethod
