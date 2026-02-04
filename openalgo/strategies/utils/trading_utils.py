@@ -219,6 +219,16 @@ def analyze_volume_profile(df, n_bins=20):
     return poc_price, poc_volume
 
 
+def calculate_ema(series, span):
+    """Calculate Exponential Moving Average."""
+    return series.ewm(span=span, adjust=False).mean()
+
+
+def calculate_sma(series, window):
+    """Calculate Simple Moving Average."""
+    return series.rolling(window=window).mean()
+
+
 class PositionManager:
     """
     Persistent position manager to track trades and prevent duplicate orders.

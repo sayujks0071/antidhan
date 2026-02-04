@@ -98,7 +98,8 @@ def get_order_book(auth):
         auth (str): Authentication token.
 
     Returns:
-        dict or list: The order book data or error response.
+        list: The order book data as a list of orders.
+        or dict: Error response if failed.
     """
     return get_api_response("/v2/orders", auth)
 
@@ -111,7 +112,8 @@ def get_trade_book(auth):
         auth (str): Authentication token.
 
     Returns:
-        dict or list: The trade book data or error response.
+        list: The trade book data as a list of trades.
+        or dict: Error response if failed.
     """
     return get_api_response("/v2/trades", auth)
 
@@ -124,7 +126,8 @@ def get_positions(auth):
         auth (str): Authentication token.
 
     Returns:
-        dict or list: The positions data or error response.
+        list: The positions data as a list of positions.
+        or dict: Error response if failed.
     """
     return get_api_response("/v2/positions", auth)
 
@@ -137,7 +140,8 @@ def get_holdings(auth):
         auth (str): Authentication token.
 
     Returns:
-        dict or list: The holdings data or error response.
+        list: The holdings data as a list of holdings.
+        or dict: Error response if failed.
     """
     return get_api_response("/v2/holdings", auth)
 
@@ -195,6 +199,9 @@ def place_order_api(data, auth):
 
     Returns:
         tuple: (response_object, response_dict, order_id)
+            - response_object (httpx.Response): The raw response object.
+            - response_dict (dict): The parsed JSON response.
+            - order_id (str or None): The order ID if successful, else None.
     """
     # 1. Error handling for Invalid Token (Auth Token)
     if not auth:
@@ -290,6 +297,9 @@ def place_smartorder_api(data, auth):
 
     Returns:
         tuple: (response_object, response_dict, order_id)
+            - response_object (httpx.Response): The raw response object (None if no API call made).
+            - response_dict (dict): The parsed JSON response.
+            - order_id (str or None): The order ID if successful, else None.
     """
     AUTH_TOKEN = auth
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
@@ -367,7 +377,7 @@ def place_smartorder_api(data, auth):
 
 def close_all_positions(current_api_key, auth):
     """
-    Close all open positions.
+    Close all open positions by placing opposite orders.
 
     Args:
         current_api_key (str): The user's API Key (OpenAlgo context).
@@ -375,6 +385,8 @@ def close_all_positions(current_api_key, auth):
 
     Returns:
         tuple: (response_dict, status_code)
+            - response_dict (dict): Result message.
+            - status_code (int): HTTP status code.
     """
     AUTH_TOKEN = auth
     # Fetch the current open positions
@@ -437,6 +449,8 @@ def cancel_order(orderid, auth):
 
     Returns:
         tuple: (response_dict, status_code)
+            - response_dict (dict): Success or error message.
+            - status_code (int): HTTP status code.
     """
     # Assuming you have a function to get the authentication token
     AUTH_TOKEN = auth
@@ -482,11 +496,13 @@ def modify_order(data, auth):
     Modify an existing order.
 
     Args:
-        data (dict): Order modification parameters (must include 'orderid').
+        data (dict): Order modification parameters (must include 'orderid', 'quantity', 'price', etc.).
         auth (str): Authentication token.
 
     Returns:
         tuple: (response_dict, status_code)
+            - response_dict (dict): Success or error message.
+            - status_code (int): HTTP status code.
     """
     # Assuming you have a function to get the authentication token
     AUTH_TOKEN = auth
@@ -542,11 +558,13 @@ def cancel_all_orders_api(data, auth):
     Cancel all pending orders.
 
     Args:
-        data (dict): Request data (unused).
+        data (dict): Request data (unused, but kept for compatibility).
         auth (str): Authentication token.
 
     Returns:
         tuple: (canceled_orders_list, failed_cancellations_list)
+            - canceled_orders_list (list): List of Order IDs successfully canceled.
+            - failed_cancellations_list (list): List of Order IDs that failed to cancel.
     """
     # Get the order book
     AUTH_TOKEN = auth
