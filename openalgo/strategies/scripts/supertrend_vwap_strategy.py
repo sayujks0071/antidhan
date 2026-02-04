@@ -67,8 +67,8 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         """
         exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper() else "NSE"
 
-        # Increased lookback to 10 days to handle weekends/data gaps better
-        df = self.fetch_history(days=10, exchange=exchange)
+        # Increased lookback to 30 days to handle weekends/data gaps better
+        df = self.fetch_history(days=30, exchange=exchange)
         if df.empty or len(df) < 50:
             self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows. Need at least 50.")
             return
@@ -157,7 +157,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             else:
                 sector_symbol = "NIFTY"
 
-            df = self.fetch_history(days=5, symbol=sector_symbol, interval="D", exchange="NSE_INDEX")
+            df = self.fetch_history(days=30, symbol=sector_symbol, interval="D", exchange="NSE_INDEX")
 
             if not df.empty and len(df) > 15:
                 rsi = self.calculate_rsi(df['close'])

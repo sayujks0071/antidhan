@@ -148,7 +148,7 @@ class MLMomentumStrategy:
             try:
                 # 1. Fetch Stock Data
                 end_date = datetime.now().strftime("%Y-%m-%d")
-                start_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+                start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
 
                 # Use NSE_INDEX for NIFTY index
                 exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
