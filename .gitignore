@@ -13,3 +13,5 @@ __pycache__/
 *.pyc
 *.log
 reports/
+.cache/
+audit_results.md

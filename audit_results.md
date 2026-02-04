@@ -1,113 +1,104 @@
-# System Audit & Portfolio Rebalancing Report
+# System Audit Results
 
-## 1. Cross-Strategy Correlation Analysis
+Generated on: 2026-02-04 18:22:40.967827
 
-### Correlation Matrix (Hourly PnL)
-|                |   SuperTrendVWAP |   TrendPullback |   ORB |
-|:---------------|-----------------:|----------------:|------:|
-| SuperTrendVWAP |                1 |               1 |     1 |
-| TrendPullback  |                1 |               1 |     1 |
-| ORB            |                1 |               1 |     1 |
+## Cross-Strategy Correlation
 
-### ⚠️ High Correlation Alerts (> 0.7)
-- **SuperTrendVWAP** vs **TrendPullback**: 1.00
-  - Action: Consider merging or keeping higher Calmar strategy.
-- **SuperTrendVWAP** vs **ORB**: 1.00
-  - Action: Consider merging or keeping higher Calmar strategy.
-- **TrendPullback** vs **ORB**: 1.00
-  - Action: Consider merging or keeping higher Calmar strategy.
+Correlation Matrix:
 
-## 2. Strategy Performance (Calmar Ratio)
+| strategy       |   ORB |   SuperTrendVWAP |   TrendPullback |
+|:---------------|------:|-----------------:|----------------:|
+| ORB            |   nan |              nan |             nan |
+| SuperTrendVWAP |   nan |              nan |             nan |
+| TrendPullback  |   nan |              nan |             nan |
 
-|                |   Net PnL |     Max DD |   Calmar |
-|:---------------|----------:|-----------:|---------:|
-| SuperTrendVWAP |  209539   | -0.0430762 | 17755    |
-| TrendPullback  |   12728.2 | -0.0103448 |  4490.97 |
-| ORB            |  355064   | -0.101351  | 12787.1  |
+No highly correlated pairs found.
 
-## 3. Equity Curve Stress Test
+## Equity Curve Stress Test
 
-### Worst Day Analysis
-- **Date:** 2026-01-19
-- **Net Loss:** 577330.95
+- **Worst Day**: 2026-01-19
+- **Loss**: 577330.95
 
-#### Trades on Worst Day:
-|    | strategy       | symbol    | direction   |       pnl |
-|---:|:---------------|:----------|:------------|----------:|
-| 44 | ORB            | FINNIFTY  | LONG        |  20361.6  |
-| 45 | ORB            | FINNIFTY  | LONG        |  17247.7  |
-| 46 | ORB            | NIFTY     | LONG        |  18779.7  |
-| 47 | ORB            | BANKNIFTY | LONG        |  18243.5  |
-| 48 | ORB            | BANKNIFTY | LONG        |  14170.1  |
-| 49 | ORB            | BANKNIFTY | SHORT       |  23851.1  |
-| 50 | ORB            | BANKNIFTY | LONG        |  -6980.79 |
-| 51 | ORB            | NIFTY     | SHORT       | -14571.8  |
-| 52 | ORB            | BANKNIFTY | SHORT       |  15761.3  |
-| 53 | ORB            | FINNIFTY  | LONG        |  16522.2  |
-| 54 | ORB            | NIFTY     | SHORT       |  16961.4  |
-| 55 | ORB            | BANKNIFTY | SHORT       |  25145.3  |
-| 56 | ORB            | BANKNIFTY | SHORT       |  12736.9  |
-| 57 | ORB            | FINNIFTY  | SHORT       |  23395.4  |
-| 58 | ORB            | FINNIFTY  | SHORT       |  12898    |
-| 20 | TrendPullback  | RELIANCE  | LONG        |    819.01 |
-| 21 | TrendPullback  | TCS       | SHORT       |   1390.31 |
-| 22 | TrendPullback  | RELIANCE  | SHORT       |   -143.73 |
-| 23 | TrendPullback  | ICICIBANK | LONG        |   -251.79 |
-| 24 | TrendPullback  | INFY      | SHORT       |   -188.38 |
-| 25 | TrendPullback  | ICICIBANK | SHORT       |    802.24 |
-| 26 | TrendPullback  | TCS       | LONG        |   -180.59 |
-| 27 | TrendPullback  | TCS       | SHORT       |   1388.59 |
-| 28 | TrendPullback  | TCS       | LONG        |   1997.24 |
-| 29 | TrendPullback  | RELIANCE  | SHORT       |   1317.47 |
-| 30 | TrendPullback  | TCS       | LONG        |   -375.11 |
-| 31 | TrendPullback  | HDFCBANK  | LONG        |   1620.47 |
-| 59 | ORB            | NIFTY     | SHORT       |  13464.8  |
-| 60 | ORB            | BANKNIFTY | LONG        | -14894    |
-| 61 | ORB            | NIFTY     | SHORT       | -12537    |
-| 62 | ORB            | FINNIFTY  | LONG        |  25735    |
-| 63 | ORB            | FINNIFTY  | LONG        |  23109.9  |
-| 64 | ORB            | BANKNIFTY | SHORT       |  17819.8  |
-| 65 | ORB            | FINNIFTY  | SHORT       |  -7046.73 |
-| 66 | ORB            | BANKNIFTY | SHORT       |  29776.1  |
-| 67 | ORB            | BANKNIFTY | SHORT       |  22446.8  |
-| 68 | ORB            | NIFTY     | SHORT       | -16319.7  |
-| 69 | ORB            | FINNIFTY  | LONG        | -10420.3  |
-| 70 | ORB            | NIFTY     | SHORT       |  27816.3  |
-| 71 | ORB            | NIFTY     | LONG        |  24828.5  |
-| 72 | ORB            | FINNIFTY  | SHORT       |  28283.5  |
-| 73 | ORB            | NIFTY     | SHORT       | -11520.5  |
-| 32 | TrendPullback  | ICICIBANK | LONG        |   -204.05 |
-| 33 | TrendPullback  | RELIANCE  | LONG        |   -331.56 |
-| 34 | TrendPullback  | TCS       | LONG        |   -514.73 |
-| 35 | TrendPullback  | INFY      | LONG        |    631.55 |
-| 36 | TrendPullback  | RELIANCE  | SHORT       |   -700.47 |
-| 37 | TrendPullback  | ICICIBANK | LONG        |   1090.53 |
-| 38 | TrendPullback  | HDFCBANK  | SHORT       |   -195.12 |
-| 39 | TrendPullback  | INFY      | LONG        |    334.64 |
-| 40 | TrendPullback  | HDFCBANK  | LONG        |   1744.86 |
-| 41 | TrendPullback  | ICICIBANK | SHORT       |   1460.93 |
-| 42 | TrendPullback  | INFY      | LONG        |   1489.2  |
-| 43 | TrendPullback  | TCS       | SHORT       |   -273.29 |
-|  0 | SuperTrendVWAP | NIFTY     | LONG        |   7992.91 |
-|  1 | SuperTrendVWAP | TCS       | SHORT       |  16140.4  |
-|  2 | SuperTrendVWAP | INFY      | LONG        |   8626.02 |
-|  3 | SuperTrendVWAP | BANKNIFTY | LONG        |  -3317.78 |
-|  4 | SuperTrendVWAP | TCS       | LONG        |  14596.1  |
-|  5 | SuperTrendVWAP | NIFTY     | LONG        |  18215.9  |
-|  6 | SuperTrendVWAP | BANKNIFTY | LONG        |   8330.73 |
-|  7 | SuperTrendVWAP | RELIANCE  | SHORT       |   2325.55 |
-|  8 | SuperTrendVWAP | INFY      | LONG        |   7985.69 |
-|  9 | SuperTrendVWAP | BANKNIFTY | LONG        |  -7792.29 |
-| 10 | SuperTrendVWAP | BANKNIFTY | SHORT       |  28644.6  |
-| 11 | SuperTrendVWAP | NIFTY     | SHORT       |  25063.2  |
-| 12 | SuperTrendVWAP | BANKNIFTY | SHORT       |  14911.7  |
-| 13 | SuperTrendVWAP | BANKNIFTY | LONG        |  26265.8  |
-| 14 | SuperTrendVWAP | TCS       | LONG        |  17494.2  |
-| 15 | SuperTrendVWAP | BANKNIFTY | LONG        |  -6017.34 |
-| 16 | SuperTrendVWAP | NIFTY     | LONG        |   -572.55 |
-| 17 | SuperTrendVWAP | NIFTY     | LONG        |  -1152.54 |
-| 18 | SuperTrendVWAP | INFY      | LONG        |  17418.8  |
-| 19 | SuperTrendVWAP | TCS       | LONG        |  14379.3  |
+### Trades on Worst Day
+|    | strategy       | symbol    | direction   | entry_time                 | exit_time                  |       pnl | exit_reason   |
+|---:|:---------------|:----------|:------------|:---------------------------|:---------------------------|----------:|:--------------|
+| 44 | ORB            | FINNIFTY  | LONG        | 2026-01-19 16:02:19.126464 | 2026-01-19 19:02:19.126479 |  20361.6  | TP            |
+| 45 | ORB            | FINNIFTY  | LONG        | 2026-01-19 17:02:19.227972 | 2026-01-19 19:02:19.228008 |  17247.7  | TP            |
+| 46 | ORB            | NIFTY     | LONG        | 2026-01-19 15:02:19.333519 | 2026-01-19 19:02:19.333549 |  18779.7  | TP            |
+| 47 | ORB            | BANKNIFTY | LONG        | 2026-01-19 16:02:19.438333 | 2026-01-19 19:02:19.438396 |  18243.5  | TP            |
+| 48 | ORB            | BANKNIFTY | LONG        | 2026-01-19 14:02:19.542542 | 2026-01-19 19:02:19.542590 |  14170.1  | TP            |
+| 49 | ORB            | BANKNIFTY | SHORT       | 2026-01-19 16:02:19.644452 | 2026-01-19 19:02:19.644501 |  23851.1  | TP            |
+| 50 | ORB            | BANKNIFTY | LONG        | 2026-01-19 17:02:19.746991 | 2026-01-19 19:02:19.747095 |  -6980.79 | SL            |
+| 51 | ORB            | NIFTY     | SHORT       | 2026-01-19 16:02:19.853207 | 2026-01-19 19:02:19.853266 | -14571.8  | SL            |
+| 52 | ORB            | BANKNIFTY | SHORT       | 2026-01-19 16:02:19.955048 | 2026-01-19 19:02:19.955093 |  15761.3  | TP            |
+| 53 | ORB            | FINNIFTY  | LONG        | 2026-01-19 16:02:20.060872 | 2026-01-19 19:02:20.060909 |  16522.2  | TP            |
+| 54 | ORB            | NIFTY     | SHORT       | 2026-01-19 16:02:20.166795 | 2026-01-19 19:02:20.166827 |  16961.4  | TP            |
+| 55 | ORB            | BANKNIFTY | SHORT       | 2026-01-19 17:02:20.272095 | 2026-01-19 19:02:20.272132 |  25145.3  | TP            |
+| 56 | ORB            | BANKNIFTY | SHORT       | 2026-01-19 18:02:20.379267 | 2026-01-19 19:02:20.379349 |  12736.9  | TP            |
+| 57 | ORB            | FINNIFTY  | SHORT       | 2026-01-19 15:02:20.486063 | 2026-01-19 19:02:20.486123 |  23395.4  | TP            |
+| 58 | ORB            | FINNIFTY  | SHORT       | 2026-01-19 16:02:20.592543 | 2026-01-19 19:02:20.592612 |  12898    | TP            |
+| 20 | TrendPullback  | RELIANCE  | LONG        | 2026-01-19 18:02:20.696255 | 2026-01-19 19:02:20.696318 |    819.01 | TP            |
+| 21 | TrendPullback  | TCS       | SHORT       | 2026-01-19 15:02:20.802513 | 2026-01-19 19:02:20.802573 |   1390.31 | TP            |
+| 22 | TrendPullback  | RELIANCE  | SHORT       | 2026-01-19 14:02:20.908302 | 2026-01-19 19:02:20.908348 |   -143.73 | SL            |
+| 23 | TrendPullback  | ICICIBANK | LONG        | 2026-01-19 17:02:21.014015 | 2026-01-19 19:02:21.014078 |   -251.79 | SL            |
+| 24 | TrendPullback  | INFY      | SHORT       | 2026-01-19 15:02:21.116923 | 2026-01-19 19:02:21.116990 |   -188.38 | SL            |
+| 25 | TrendPullback  | ICICIBANK | SHORT       | 2026-01-19 14:02:21.225962 | 2026-01-19 19:02:21.226035 |    802.24 | TP            |
+| 26 | TrendPullback  | TCS       | LONG        | 2026-01-19 14:02:21.332321 | 2026-01-19 19:02:21.332425 |   -180.59 | SL            |
+| 27 | TrendPullback  | TCS       | SHORT       | 2026-01-19 16:02:21.442200 | 2026-01-19 19:02:21.442261 |   1388.59 | TP            |
+| 28 | TrendPullback  | TCS       | LONG        | 2026-01-19 14:02:21.547344 | 2026-01-19 19:02:21.547412 |   1997.24 | TP            |
+| 29 | TrendPullback  | RELIANCE  | SHORT       | 2026-01-19 16:02:21.649934 | 2026-01-19 19:02:21.650002 |   1317.47 | TP            |
+| 30 | TrendPullback  | TCS       | LONG        | 2026-01-19 14:02:21.756209 | 2026-01-19 19:02:21.756270 |   -375.11 | SL            |
+| 31 | TrendPullback  | HDFCBANK  | LONG        | 2026-01-19 17:02:21.861066 | 2026-01-19 19:02:21.861116 |   1620.47 | TP            |
+| 59 | ORB            | NIFTY     | SHORT       | 2026-01-19 18:08:37.103175 | 2026-01-19 19:08:37.103187 |  13464.8  | TP            |
+| 60 | ORB            | BANKNIFTY | LONG        | 2026-01-19 16:08:37.205813 | 2026-01-19 19:08:37.205834 | -14894    | SL            |
+| 61 | ORB            | NIFTY     | SHORT       | 2026-01-19 15:08:37.311320 | 2026-01-19 19:08:37.311338 | -12537    | SL            |
+| 62 | ORB            | FINNIFTY  | LONG        | 2026-01-19 14:08:37.416935 | 2026-01-19 19:08:37.416961 |  25735    | TP            |
+| 63 | ORB            | FINNIFTY  | LONG        | 2026-01-19 18:08:37.522835 | 2026-01-19 19:08:37.522867 |  23109.9  | TP            |
+| 64 | ORB            | BANKNIFTY | SHORT       | 2026-01-19 14:08:37.628879 | 2026-01-19 19:08:37.628920 |  17819.8  | TP            |
+| 65 | ORB            | FINNIFTY  | SHORT       | 2026-01-19 18:08:37.735382 | 2026-01-19 19:08:37.735421 |  -7046.73 | SL            |
+| 66 | ORB            | BANKNIFTY | SHORT       | 2026-01-19 17:08:37.839401 | 2026-01-19 19:08:37.839445 |  29776.1  | TP            |
+| 67 | ORB            | BANKNIFTY | SHORT       | 2026-01-19 14:08:37.946174 | 2026-01-19 19:08:37.946211 |  22446.8  | TP            |
+| 68 | ORB            | NIFTY     | SHORT       | 2026-01-19 16:08:38.052592 | 2026-01-19 19:08:38.052614 | -16319.7  | SL            |
+| 69 | ORB            | FINNIFTY  | LONG        | 2026-01-19 18:08:38.158389 | 2026-01-19 19:08:38.158481 | -10420.3  | SL            |
+| 70 | ORB            | NIFTY     | SHORT       | 2026-01-19 16:08:38.263800 | 2026-01-19 19:08:38.263868 |  27816.3  | TP            |
+| 71 | ORB            | NIFTY     | LONG        | 2026-01-19 17:08:38.372967 | 2026-01-19 19:08:38.373081 |  24828.5  | TP            |
+| 72 | ORB            | FINNIFTY  | SHORT       | 2026-01-19 14:08:38.479175 | 2026-01-19 19:08:38.479244 |  28283.5  | TP            |
+| 73 | ORB            | NIFTY     | SHORT       | 2026-01-19 18:08:38.583917 | 2026-01-19 19:08:38.583980 | -11520.5  | SL            |
+| 32 | TrendPullback  | ICICIBANK | LONG        | 2026-01-19 15:08:38.691686 | 2026-01-19 19:08:38.691727 |   -204.05 | SL            |
+| 33 | TrendPullback  | RELIANCE  | LONG        | 2026-01-19 17:08:38.794868 | 2026-01-19 19:08:38.794940 |   -331.56 | SL            |
+| 34 | TrendPullback  | TCS       | LONG        | 2026-01-19 15:08:38.902482 | 2026-01-19 19:08:38.902528 |   -514.73 | SL            |
+| 35 | TrendPullback  | INFY      | LONG        | 2026-01-19 17:08:39.006486 | 2026-01-19 19:08:39.006539 |    631.55 | TP            |
+| 36 | TrendPullback  | RELIANCE  | SHORT       | 2026-01-19 16:08:39.111465 | 2026-01-19 19:08:39.111525 |   -700.47 | SL            |
+| 37 | TrendPullback  | ICICIBANK | LONG        | 2026-01-19 16:08:39.215410 | 2026-01-19 19:08:39.215475 |   1090.53 | TP            |
+| 38 | TrendPullback  | HDFCBANK  | SHORT       | 2026-01-19 17:08:39.322296 | 2026-01-19 19:08:39.322621 |   -195.12 | SL            |
+| 39 | TrendPullback  | INFY      | LONG        | 2026-01-19 18:08:39.427960 | 2026-01-19 19:08:39.428033 |    334.64 | TP            |
+| 40 | TrendPullback  | HDFCBANK  | LONG        | 2026-01-19 17:08:39.534185 | 2026-01-19 19:08:39.534225 |   1744.86 | TP            |
+| 41 | TrendPullback  | ICICIBANK | SHORT       | 2026-01-19 14:08:39.639542 | 2026-01-19 19:08:39.639585 |   1460.93 | TP            |
+| 42 | TrendPullback  | INFY      | LONG        | 2026-01-19 18:08:39.746000 | 2026-01-19 19:08:39.746056 |   1489.2  | TP            |
+| 43 | TrendPullback  | TCS       | SHORT       | 2026-01-19 18:08:39.848482 | 2026-01-19 19:08:39.848526 |   -273.29 | SL            |
+|  0 | SuperTrendVWAP | NIFTY     | LONG        | 2026-01-19 14:08:39.955739 | 2026-01-19 19:08:39.955782 |   7992.91 | TP            |
+|  1 | SuperTrendVWAP | TCS       | SHORT       | 2026-01-19 16:08:40.061621 | 2026-01-19 19:08:40.061677 |  16140.4  | TP            |
+|  2 | SuperTrendVWAP | INFY      | LONG        | 2026-01-19 14:08:40.162953 | 2026-01-19 19:08:40.163013 |   8626.02 | TP            |
+|  3 | SuperTrendVWAP | BANKNIFTY | LONG        | 2026-01-19 15:08:40.269205 | 2026-01-19 19:08:40.269243 |  -3317.78 | SL            |
+|  4 | SuperTrendVWAP | TCS       | LONG        | 2026-01-19 18:08:40.370785 | 2026-01-19 19:08:40.370810 |  14596.1  | TP            |
+|  5 | SuperTrendVWAP | NIFTY     | LONG        | 2026-01-19 15:08:40.476541 | 2026-01-19 19:08:40.476566 |  18215.9  | TP            |
+|  6 | SuperTrendVWAP | BANKNIFTY | LONG        | 2026-01-19 15:08:40.578978 | 2026-01-19 19:08:40.579018 |   8330.73 | TP            |
+|  7 | SuperTrendVWAP | RELIANCE  | SHORT       | 2026-01-19 15:08:40.684778 | 2026-01-19 19:08:40.684850 |   2325.55 | TP            |
+|  8 | SuperTrendVWAP | INFY      | LONG        | 2026-01-19 14:08:40.789974 | 2026-01-19 19:08:40.790019 |   7985.69 | TP            |
+|  9 | SuperTrendVWAP | BANKNIFTY | LONG        | 2026-01-19 16:08:40.896172 | 2026-01-19 19:08:40.896240 |  -7792.29 | SL            |
+| 10 | SuperTrendVWAP | BANKNIFTY | SHORT       | 2026-01-19 15:08:41.003600 | 2026-01-19 19:08:41.003631 |  28644.6  | TP            |
+| 11 | SuperTrendVWAP | NIFTY     | SHORT       | 2026-01-19 18:08:41.109596 | 2026-01-19 19:08:41.109620 |  25063.2  | TP            |
+| 12 | SuperTrendVWAP | BANKNIFTY | SHORT       | 2026-01-19 16:08:41.215339 | 2026-01-19 19:08:41.215399 |  14911.7  | TP            |
+| 13 | SuperTrendVWAP | BANKNIFTY | LONG        | 2026-01-19 15:08:41.322657 | 2026-01-19 19:08:41.322709 |  26265.8  | TP            |
+| 14 | SuperTrendVWAP | TCS       | LONG        | 2026-01-19 17:08:41.424447 | 2026-01-19 19:08:41.424499 |  17494.2  | TP            |
+| 15 | SuperTrendVWAP | BANKNIFTY | LONG        | 2026-01-19 14:08:41.527318 | 2026-01-19 19:08:41.527388 |  -6017.34 | SL            |
+| 16 | SuperTrendVWAP | NIFTY     | LONG        | 2026-01-19 17:08:41.633448 | 2026-01-19 19:08:41.633510 |   -572.55 | SL            |
+| 17 | SuperTrendVWAP | NIFTY     | LONG        | 2026-01-19 18:08:41.739794 | 2026-01-19 19:08:41.739836 |  -1152.54 | SL            |
+| 18 | SuperTrendVWAP | INFY      | LONG        | 2026-01-19 14:08:41.846794 | 2026-01-19 19:08:41.846839 |  17418.8  | TP            |
+| 19 | SuperTrendVWAP | TCS       | LONG        | 2026-01-19 15:08:41.949416 | 2026-01-19 19:08:41.949473 |  14379.3  | TP            |
 
-#### Root Cause Analysis (Automated)
-- **Worst Strategy:** TrendPullback (12728.22)
+### Root Cause Analysis Prompt
+Review the trades above. Did the logic fail due to:
+1. Gap-up/down?
+2. High IV crush?
+3. Specific sector meltdown?
