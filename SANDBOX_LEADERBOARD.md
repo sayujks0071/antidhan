@@ -1,19 +1,17 @@
-# SANDBOX LEADERBOARD (2026-02-03)
+# SANDBOX LEADERBOARD (2026-02-04)
 
 No trades executed today.
-| Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Status |
-|------|----------|---------------|--------------|----------|--------|
-| - | SuperTrendVWAP | N/A | N/A | N/A | No Trades (Data/Market Closed) |
-| - | AdvancedMLMomentum | N/A | N/A | N/A | No Trades (Data/Market Closed) |
-| - | ORB | N/A | N/A | N/A | No Trades (Data/Market Closed) |
-| - | TrendPullback | N/A | N/A | N/A | No Trades (Data/Market Closed) |
+
+## Leaderboard (Based on Latest Available Data)
+| Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |
+|------|----------|---------------|--------------|----------|--------------|
+| 1 | SuperTrendVWAP | 12.11 | -7792.29 | 75.0% | 20 |
+| 2 | TrendPullback | 4.79 | -907.16 | 54.2% | 24 |
+| 3 | ORB | 4.77 | -31213.75 | 73.3% | 30 |
+| 4 | AdvancedMLMomentum | N/A | N/A | N/A | 0 |
 
 ## Analysis & Improvements
 
-### SuperTrendVWAP
-- **Win Rate**: N/A (No Trades)
-- **Suggestion**: Strategy failed to execute trades. Likely due to insufficient data lookback for indicators (VWAP/ATR) in Sandbox environment. Increasing `fetch_history` lookback to 30 days is recommended.
-
 ### AdvancedMLMomentum
-- **Win Rate**: N/A (No Trades)
-- **Suggestion**: Strategy failed to execute trades. Likely due to strict data requirements (50 days) and insufficient history fetching. Increasing `fetch_history` lookback to 30 days is recommended.
+- **Status**: No Trades Executed
+- **Suggestion**: Check data fetching logic (lookback periods), sector data availability, or entry conditions.
