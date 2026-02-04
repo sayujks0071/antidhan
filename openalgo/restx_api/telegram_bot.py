@@ -212,7 +212,8 @@ class StartBot(Resource):
 
             # Start bot
             if config.get("polling_mode", True):
-                success, message = run_async(bot.start_polling())
+                # Use the service method to start the bot
+                success, message = telegram_bot_service.start_bot()
             else:
                 # Webhook mode would be configured separately
                 success = True

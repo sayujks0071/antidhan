@@ -9,15 +9,15 @@ from utils.httpx_client import get_httpx_client
 
 def authenticate_broker(code):
     """
-    Authenticate with the Broker API.
+    Authenticate with the Broker API using the authorization code.
 
     Args:
         code (str): The authorization code received from the OAuth callback.
 
     Returns:
         tuple: (access_token, error_message).
-               If success, access_token is str and error_message is None.
-               If failure, access_token is None and error_message is str.
+               - access_token (str): The access token if authentication is successful, else None.
+               - error_message (str): Error description if authentication fails, else None.
     """
     try:
         BROKER_API_KEY = os.getenv("BROKER_API_KEY")

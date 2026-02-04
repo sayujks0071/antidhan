@@ -31,8 +31,10 @@ try:
         analyze_volume_profile,
         calculate_adx,
         calculate_atr,
+        calculate_ema,
         calculate_intraday_vwap,
         calculate_rsi,
+        calculate_sma,
         is_market_open,
         normalize_symbol,
     )
@@ -47,8 +49,10 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_ema,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_sma,
             is_market_open,
             normalize_symbol,
         )
@@ -63,8 +67,10 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_ema,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_sma,
             is_market_open,
             normalize_symbol,
         )
