@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-import sys
-import os
-from pathlib import Path
-
-# Add repo root to path to allow imports (if running as script)
+# Use strategy_loader to handle paths and imports
 try:
-    from base_strategy import BaseStrategy
+    from strategy_loader import BaseStrategy
 except ImportError:
-    # Try setting path to find utils
+    # Fallback for direct execution if loader not found
+    import sys
+    import os
     script_dir = os.path.dirname(os.path.abspath(__file__))
     strategies_dir = os.path.dirname(script_dir)
     utils_dir = os.path.join(strategies_dir, 'utils')
