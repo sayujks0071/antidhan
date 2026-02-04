@@ -1,5 +1,6 @@
 """Price utilities for order validation"""
 from typing import Tuple
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -18,7 +19,7 @@ def clamp_price(price: float, tick_size: float) -> float:
     """
     if tick_size <= 0:
         return price
-    
+
     return round(round(price / tick_size) * tick_size, 10)
 
 
@@ -56,7 +57,7 @@ def validate_order_price(
         (clamped_price, is_valid)
     """
     clamped = clamp_price(price, tick_size)
-    
+
     if lower_band is not None and upper_band is not None:
         if not within_band(clamped, lower_band, upper_band):
             logger.warning(
@@ -66,6 +67,6 @@ def validate_order_price(
                 upper=upper_band
             )
             return clamped, False
-    
+
     return clamped, True
 

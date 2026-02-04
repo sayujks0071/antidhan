@@ -4,7 +4,9 @@ Core Data Provider Adapter
 # Placeholder if core has a unified data provider.
 # Currently strategy foundry uses its own loader/source logic but this is here for future linkage.
 from typing import Optional
+
 import pandas as pd
+
 
 class CoreDataProvider:
     @staticmethod

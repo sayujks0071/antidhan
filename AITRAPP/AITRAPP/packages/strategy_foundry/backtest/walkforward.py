@@ -1,10 +1,13 @@
-import pandas as pd
+from typing import Dict, List
+
 import numpy as np
-from typing import List, Dict
+import pandas as pd
+
+from packages.strategy_foundry.adapters.core_costs import CostModel
 from packages.strategy_foundry.backtest.engine import BacktestEngine
 from packages.strategy_foundry.backtest.metrics import MetricCalculator
 from packages.strategy_foundry.factory.grammar import StrategyConfig
-from packages.strategy_foundry.adapters.core_costs import CostModel
+
 
 class WalkForwardEvaluator:
     def __init__(self, df: pd.DataFrame, folds: int = 4, cost_model: CostModel = None):

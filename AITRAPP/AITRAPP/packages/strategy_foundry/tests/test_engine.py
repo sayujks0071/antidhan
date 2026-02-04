@@ -1,9 +1,11 @@
 import unittest
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+
 from packages.strategy_foundry.backtest.engine import BacktestEngine
-from packages.strategy_foundry.factory.grammar import StrategyConfig, Rule
-from packages.strategy_foundry.factory.generator import StrategyGenerator
+from packages.strategy_foundry.factory.grammar import Rule, StrategyConfig
+
 
 class TestEngine(unittest.TestCase):
     def setUp(self):

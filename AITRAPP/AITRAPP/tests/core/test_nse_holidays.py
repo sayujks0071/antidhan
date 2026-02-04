@@ -1,16 +1,16 @@
-import json
 import os
 import unittest
-from unittest.mock import patch, MagicMock
-from datetime import datetime, date
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 from packages.core.nse_holidays import (
     extract_segment_dates,
     fetch_nse_holidays,
-    save_cache,
+    get_trading_holidays,
     load_cache,
-    get_trading_holidays
+    save_cache,
 )
+
 
 class TestNSEHolidays(unittest.TestCase):
 

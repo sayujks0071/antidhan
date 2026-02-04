@@ -1,11 +1,14 @@
+import os
 import threading
 import time
-import requests
-import os
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+import requests
+
 from scripts import kite_auth_bootstrap
 from scripts.kite_auth_bootstrap import main, start_server
+
 
 class TestKiteAuthIntegration:
 

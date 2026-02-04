@@ -14,7 +14,7 @@ import zmq.asyncio
 from dotenv import load_dotenv
 from sqlalchemy import text
 
-from database.auth_db import get_broker_name, verify_api_key, db_session
+from database.auth_db import db_session, get_broker_name, verify_api_key
 from services.market_data_service import get_market_data_service
 from utils.logging import get_logger, highlight_url
 
@@ -219,7 +219,7 @@ class WebSocketProxy:
                         aio.gather(*close_tasks, return_exceptions=True),
                         timeout=2.0,  # 2 second timeout
                     )
-                except aio.TimeoutError:
+                except TimeoutError:
                     logger.warning("Timeout waiting for client connections to close")
 
             # Disconnect all broker adapters

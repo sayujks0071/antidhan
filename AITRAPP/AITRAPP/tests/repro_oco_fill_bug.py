@@ -1,9 +1,11 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from datetime import datetime
+
+from packages.core.oco import OCOGroup, OCOManager
 from packages.core.order_watcher import OrderWatcher
-from packages.core.oco import OCOManager, OCOGroup
-from packages.storage.models import Order, OrderStatusEnum, OrderSideEnum, OrderTypeEnum
+from packages.storage.models import Order, OrderSideEnum, OrderStatusEnum, OrderTypeEnum
+
 
 @pytest.mark.asyncio
 class TestOCOFillBug:

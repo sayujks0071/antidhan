@@ -1,8 +1,10 @@
 """Market hours and holiday management"""
 from datetime import datetime, time
-from typing import List, Set
+from typing import List
+
 import pytz
 import structlog
+
 from packages.core.nse_holidays import get_trading_holidays
 
 logger = structlog.get_logger(__name__)
@@ -17,7 +19,7 @@ IST = pytz.timezone("Asia/Kolkata")
 
 class MarketHoursGuard:
     """Guards against trading outside market hours"""
-    
+
     def __init__(self, trading_holidays: List[str] = None):
         """
         Args:
@@ -27,7 +29,7 @@ class MarketHoursGuard:
             self.trading_holidays = set(trading_holidays)
         else:
             self.trading_holidays = get_trading_holidays()
-    
+
     def is_market_open(self, dt: datetime = None) -> bool:
         """
         Check if market is open for entries.
@@ -46,29 +48,29 @@ class MarketHoursGuard:
                 dt = IST.localize(dt)
             else:
                 dt = dt.astimezone(IST)
-        
+
         # Check if holiday
         date_str = dt.date().isoformat()
         if date_str in self.trading_holidays:
             logger.debug("Market closed: holiday", date=date_str)
             return False
-        
+
         # Check if weekend
         if dt.weekday() >= 5:  # Saturday = 5, Sunday = 6
             logger.debug("Market closed: weekend", weekday=dt.weekday())
             return False
-        
+
         # Check trading hours
         current_time = dt.time()
         if current_time < MARKET_OPEN or current_time >= MARKET_CLOSE:
-            logger.debug("Market closed: outside hours", 
+            logger.debug("Market closed: outside hours",
                         current_time=current_time,
                         open=MARKET_OPEN,
                         close=MARKET_CLOSE)
             return False
-        
+
         return True
-    
+
     def can_place_entry(self, dt: datetime = None) -> bool:
         """
         Check if entry orders can be placed.
@@ -76,7 +78,7 @@ class MarketHoursGuard:
         Entries allowed: 09:15 - 15:20 IST
         """
         return self.is_market_open(dt)
-    
+
     def can_place_exit(self, dt: datetime = None) -> bool:
         """
         Check if exit orders can be placed.
@@ -90,23 +92,23 @@ class MarketHoursGuard:
                 dt = IST.localize(dt)
             else:
                 dt = dt.astimezone(IST)
-        
+
         # Check if holiday
         date_str = dt.date().isoformat()
         if date_str in self.trading_holidays:
             return False
-        
+
         # Check if weekend
         if dt.weekday() >= 5:
             return False
-        
+
         # Check trading hours (exits allowed until 15:25)
         current_time = dt.time()
         if current_time < MARKET_OPEN or current_time >= HARD_CLOSE:
             return False
-        
+
         return True
-    
+
     def is_expiry_day(self, dt: datetime = None) -> bool:
         """
         Check if today is weekly/monthly expiry.
@@ -120,7 +122,7 @@ class MarketHoursGuard:
                 dt = IST.localize(dt)
             else:
                 dt = dt.astimezone(IST)
-        
+
         # Thursday = weekly expiry, last Thursday = monthly expiry
         # This is a placeholder - should load from NSE calendar
         if dt.weekday() == 3:  # Thursday
@@ -129,14 +131,14 @@ class MarketHoursGuard:
             if next_thursday.month != dt.month:
                 return True  # Monthly expiry
             return True  # Weekly expiry
-        
+
         return False
-    
+
     def add_holiday(self, date_str: str) -> None:
         """Add a trading holiday"""
         self.trading_holidays.add(date_str)
         logger.info("Holiday added", date=date_str)
-    
+
     def remove_holiday(self, date_str: str) -> None:
         """Remove a trading holiday"""
         self.trading_holidays.discard(date_str)

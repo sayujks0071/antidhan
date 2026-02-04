@@ -1,8 +1,8 @@
 import json
 import os
-import shutil
 from datetime import datetime
 from typing import Dict, Optional
+
 
 class ChampionStore:
     def __init__(self, base_dir: str = "packages/strategy_foundry/results/champions"):

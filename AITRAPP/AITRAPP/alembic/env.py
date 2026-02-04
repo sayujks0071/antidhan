@@ -1,14 +1,12 @@
 """Alembic environment configuration"""
-from logging.config import dictConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from packages.core.config import settings
 
 # Import Base and models
 from packages.storage.models import Base
-from packages.core.config import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 
+
 # Add AITRAPP to Python path
 def setup_aitrapp_path():
     """Add AITRAPP repository to Python path"""
@@ -12,13 +13,13 @@ def setup_aitrapp_path():
         Path(__file__).resolve().parent.parent.parent.parent / "AITRAPP" / "AITRAPP",
         Path(__file__).resolve().parent.parent.parent.parent.parent / "AITRAPP" / "AITRAPP",
     ]
-    
+
     aitrapp_path = None
     for path in possible_paths:
         if path.exists() and (path / "packages").exists():
             aitrapp_path = path
             break
-    
+
     if not aitrapp_path:
         # Try to find it relative to current file
         current = Path(__file__).resolve()
@@ -30,10 +31,10 @@ def setup_aitrapp_path():
                 f"AITRAPP repository not found. Tried: {possible_paths}\n"
                 f"Please ensure AITRAPP/AITRAPP directory exists."
             )
-    
+
     if str(aitrapp_path) not in sys.path:
         sys.path.insert(0, str(aitrapp_path))
-    
+
     return aitrapp_path
 
 
@@ -41,7 +42,6 @@ def setup_aitrapp_path():
 AITRAPP_PATH = setup_aitrapp_path()
 
 # Change to AITRAPP directory for config loading
-import os
 _original_cwd = os.getcwd()
 try:
     os.chdir(str(AITRAPP_PATH))
@@ -52,8 +52,8 @@ except:
 try:
     from packages.core.backtest import BacktestEngine
     from packages.core.historical_data import HistoricalDataLoader
+    from packages.core.models import Bar, Instrument, InstrumentType, Signal, SignalSide, Tick
     from packages.core.strategies.base import Strategy, StrategyContext
-    from packages.core.models import Signal, SignalSide, Instrument, InstrumentType, Bar, Tick
 finally:
     # Restore original directory
     try:

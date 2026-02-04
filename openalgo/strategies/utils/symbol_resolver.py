@@ -1,8 +1,9 @@
-import pandas as pd
 import logging
-from datetime import datetime, timedelta
 import os
 import re
+from datetime import datetime, timedelta
+
+import pandas as pd
 
 logger = logging.getLogger("SymbolResolver")
 
@@ -122,7 +123,7 @@ class SymbolResolver:
 
             # Check for explicitly 'MINI' or 'M' suffix on underlying name
             # Use non-capturing group to avoid pandas UserWarning
-            mini_pattern = r'(?:{}M|{}MINI)'.format(underlying, underlying)
+            mini_pattern = rf'(?:{underlying}M|{underlying}MINI)'
 
             mini_matches = matches[matches['symbol'].str.contains(mini_pattern, regex=True, flags=re.IGNORECASE)]
 

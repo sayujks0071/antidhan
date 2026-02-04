@@ -1,8 +1,11 @@
 import os
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+from kiteconnect import exceptions
+
 from src.auth.kite_auth import KiteAuth
-from kiteconnect import KiteConnect, exceptions
+
 
 class TestKiteAuthUnit(unittest.TestCase):
 

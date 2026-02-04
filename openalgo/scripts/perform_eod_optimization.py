@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-import os
-import re
+import argparse
 import glob
 import logging
-import argparse
+import os
+import re
 from datetime import datetime
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 # Setup paths
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,7 +48,7 @@ class StrategyOptimizer:
             symbol = parts[-1]
             strategy_name = "_".join(parts[:-1])
 
-            with open(log_file, 'r') as f:
+            with open(log_file) as f:
                 lines = f.readlines()
 
             signals = 0
@@ -132,7 +133,7 @@ class StrategyOptimizer:
                 logger.warning(f"Strategy file not found: {filepath}")
                 continue
 
-            with open(filepath, 'r') as f:
+            with open(filepath) as f:
                 content = f.read()
 
             new_content = content

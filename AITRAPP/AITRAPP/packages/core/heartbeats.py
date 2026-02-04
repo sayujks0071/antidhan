@@ -1,6 +1,7 @@
 """Heartbeat tracking for market data, order stream, and scan loop"""
 import asyncio
 import time
+
 import structlog
 
 from packages.core.metrics import (
@@ -38,16 +39,16 @@ def touch_scan() -> None:
 async def run_heartbeat_updater(interval: float = 1.0, stop: asyncio.Event | None = None) -> None:
     """Background task to update heartbeat metrics"""
     log = logger.bind(component="heartbeats")
-    
+
     try:
         while not (stop and stop.is_set()):
             now = time.monotonic()
-            
+
             # Update heartbeat gauges
             marketdata_heartbeat_seconds.set(now - _last_md)
             order_stream_heartbeat_seconds.set(now - _last_order)
             scan_heartbeat_seconds.set(now - _last_scan)
-            
+
             await asyncio.sleep(interval)
     except asyncio.CancelledError:
         log.info("Heartbeat updater cancelled")

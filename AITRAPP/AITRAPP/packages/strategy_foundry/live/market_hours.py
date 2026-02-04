@@ -1,5 +1,7 @@
+from datetime import datetime
+
 from packages.strategy_foundry.adapters.core_market_hours import MarketHoursAdapter
-from datetime import datetime, time
+
 
 class LiveMarketHours:
     def __init__(self):

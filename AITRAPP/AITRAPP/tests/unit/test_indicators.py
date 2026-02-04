@@ -1,7 +1,9 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from packages.core.indicators import IndicatorCalculator
+
 
 @pytest.fixture
 def sample_data():

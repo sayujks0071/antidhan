@@ -13,6 +13,7 @@ import pandas as pd
 # Add repo root to path to allow imports (if running as script)
 try:
     from base_strategy import BaseStrategy
+    from trading_utils import normalize_symbol
 except ImportError:
     # Try setting path to find utils
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -21,6 +22,7 @@ except ImportError:
     if utils_dir not in sys.path:
         sys.path.insert(0, utils_dir)
     from base_strategy import BaseStrategy
+    from trading_utils import normalize_symbol
 
 class SuperTrendVWAPStrategy(BaseStrategy):
     def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
@@ -149,13 +151,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
     def check_sector_correlation(self):
         try:
-            sector_symbol = self.sector_benchmark.replace(" ", "").upper()
-            if "BANK" in sector_symbol and "NIFTY" in sector_symbol:
-                sector_symbol = "BANKNIFTY"
-            elif "NIFTY" in sector_symbol:
-                sector_symbol = "NIFTY"
-            else:
-                sector_symbol = "NIFTY"
+            sector_symbol = normalize_symbol(self.sector_benchmark)
 
             df = self.fetch_history(days=30, symbol=sector_symbol, interval="D", exchange="NSE_INDEX")
 

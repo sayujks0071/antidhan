@@ -9,15 +9,16 @@ Analyzes strategy logs to provide deep insights into trading performance:
 - Strategy Comparison
 """
 
-import os
-import sys
-import re
 import argparse
-import pandas as pd
-import numpy as np
+import os
+import re
+import sys
+from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from collections import defaultdict
+
+import numpy as np
+import pandas as pd
 
 try:
     import tabulate
@@ -60,7 +61,7 @@ class PerformanceAnalyzer:
             # State for this file
             entry_time = None
 
-            with open(log_file, 'r', errors='ignore') as f:
+            with open(log_file, errors='ignore') as f:
                 for line in f:
                     time_match = time_pattern.search(line)
                     if not time_match:
@@ -116,7 +117,7 @@ class PerformanceAnalyzer:
 
     def generate_report(self):
         if not self.trades:
-            print("No trades found in the last {} days.".format(self.lookback_days))
+            print(f"No trades found in the last {self.lookback_days} days.")
             return
 
         df = pd.DataFrame(self.trades)
@@ -140,7 +141,7 @@ class PerformanceAnalyzer:
         avg_loss = losses['pnl'].mean() if not losses.empty else 0
         avg_duration = df['duration_mins'].mean()
 
-        print(f"\n📈 OVERALL SUMMARY")
+        print("\n📈 OVERALL SUMMARY")
         print(f"Total P&L:       ₹{total_pnl:,.2f}")
         print(f"Total Trades:    {total_trades}")
         print(f"Win Rate:        {win_rate:.1f}%")
@@ -157,7 +158,7 @@ class PerformanceAnalyzer:
                 print(df_table.to_string())
 
         # 2. Strategy Breakdown
-        print(f"\n🏆 STRATEGY PERFORMANCE")
+        print("\n🏆 STRATEGY PERFORMANCE")
         strat_group = df.groupby('strategy').agg({
             'pnl': ['sum', 'count', 'mean'],
             'duration_mins': 'mean'
@@ -171,7 +172,7 @@ class PerformanceAnalyzer:
         print_table(strat_group, headers="keys")
 
         # 3. Time of Day Attribution
-        print(f"\n⏰ P&L BY HOUR OF DAY")
+        print("\n⏰ P&L BY HOUR OF DAY")
         hourly = df.groupby('hour')['pnl'].agg(['sum', 'count', 'mean']).sort_index()
         hourly.columns = ['Total P&L', 'Trades', 'Avg P&L']
         print_table(hourly, headers="keys")

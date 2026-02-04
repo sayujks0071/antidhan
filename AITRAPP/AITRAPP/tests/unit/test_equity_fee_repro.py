@@ -1,8 +1,10 @@
 
 import pytest
+
 from packages.core.config import RiskConfig
 from packages.core.models import Instrument, InstrumentType
 from packages.core.risk import RiskManager
+
 
 @pytest.fixture
 def risk_manager():

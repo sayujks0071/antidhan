@@ -112,16 +112,6 @@ def close_position_with_auth(
 
         return sandbox_close_position(close_data, api_key, original_data)
 
-    # Existing broker logic below - keep the socketio.emit line
-    if False:  # This will never execute but preserves the code structure
-        socketio.emit("analyzer_update", {"request": analyzer_request, "response": response_data})
-
-        # Send Telegram alert for analyze mode
-        telegram_alert_service.send_order_alert(
-            "closeposition", position_data, response_data, position_data.get("apikey")
-        )
-        return True, response_data, 200
-
     broker_module = import_broker_module(broker)
     if broker_module is None:
         error_response = {"status": "error", "message": "Broker-specific module not found"}

@@ -1,12 +1,13 @@
-import unittest
+import json
 import os
 import shutil
-import json
-from datetime import datetime, timedelta, time
+import unittest
+from datetime import datetime, time, timedelta
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from openalgo.strategies.utils.risk_manager import RiskManager, EODSquareOff, create_risk_manager
+from openalgo.strategies.utils.risk_manager import EODSquareOff, RiskManager, create_risk_manager
+
 
 class TestRiskManager(unittest.TestCase):
     def setUp(self):
@@ -52,7 +53,7 @@ class TestRiskManager(unittest.TestCase):
         self.assertEqual(self.rm.daily_trades, 1)
 
         # Check persisted state
-        with open(self.rm.state_file, 'r') as f:
+        with open(self.rm.state_file) as f:
             data = json.load(f)
             self.assertIn(symbol, data['positions'])
 

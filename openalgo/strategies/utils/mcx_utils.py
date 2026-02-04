@@ -1,6 +1,7 @@
 import re
 from datetime import date
 
+
 def format_mcx_symbol(underlying, expiry_date, mini=False):
     """
     Format MCX Futures Symbol strictly according to canonical rules.

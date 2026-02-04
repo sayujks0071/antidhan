@@ -1,5 +1,6 @@
 import logging
 from typing import Dict
+
 from packages.strategy_foundry.selection.champion_store import ChampionStore
 
 logger = logging.getLogger(__name__)

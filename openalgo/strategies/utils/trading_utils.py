@@ -1,15 +1,18 @@
+import json
+import logging
 import os
 import time
-import logging
-import pytz
-import json
 import time as time_module
-from pathlib import Path
-from datetime import datetime, time as dt_time
+from datetime import datetime
+from datetime import time as dt_time
 from functools import lru_cache
+from pathlib import Path
+
 import httpx
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytz
+
 from utils import httpx_client
 
 # Configure logging
@@ -145,6 +148,18 @@ def calculate_atr(df, period=14):
     return tr.rolling(period).mean()
 
 
+def calculate_bollinger_bands(series, window=20, num_std=2):
+    """
+    Calculate Bollinger Bands.
+    Returns: sma, upper, lower
+    """
+    sma = series.rolling(window=window).mean()
+    std = series.rolling(window=window).std()
+    upper = sma + (std * num_std)
+    lower = sma - (std * num_std)
+    return sma, upper, lower
+
+
 def calculate_adx(df, period=14):
     """Calculate ADX (Returns Series)."""
     try:
@@ -228,7 +243,7 @@ class PositionManager:
     def load_state(self):
         if self.state_file.exists():
             try:
-                with open(self.state_file, "r") as f:
+                with open(self.state_file) as f:
                     data = json.load(f)
                     self.position = data.get("position", 0)
                     self.entry_price = data.get("entry_price", 0.0)
@@ -509,7 +524,7 @@ class APIClient:
 
                 try:
                     data = response.json()
-                except ValueError as json_err:
+                except ValueError:
                     error_text = response.text[:200] if response.text else "(empty)"
                     logger.error(
                         f"Quote API returned non-JSON for {symbol}: {error_text}"
