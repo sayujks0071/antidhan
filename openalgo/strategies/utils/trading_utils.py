@@ -3,7 +3,7 @@ import logging
 import os
 import time
 import time as time_module
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import time as dt_time
 from functools import lru_cache
 from pathlib import Path
@@ -712,3 +712,41 @@ class APIClient:
         # Fallback to a default or raise error?
         # For safety, return None so caller handles it
         return None
+
+
+def get_vix_value(client):
+    """Fetch real VIX or default to 15.0."""
+    try:
+        # Use existing client method
+        vix_df = client.history(
+            symbol="INDIA VIX",
+            exchange="NSE_INDEX",
+            interval="D",
+            start_date=(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d"),
+            end_date=datetime.now().strftime("%Y-%m-%d")
+        )
+        if not vix_df.empty:
+            vix = vix_df.iloc[-1]['close']
+            return float(vix)
+    except Exception as e:
+        logger.warning(f"Could not fetch VIX: {e}. Defaulting to 15.0.")
+    return 15.0
+
+
+def fetch_sector_data(client, sector_symbol, days=30):
+    """Fetch sector data for correlation/strength checks."""
+    try:
+        symbol = normalize_symbol(sector_symbol)
+        exchange = "NSE_INDEX" if "NIFTY" in symbol.upper() else "NSE"
+
+        df = client.history(
+            symbol=symbol,
+            interval="D",
+            exchange=exchange,
+            start_date=(datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d"),
+            end_date=datetime.now().strftime("%Y-%m-%d")
+        )
+        return df
+    except Exception as e:
+        logger.warning(f"Failed to fetch sector data for {sector_symbol}: {e}")
+        return pd.DataFrame()
