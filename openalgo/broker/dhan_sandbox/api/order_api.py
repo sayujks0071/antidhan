@@ -34,7 +34,7 @@ def get_api_response(endpoint, auth, method="GET", payload=""):
         dict: The JSON response from the API, or an error dictionary.
     """
     AUTH_TOKEN = auth
-    api_key = os.getenv("BROKER_API_KEY")
+    # api_key = os.getenv("BROKER_API_KEY")
 
     # Headers for the request
     headers = {
@@ -292,7 +292,7 @@ def place_smartorder_api(data, auth):
         tuple: (response_object, response_dict, order_id)
     """
     AUTH_TOKEN = auth
-    BROKER_API_KEY = os.getenv("BROKER_API_KEY")
+    # BROKER_API_KEY = os.getenv("BROKER_API_KEY")
     # If no API call is made in this function then res will return None
     res = None
 

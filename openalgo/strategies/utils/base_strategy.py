@@ -33,6 +33,7 @@ try:
         calculate_atr,
         calculate_intraday_vwap,
         calculate_rsi,
+        calculate_supertrend,
         is_market_open,
         normalize_symbol,
     )
@@ -49,6 +50,7 @@ except ImportError:
             calculate_atr,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_supertrend,
             is_market_open,
             normalize_symbol,
         )
@@ -65,6 +67,7 @@ except ImportError:
             calculate_atr,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_supertrend,
             is_market_open,
             normalize_symbol,
         )
@@ -313,9 +316,36 @@ class BaseStrategy:
         """Calculate VWAP."""
         return calculate_intraday_vwap(df)
 
+    def calculate_supertrend(self, df, period=10, multiplier=3):
+        """Calculate SuperTrend."""
+        return calculate_supertrend(df, period, multiplier)
+
     def analyze_volume_profile(self, df, n_bins=20):
         """Find Point of Control (POC)."""
         return analyze_volume_profile(df, n_bins)
+
+    def check_sector_correlation(self, sector_benchmark="NIFTY BANK", lookback_days=30):
+        """
+        Check sector correlation using RSI logic.
+        """
+        try:
+            sector_symbol = normalize_symbol(sector_benchmark)
+
+            # Use NSE_INDEX for indices
+            exchange = "NSE_INDEX" if "NIFTY" in sector_symbol.upper() or "VIX" in sector_symbol.upper() else "NSE"
+
+            # Fetch data using the existing client
+            df = self.fetch_history(days=lookback_days, symbol=sector_symbol, interval="D", exchange=exchange)
+
+            if not df.empty and len(df) > 15:
+                rsi = self.calculate_rsi(df['close'])
+                last_rsi = rsi.iloc[-1]
+                self.logger.info(f"Sector {sector_benchmark} RSI: {last_rsi:.2f}")
+                return last_rsi > 50
+            return False
+        except Exception as e:
+            self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True (Allow) to prevent blocking on data issues.")
+            return True
 
     @staticmethod
     def get_standard_parser(description="Strategy"):
