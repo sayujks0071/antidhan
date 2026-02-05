@@ -21,20 +21,26 @@ utils_dir = os.path.join(strategies_dir, 'utils')
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open
+    from trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi
 except ImportError:
     try:
         # Try absolute import
         sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open
+        from utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
             APIClient = None
             PositionManager = None
             is_market_open = lambda: True
+            def calculate_rsi(series, period=14):
+                delta = series.diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+                rs = gain / loss
+                return 100 - (100 / (1 + rs))
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -59,12 +65,8 @@ class MLMomentumStrategy:
         # Indicators
         df['roc'] = df['close'].pct_change(periods=10)
 
-        # RSI
-        delta = df['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs_val = gain / loss
-        df['rsi'] = 100 - (100 / (1 + rs_val))
+        # RSI (Refactored to use shared utility)
+        df['rsi'] = calculate_rsi(df['close'], period=14)
 
         # SMA for Trend
         df['sma50'] = df['close'].rolling(50).mean()
@@ -170,12 +172,8 @@ class MLMomentumStrategy:
                 # 3. Indicators
                 df['roc'] = df['close'].pct_change(periods=10)
 
-                # RSI
-                delta = df['close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                rs_val = gain / loss
-                df['rsi'] = 100 - (100 / (1 + rs_val))
+                # RSI (Refactored to use shared utility)
+                df['rsi'] = calculate_rsi(df['close'], period=14)
 
                 # SMA for Trend
                 df['sma50'] = df['close'].rolling(50).mean()
