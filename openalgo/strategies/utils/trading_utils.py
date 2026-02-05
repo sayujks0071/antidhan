@@ -332,6 +332,34 @@ class PositionManager:
 
         return int(qty)
 
+    def calculate_adaptive_quantity_monthly_atr(self, capital, risk_per_trade_pct, monthly_atr, price):
+        """
+        Calculate position size based on Monthly ATR-based stop loss (1.5x Monthly ATR).
+        Risk Amount = Capital * (risk_per_trade_pct/100)
+        Stop Distance = Monthly ATR * 1.5
+        Qty = Risk Amount / Stop Distance
+        """
+        if monthly_atr <= 0 or price <= 0:
+            logger.warning(f"Invalid Monthly ATR ({monthly_atr}) or Price ({price}) for sizing.")
+            return 0
+
+        risk_amount = capital * (risk_per_trade_pct / 100.0)
+        stop_loss_dist = monthly_atr * 1.5
+
+        # Avoid division by zero
+        if stop_loss_dist == 0:
+            qty = 0
+        else:
+            qty = risk_amount / stop_loss_dist
+
+        # Ensure quantity is at least 1 if risk allowed it, but respect capital limits
+        # Max quantity based on capital = capital / price
+        max_qty_capital = capital / price
+
+        qty = min(qty, max_qty_capital)
+
+        return int(qty)
+
     def has_position(self):
         return self.position != 0
 

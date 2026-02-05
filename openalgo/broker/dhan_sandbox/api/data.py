@@ -1,7 +1,9 @@
 import json
 import os
+import pickle
 import urllib.parse
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import httpx
 import jwt
@@ -89,6 +91,8 @@ class BrokerData:
             # Daily
             "D": "D",  # Daily data
         }
+        self.cache_dir = Path(".cache/history")
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _convert_to_dhan_request(self, symbol, exchange):
         """Convert symbol and exchange to Dhan format"""
@@ -319,6 +323,20 @@ class BrokerData:
 
             # Adjust dates for trading days
             start_date, end_date = self._adjust_dates(start_date, end_date)
+
+            # Check cache
+            cache_key = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}.pkl"
+            cache_file = self.cache_dir / cache_key
+
+            if cache_file.exists():
+                try:
+                    with open(cache_file, "rb") as f:
+                        logger.info(f"Loading {symbol} history from cache: {cache_file}")
+                        cached_df = pickle.load(f)
+                        if not cached_df.empty:
+                            return cached_df
+                except Exception as e:
+                    logger.warning(f"Failed to load cache {cache_file}: {e}")
 
             # If both dates are weekends, return empty DataFrame
             if not self._is_trading_day(start_date) and not self._is_trading_day(end_date):
@@ -571,6 +589,15 @@ class BrokerData:
                     .drop_duplicates(subset=["timestamp"])
                     .reset_index(drop=True)
                 )
+
+            # Save to cache
+            if not df.empty:
+                try:
+                    with open(cache_file, "wb") as f:
+                        pickle.dump(df, f)
+                        logger.info(f"Saved {symbol} history to cache: {cache_file}")
+                except Exception as e:
+                    logger.warning(f"Failed to save cache {cache_file}: {e}")
 
             return df
 

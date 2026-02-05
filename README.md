@@ -163,25 +163,24 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 - Central monitor via `openalgo/scripts/monitor_trades.py`
 - Broker positionbook is used to reconcile live positions.
 
-## 🛡️ System Audit & Performance (Feb 2026)
+## 🛡️ System Audit & Performance (Jan 2026)
 
-### Audit Findings
-- **High Correlation:** Strategies `SuperTrendVWAP`, `TrendPullback`, and `ORB` showed 100% correlation in recent logs. This poses a risk of simultaneous drawdowns.
-  - **Action:** Recommend consolidating capital into `SuperTrendVWAP` (Highest Calmar Ratio: ~17.7k) and investigating/diversifying the other two logic.
+### Audit Findings (2026-01-29)
+- **Data Availability:** Analysis of logs revealed limited data points (single day: 2026-01-19), preventing meaningful correlation analysis across strategies (resulted in NaN).
 - **Equity Curve Stress Test:**
-  - **Worst Day:** 2026-01-19.
-  - **Worst Strategy:** `TrendPullback` (relative to potential).
-  - The system has shown resilience but the lack of diversity in signals is a concern.
+  - **Assessment Date:** 2026-01-19
+  - **Performance:** The system was profitable overall (+577k), but this single data point cannot be extrapolated for stress testing.
+  - **Action Item:** Accumulate more trade history (at least 30 days) to perform a valid stress test and correlation analysis.
 
 ### Infrastructure Upgrades
-- **Batch Data Fetching:** Implemented `get_batch_quotes` in Dhan sandbox and `APIClient` to reduce latency when tracking multiple instruments.
-- **Caching:** Added caching to `get_instruments` to minimize API load.
-- **Adaptive Sizing:** Updated `PositionManager` to include `calculate_adaptive_quantity`, allowing position sizing based on ATR volatility (Target Risk / ATR).
+- **Data Caching:** Implemented `pickle`-based caching in `Dhan Sandbox API` (`get_history`) to reduce latency and API calls for historical data.
+- **Adaptive Sizing:** Enhanced `PositionManager` with `calculate_adaptive_quantity_monthly_atr` to support position sizing based on 1.5x Monthly ATR, normalizing risk across varying volatility regimes.
+- **Batch Processing:** Verified batch quote fetching capabilities to optimize multi-symbol strategies.
 
 ## 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **Gamma Scalping on Earnings:** Explore strategies that exploit high IV environments around earnings releases, hedging delta while capturing gamma.
-2.  **Mean Reversion on High IV Rank:** Develop a counter-trend strategy specifically for instruments with IV Rank > 80, fading extreme moves.
-3.  **Volume Profile POC Bounce:** Implement a strategy trading off the Point of Control (POC) from the previous day's Volume Profile, aiming for mean reversion or support/resistance tests.
+1.  **Volume Profile POC:** Explore trading logic based on the Point of Control (POC) to identify high-probability reversal or support levels.
+2.  **Market Breadth / Advance-Decline:** Integrate broad market sentiment indicators (A/D Ratio) to filter trend-following strategies during choppy markets.
+3.  **Options Flow & Greeks:** Leverage real-time option chain analytics (Delta/Gamma exposure) to anticipate market moves and hedge directional risk.
