@@ -2,8 +2,7 @@ import os
 import glob
 import json
 import re
-import pandas as pd
-from datetime import datetime, date
+import datetime
 
 # Configuration
 LOG_DIRS = [
@@ -11,7 +10,7 @@ LOG_DIRS = [
     "openalgo_backup_20260128_164229/logs"
 ]
 
-TODAY = datetime.now().date()
+TODAY = datetime.date.today()
 TODAY_STR = TODAY.strftime("%Y-%m-%d")
 
 def parse_text_log(filepath):
@@ -28,7 +27,7 @@ def parse_text_log(filepath):
 
                 timestamp_str = match.group(1)
                 try:
-                    dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    dt = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
                 except ValueError:
                     continue
 
@@ -37,23 +36,24 @@ def parse_text_log(filepath):
                     price_match = re.search(r'Price: ([\d\.]+)', line)
                     if price_match and not current_trade:
                         current_trade = {
-                            'entry_time': dt,
+                            'entry_time_dt': dt,
+                            'entry_date': dt.date(),
                             'entry_price': float(price_match.group(1)),
                             'direction': 'LONG',
-                            'status': 'OPEN'
+                            'status': 'OPEN',
+                            'pnl': 0.0
                         }
 
                 # Exit Logic
                 if "Trailing Stop Hit" in line or "Exiting" in line or "Stop Loss Hit" in line:
                     if current_trade.get('status') == 'OPEN':
                         price_match = re.search(r'at ([\d\.]+)', line)
-                        # Sometimes price might be inferred differently
                         if not price_match:
                              price_match = re.search(r'Price: ([\d\.]+)', line)
 
                         if price_match:
                             exit_price = float(price_match.group(1))
-                            current_trade['exit_time'] = dt
+                            current_trade['exit_time_dt'] = dt
                             current_trade['exit_price'] = exit_price
                             current_trade['status'] = 'CLOSED'
                             current_trade['pnl'] = (exit_price - current_trade['entry_price'])
@@ -71,16 +71,32 @@ def parse_json_log(filepath):
             data = json.load(f)
             if isinstance(data, list):
                 for item in data:
+                    # Normalize keys
                     if 'entry_time' in item:
-                        # Ensure timestamp is datetime
-                        if isinstance(item['entry_time'], str):
-                            item['entry_time'] = pd.to_datetime(item['entry_time']).to_pydatetime()
-                        if 'exit_time' in item and isinstance(item['exit_time'], str):
-                            item['exit_time'] = pd.to_datetime(item['exit_time']).to_pydatetime()
+                        # Parse timestamp
+                        try:
+                            entry_dt = datetime.datetime.fromisoformat(item['entry_time'])
+                        except ValueError:
+                            try:
+                                entry_dt = datetime.datetime.strptime(item['entry_time'], "%Y-%m-%d %H:%M:%S")
+                            except ValueError:
+                                # Fallback or skip
+                                continue
 
-                        # Calculate PnL if not present but prices are
-                        if 'pnl' not in item and 'entry_price' in item and 'exit_price' in item:
-                            item['pnl'] = item['exit_price'] - item['entry_price'] # Assuming LONG for simplicity if direction missing
+                        item['entry_time_dt'] = entry_dt
+                        item['entry_date'] = entry_dt.date()
+
+                        if 'exit_time' in item and item['exit_time']:
+                            try:
+                                exit_dt = datetime.datetime.fromisoformat(item['exit_time'])
+                                item['exit_time_dt'] = exit_dt
+                            except ValueError:
+                                pass
+
+                        # Ensure numeric
+                        item['pnl'] = float(item.get('pnl', 0.0))
+                        item['entry_price'] = float(item.get('entry_price', 0.0))
+                        item['exit_price'] = float(item.get('exit_price', 0.0))
 
                         trades.append(item)
     except Exception as e:
@@ -115,27 +131,43 @@ def scan_logs():
 
     return all_trades
 
-def calculate_metrics(df):
+def calculate_metrics(trades):
     metrics = {}
 
-    for strategy, group in df.groupby('strategy'):
+    # Group by strategy
+    strategies = {}
+    for t in trades:
+        s = t.get('strategy', 'Unknown')
+        if s not in strategies:
+            strategies[s] = []
+        strategies[s].append(t)
+
+    for strategy, group in strategies.items():
+        # Sort by entry time
+        group.sort(key=lambda x: x.get('entry_time_dt', datetime.datetime.min))
+
         # Profit Factor
-        gross_profit = group[group['pnl'] > 0]['pnl'].sum()
-        gross_loss = abs(group[group['pnl'] < 0]['pnl'].sum())
+        gross_profit = sum(t['pnl'] for t in group if t['pnl'] > 0)
+        gross_loss = abs(sum(t['pnl'] for t in group if t['pnl'] < 0))
         profit_factor = gross_profit / gross_loss if gross_loss != 0 else float('inf')
 
         # Win Rate
-        wins = len(group[group['pnl'] > 0])
+        wins = len([t for t in group if t['pnl'] > 0])
         total = len(group)
         win_rate = (wins / total) * 100 if total > 0 else 0
 
         # Max Drawdown
-        group = group.sort_values('entry_time')
-        cumulative_pnl = group['pnl'].cumsum()
-        peak = cumulative_pnl.expanding(min_periods=1).max()
-        drawdown = cumulative_pnl - peak
-        max_drawdown = drawdown.min()
-        if pd.isna(max_drawdown): max_drawdown = 0.0
+        cumulative_pnl = 0
+        peak = 0
+        max_drawdown = 0
+
+        for t in group:
+            cumulative_pnl += t['pnl']
+            if cumulative_pnl > peak:
+                peak = cumulative_pnl
+            drawdown = cumulative_pnl - peak
+            if drawdown < max_drawdown:
+                max_drawdown = drawdown
 
         metrics[strategy] = {
             'Profit Factor': profit_factor,
@@ -148,43 +180,33 @@ def calculate_metrics(df):
 
 def main():
     print(f"Generating Sandbox Leaderboard for {TODAY_STR}")
-    trades = scan_logs()
-
-    df = pd.DataFrame(trades)
+    all_trades = scan_logs()
 
     # Filter for TODAY
-    if not df.empty:
-        today_trades = df[df['entry_time'].apply(lambda x: x.date() == TODAY)]
-    else:
-        today_trades = pd.DataFrame()
+    today_trades = [t for t in all_trades if t.get('entry_date') == TODAY]
 
     markdown_content = f"# SANDBOX LEADERBOARD ({TODAY_STR})\n\n"
 
-    if today_trades.empty:
+    if not today_trades:
+        print("No trades found for today.")
         markdown_content += "No trades executed today.\n"
-        # We can analyze historical trades from logs found, even if not today,
-        # to fulfill the 'Improvement Suggestions' part effectively.
-        # But the leaderboard strictly asks for TODAY.
-        # However, to be helpful, we will analyze *all available logs* for the improvement section
-        # if today is empty, or just note it.
-        # The prompt says: "If a strategy has a 'Win Rate' below 40%, add a comment..."
-        # If no trades today, Win Rate is N/A.
-        # Let's list known active strategies with "No Trades".
 
-        # Hardcoded list of strategies we expect to see
-        strategies = ["SuperTrendVWAP", "AdvancedMLMomentum", "ORB", "TrendPullback"]
-        markdown_content += "| Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Status |\n"
-        markdown_content += "|------|----------|---------------|--------------|----------|--------|\n"
-        for s in strategies:
-             markdown_content += f"| - | {s} | N/A | N/A | N/A | No Trades (Data/Market Closed) |\n"
-
-        metrics = {} # Empty metrics
+        # Fallback to historical for improvement analysis
+        print("Analyzing historical trades for improvement suggestions...")
+        historical_metrics = calculate_metrics(all_trades)
+        display_metrics = {}
+        analysis_metrics = historical_metrics
+        if historical_metrics:
+            markdown_content += "\n> **Note:** Leaderboard is empty due to no trades today. Improvement suggestions below are based on historical data.\n"
     else:
-        metrics = calculate_metrics(today_trades)
+        print(f"Found {len(today_trades)} trades for today.")
+        display_metrics = calculate_metrics(today_trades)
+        analysis_metrics = display_metrics
 
-        # Sort by Profit Factor (desc), then Max Drawdown (desc - meaning less negative is better? No, Max Drawdown is usually negative or zero. So closest to zero is best.)
-        # Let's sort by Profit Factor desc.
-        ranked_strategies = sorted(metrics.items(), key=lambda x: x[1]['Profit Factor'], reverse=True)
+    # Leaderboard Section
+    if display_metrics:
+        # Sort by Profit Factor desc
+        ranked_strategies = sorted(display_metrics.items(), key=lambda x: x[1]['Profit Factor'], reverse=True)
 
         markdown_content += "| Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |\n"
         markdown_content += "|------|----------|---------------|--------------|----------|--------------|\n"
@@ -193,44 +215,24 @@ def main():
             pf_str = f"{m['Profit Factor']:.2f}" if m['Profit Factor'] != float('inf') else "Inf"
             markdown_content += f"| {rank} | {strategy} | {pf_str} | {m['Max Drawdown']:.2f} | {m['Win Rate']:.1f}% | {m['Total Trades']} |\n"
 
+    # Improvement Section
     markdown_content += "\n## Analysis & Improvements\n"
 
-    # If we have metrics, use them. If not, use generic advice for known strategies or check backup logs for historical context?
-    # The prompt is specific: "Extract ... for every trade executed ... today."
-    # Then "If a strategy has a 'Win Rate' below 40%...".
-    # If no trades today, we technically don't have a Win Rate.
-    # But based on the previous leaderboard, "N/A" triggered analysis.
-
-    # Let's check historical performance from the logs we scanned (ignoring date) to see if we can give better advice.
-    historical_metrics = calculate_metrics(df) if not df.empty else {}
-
-    # Merge historical context if today is empty?
-    # Actually, let's just loop through what we have.
-
-    analyzed_strategies = set()
-
-    # 1. Analyze Today's Metrics
-    for strategy, m in metrics.items():
-        analyzed_strategies.add(strategy)
+    improvement_needed = False
+    for strategy, m in analysis_metrics.items():
         if m['Win Rate'] < 40:
+            improvement_needed = True
             markdown_content += f"\n### {strategy}\n"
             markdown_content += f"- **Win Rate**: {m['Win Rate']:.1f}% (< 40%)\n"
-            markdown_content += "- **Suggestion**: Analyze entry conditions. Check log for rejections or stop loss tightness.\n"
+            markdown_content += f"- **Profit Factor**: {m['Profit Factor']:.2f}\n"
+            markdown_content += "- **Suggestion**: Strategy has a low win rate. Investigate entry logic to reduce false positives. Consider adding trend filters (e.g., ADX > 25) or tightening stop losses.\n"
+            print(f"Strategy {strategy} needs improvement (Win Rate: {m['Win Rate']:.1f}%)")
 
-    # 2. Analyze Strategies with No Trades (implied 0% participation or failure)
-    # We know from previous context that SuperTrendVWAP and MLMomentum failed.
-    # We will add specific comments for them if they didn't appear in metrics.
-
-    known_failures = {
-        "SuperTrendVWAP": "Strategy failed to execute trades. Likely due to insufficient data lookback for indicators (VWAP/ATR) in Sandbox environment.",
-        "AdvancedMLMomentum": "Strategy failed to execute trades. Likely due to strict data requirements (50 days) and insufficient history fetching."
-    }
-
-    for strategy, reason in known_failures.items():
-        if strategy not in analyzed_strategies:
-             markdown_content += f"\n### {strategy}\n"
-             markdown_content += f"- **Win Rate**: N/A (No Trades)\n"
-             markdown_content += f"- **Suggestion**: {reason} Increasing `fetch_history` lookback to 30 days is recommended.\n"
+    if not improvement_needed and analysis_metrics:
+        markdown_content += "\nAll strategies (historical or current) have Win Rate >= 40%. No immediate improvements required based on this metric.\n"
+        print("No strategies found with Win Rate < 40%.")
+    elif not analysis_metrics:
+        markdown_content += "\nNo trade data available for analysis.\n"
 
     with open("SANDBOX_LEADERBOARD.md", "w") as f:
         f.write(markdown_content)
