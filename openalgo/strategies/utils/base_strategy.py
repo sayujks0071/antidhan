@@ -31,6 +31,7 @@ try:
         analyze_volume_profile,
         calculate_adx,
         calculate_atr,
+        calculate_bollinger_bands,
         calculate_intraday_vwap,
         calculate_rsi,
         is_market_open,
@@ -47,6 +48,7 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_bollinger_bands,
             calculate_intraday_vwap,
             calculate_rsi,
             is_market_open,
@@ -63,6 +65,7 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_bollinger_bands,
             calculate_intraday_vwap,
             calculate_rsi,
             is_market_open,
@@ -317,6 +320,20 @@ class BaseStrategy:
         """Find Point of Control (POC)."""
         return analyze_volume_profile(df, n_bins)
 
+    def check_market_open(self):
+        """Check if market is open for the strategy's exchange."""
+        # Split handle NSE_INDEX -> NSE
+        exch = self.exchange.split('_')[0]
+        return is_market_open(exch)
+
+    def calculate_bollinger_bands(self, series, window=20, num_std=2):
+        """Calculate Bollinger Bands."""
+        return calculate_bollinger_bands(series, window, num_std)
+
+    def calculate_sma(self, series, window):
+        """Calculate Simple Moving Average."""
+        return series.rolling(window=window).mean()
+
     @staticmethod
     def get_standard_parser(description="Strategy"):
         """Get a standard ArgumentParser with common arguments."""
@@ -327,6 +344,7 @@ class BaseStrategy:
         parser.add_argument("--host", type=str, help="Host")
         parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours")
         parser.add_argument("--logfile", type=str, help="Log file path")
+        parser.add_argument("--sector", type=str, help="Sector Benchmark (e.g., NIFTY 50)")
         return parser
 
     @classmethod
@@ -372,6 +390,10 @@ class BaseStrategy:
         # Add exchange if available in args (it's not in standard parser but might be added)
         if hasattr(args, 'exchange') and args.exchange:
             kwargs['exchange'] = args.exchange
+
+        # Add sector if available
+        if hasattr(args, 'sector') and args.sector:
+            kwargs['sector'] = args.sector
 
         return kwargs
 
