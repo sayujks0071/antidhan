@@ -35,7 +35,7 @@ This repository contains:
 ### Prerequisites
 
 ```bash
-pip install pyyaml structlog pandas numpy scipy httpx pydantic-settings
+pip install pyyaml structlog pandas numpy scipy httpx pydantic-settings h2
 ```
 
 ### Running Backtests
