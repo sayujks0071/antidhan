@@ -31,8 +31,10 @@ try:
         analyze_volume_profile,
         calculate_adx,
         calculate_atr,
+        calculate_ema,
         calculate_intraday_vwap,
         calculate_rsi,
+        calculate_sma,
         is_market_open,
         normalize_symbol,
     )
@@ -47,8 +49,10 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_ema,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_sma,
             is_market_open,
             normalize_symbol,
         )
@@ -63,8 +67,10 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_ema,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_sma,
             is_market_open,
             normalize_symbol,
         )
@@ -299,6 +305,14 @@ class BaseStrategy:
     def calculate_rsi(self, series, period=14):
         """Calculate Relative Strength Index."""
         return calculate_rsi(series, period)
+
+    def calculate_sma(self, series, window=20):
+        """Calculate Simple Moving Average."""
+        return calculate_sma(series, window)
+
+    def calculate_ema(self, series, span=20):
+        """Calculate Exponential Moving Average."""
+        return calculate_ema(series, span)
 
     def calculate_atr(self, df, period=14):
         """Calculate Average True Range."""
