@@ -190,11 +190,22 @@ def place_order_api(data, auth):
     Place an order via the Dhan API.
 
     Args:
-        data (dict): Order parameters (symbol, quantity, price, etc.).
+        data (dict): Order parameters. Expected keys:
+            - symbol (str): Trading symbol.
+            - exchange (str): Exchange (e.g., 'NSE', 'MCX').
+            - quantity (str|int): Order quantity.
+            - price (str|float, optional): Limit price.
+            - trigger_price (str|float, optional): Trigger price for SL.
+            - pricetype (str): Order type ('LIMIT', 'MARKET', 'STOP_LOSS', 'STOP_LOSS_MARKET').
+            - product (str): Product type ('CNC', 'MIS', etc.).
+            - action (str): Transaction type ('BUY' or 'SELL').
         auth (str): Authentication token.
 
     Returns:
         tuple: (response_object, response_dict, order_id)
+            - response_object: The raw HTTP response object (or None if pre-validation fails).
+            - response_dict: Parsed JSON response or error dict.
+            - order_id: The Order ID if successful, else None.
     """
     # 1. Error handling for Invalid Token (Auth Token)
     if not auth:
@@ -285,11 +296,20 @@ def place_smartorder_api(data, auth):
     Used for closing positions or managing net quantity.
 
     Args:
-        data (dict): Order parameters including 'position_size'.
+        data (dict): Order parameters. Expected keys:
+            - symbol (str): Trading symbol.
+            - exchange (str): Exchange.
+            - product (str): Product type.
+            - action (str): Intended action ('BUY' or 'SELL').
+            - quantity (str|int): Desired quantity to trade.
+            - position_size (str|int): Target position size (often 0 for closing).
         auth (str): Authentication token.
 
     Returns:
         tuple: (response_object, response_dict, order_id)
+            - response_object: HTTP response object if API called, else None.
+            - response_dict: Response data.
+            - order_id: Order ID if order placed, else None.
     """
     AUTH_TOKEN = auth
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
