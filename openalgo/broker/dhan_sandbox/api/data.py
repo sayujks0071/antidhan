@@ -1,6 +1,9 @@
 import json
 import os
 import urllib.parse
+import pickle
+import hashlib
+from pathlib import Path
 from datetime import datetime, timedelta
 
 import httpx
@@ -317,6 +320,26 @@ class BrokerData:
             if not isinstance(end_date, str):
                 end_date = end_date.strftime("%Y-%m-%d")
 
+            # Caching Logic
+            cache_dir = Path(".cache/history")
+            cache_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create a unique cache key based on params
+            cache_key = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
+            cache_hash = hashlib.md5(cache_key.encode()).hexdigest()
+            cache_file = cache_dir / f"{cache_hash}.pkl"
+
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            is_history_final = end_date < today_str
+
+            if is_history_final and cache_file.exists():
+                try:
+                    with open(cache_file, "rb") as f:
+                        logger.info(f"Loading cached history for {symbol} ({start_date} to {end_date})")
+                        return pickle.load(f)
+                except Exception as e:
+                    logger.warning(f"Failed to load cache for {symbol}: {e}")
+
             # Adjust dates for trading days
             start_date, end_date = self._adjust_dates(start_date, end_date)
 
@@ -571,6 +594,15 @@ class BrokerData:
                     .drop_duplicates(subset=["timestamp"])
                     .reset_index(drop=True)
                 )
+
+            # Save to cache if this is historical data (not including today)
+            if is_history_final and not df.empty:
+                try:
+                    with open(cache_file, "wb") as f:
+                        pickle.dump(df, f)
+                        logger.debug(f"Cached history for {symbol}")
+                except Exception as e:
+                    logger.warning(f"Failed to save cache for {symbol}: {e}")
 
             return df
 
