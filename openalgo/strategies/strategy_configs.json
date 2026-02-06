@@ -52,8 +52,8 @@
   "MCX_GOLD_TREND": {
     "id": "MCX_GOLD_TREND",
     "name": "MCX Gold Trend",
-    "description": "MCX Gold trend following strategy using SuperTrend and RSI",
-    "file_path": "strategies/scripts/mcx_gold_trend.py",
+    "description": "MCX Gold trend following strategy using EMA and RSI",
+    "file_path": "strategies/scripts/mcx_gold_trend_strategy.py",
     "user_id": "system",
     "created_at": "2025-05-22T10:00:00",
     "underlying": "GOLD",
@@ -71,8 +71,8 @@
       "usd_inr_volatility": 0.5,
       "period_rsi": 14,
       "period_atr": 14,
-      "supertrend_period": 10,
-      "supertrend_multiplier": 3.0
+      "ema_fast": 9,
+      "ema_slow": 21
     },
     "is_running": false,
     "is_scheduled": true,
