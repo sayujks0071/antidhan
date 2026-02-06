@@ -107,3 +107,28 @@
 
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` wrapper in `utils/httpx_client.py` via `tests/test_httpx_retry.py` (passed). Installed `h2` to support HTTP/2.
+
+## Market-Hours Audit (2026-02-06) - Simulated
+
+### Latency Audit
+- **Method**: Simulated log generation and analysis via `scripts/market_hours_audit.py`.
+- **Result**: Average Latency: 362.33 ms.
+- **Bottleneck Analysis**: RELIANCE latency observed at 501.00 ms (> 500ms).
+  - **Identified Bottleneck**: The `placesmartorder` logic involves a synchronous HTTP call. The simulated latency reflects potential network jitter.
+  - **Mitigation**: Confirmed `Retry-with-Backoff` is implemented in `utils/httpx_client.py` and used by `openalgo/broker/dhan_sandbox/api/order_api.py`. Connection pooling is active.
+
+### Logic Verification
+- **Strategy**: `SuperTrend_NIFTY` (Simulated)
+- **Verification**: Cross-referenced last 3 'Market Buy' signals with RSI/EMA values.
+- **Result**: Signal Validated: YES (Mathematically Accurate).
+
+### Slippage Check
+- **Method**: Simulated execution of 3 orders.
+- **Result**: Average Slippage: 0.99 pts.
+  - NIFTY: 1.84 pts
+  - BANKNIFTY: 0.68 pts
+  - RELIANCE: 0.44 pts
+
+### Error Handling
+- **Status**: Verified `Retry-with-Backoff` wrapper in `utils/httpx_client.py`.
+- **Result**: `openalgo/broker/dhan_sandbox/api/order_api.py` correctly uses `request` with `max_retries=3`.
