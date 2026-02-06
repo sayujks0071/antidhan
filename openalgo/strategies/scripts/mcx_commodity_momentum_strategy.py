@@ -55,7 +55,6 @@ class MCXMomentumStrategy(BaseStrategy):
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument('--underlying', type=str, help='Commodity Name (e.g., GOLD, SILVER)')
         parser.add_argument('--port', type=int, help='API Port (Override host)')
         # Custom Factors
         parser.add_argument('--usd_inr_trend', type=str, default='Neutral', help='USD/INR Trend')
@@ -90,22 +89,9 @@ class MCXMomentumStrategy(BaseStrategy):
             return
 
         # Calculate Indicators
-        df['rsi'] = self.calculate_rsi(df['close'], period=self.params['period_rsi'])
-        # ATR calc needs DataFrame
-        # But BaseStrategy.calculate_atr returns scalar of last value.
-        # We need series for logic? No, just last values usually.
-        # But the original code calculated 'atr' column.
-        # Let's use BaseStrategy utils directly if we need series.
-        # BaseStrategy imports calculate_atr from trading_utils which returns Series.
-        # But BaseStrategy.calculate_atr wrapper returns scalar.
-        # So we can call self.calculate_atr(df) for scalar, or use internal import if needed.
-        # Actually, let's just stick to scalar for decision or re-implement series calc if needed.
-        # Original code: df['atr'] = calculate_atr(df, ...)
-        # Let's import the function since BaseStrategy doesn't expose series version easily
-        from trading_utils import calculate_atr, calculate_adx
-
-        df['atr'] = calculate_atr(df, period=self.params['period_atr'])
-        df['adx'] = calculate_adx(df, period=self.params['period_adx'])
+        df['rsi'] = self.calculate_rsi(df['close'], period=self.params['period_rsi'], mode='series')
+        df['atr'] = self.calculate_atr(df, period=self.params['period_atr'], mode='series')
+        df['adx'] = self.calculate_adx(df, period=self.params['period_adx'], mode='series')
 
         current = df.iloc[-1]
         prev = df.iloc[-2]
@@ -169,11 +155,10 @@ class MCXMomentumStrategy(BaseStrategy):
         if df.empty: return 'HOLD', 0.0, {}
 
         # Re-calc indicators locally for backtest df
-        from trading_utils import calculate_atr, calculate_adx, calculate_rsi
         df = df.copy()
-        df['rsi'] = calculate_rsi(df['close'], period=self.params['period_rsi'])
-        df['atr'] = calculate_atr(df, period=self.params['period_atr'])
-        df['adx'] = calculate_adx(df, period=self.params['period_adx'])
+        df['rsi'] = self.calculate_rsi(df['close'], period=self.params['period_rsi'], mode='series')
+        df['atr'] = self.calculate_atr(df, period=self.params['period_atr'], mode='series')
+        df['adx'] = self.calculate_adx(df, period=self.params['period_adx'], mode='series')
 
         current = df.iloc[-1]
         prev = df.iloc[-2] if len(df) > 1 else current

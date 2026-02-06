@@ -195,6 +195,23 @@ def calculate_adx(df, period=14):
         return pd.Series(0, index=df.index)
 
 
+def calculate_relative_strength(df, index_df, period=10):
+    """
+    Calculate Relative Strength (Excess Return) vs Index.
+    Returns scalar excess return (Stock ROC - Index ROC).
+    """
+    if df.empty or index_df.empty:
+        return 0.0
+
+    try:
+        # Align timestamps (simplistic approach using last N periods)
+        stock_roc = df['close'].pct_change(period).iloc[-1]
+        index_roc = index_df['close'].pct_change(period).iloc[-1]
+        return stock_roc - index_roc
+    except Exception:
+        return 0.0
+
+
 def analyze_volume_profile(df, n_bins=20):
     """Find Point of Control (POC)."""
     price_min = df['low'].min()
