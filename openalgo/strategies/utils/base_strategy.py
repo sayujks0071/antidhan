@@ -71,7 +71,7 @@ except ImportError:
 
 class BaseStrategy:
     def __init__(self, name, symbol, quantity, interval="5m", exchange="NSE",
-                 api_key=None, host=None, ignore_time=False, log_file=None, client=None):
+                 api_key=None, host=None, ignore_time=False, log_file=None, client=None, sector_benchmark=None):
         """
         Base Strategy Class for Dhan Sandbox Strategies.
         """
@@ -81,6 +81,7 @@ class BaseStrategy:
         self.interval = interval
         self.exchange = exchange
         self.ignore_time = ignore_time
+        self.sector_benchmark = sector_benchmark
 
         # Ensure project root is in path for DB access
         self._add_project_root_to_path()
@@ -296,18 +297,53 @@ class BaseStrategy:
             self.logger.warning(f"Could not fetch VIX: {e}. Defaulting to 15.0.")
         return 15.0
 
-    def calculate_rsi(self, series, period=14):
+    def check_sector_correlation(self, lookback_days=30, threshold_rsi=50):
+        """
+        Check if the sector is bullish.
+        Default implementation checks RSI > 50 for the sector benchmark.
+        """
+        if not self.sector_benchmark:
+             return True
+
+        try:
+            sector_symbol = normalize_symbol(self.sector_benchmark)
+            # Fetch daily data for sector to check trend
+            # Note: Using 1d interval might require 'NSE_INDEX' if it's an index
+            exchange = "NSE_INDEX" if "NIFTY" in sector_symbol.upper() else self.exchange
+            df = self.fetch_history(days=lookback_days, symbol=sector_symbol, interval="1d", exchange=exchange)
+
+            if not df.empty and len(df) > 15:
+                # Use scalar mode for RSI here
+                rsi = self.calculate_rsi(df['close'], period=14, mode='scalar')
+                if hasattr(self, 'logger'):
+                     self.logger.info(f"Sector {self.sector_benchmark} RSI: {rsi:.2f}")
+                return rsi > threshold_rsi
+            return False
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                 self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True.")
+            return True
+
+    def calculate_rsi(self, series, period=14, mode='series'):
         """Calculate Relative Strength Index."""
-        return calculate_rsi(series, period)
+        res = calculate_rsi(series, period)
+        if mode == 'scalar':
+             return res.iloc[-1] if not res.empty else 0
+        return res
 
-    def calculate_atr(self, df, period=14):
+    def calculate_atr(self, df, period=14, mode='scalar'):
         """Calculate Average True Range."""
-        return calculate_atr(df, period).iloc[-1]
+        res = calculate_atr(df, period)
+        if mode == 'series':
+             return res
+        return res.iloc[-1] if not res.empty else 0
 
-    def calculate_adx(self, df, period=14):
+    def calculate_adx(self, df, period=14, mode='scalar'):
         """Calculate ADX."""
-        result = calculate_adx(df, period)
-        return result.iloc[-1] if not result.empty else 0
+        res = calculate_adx(df, period)
+        if mode == 'series':
+             return res
+        return res.iloc[-1] if not res.empty else 0
 
     def calculate_intraday_vwap(self, df):
         """Calculate VWAP."""
@@ -322,6 +358,10 @@ class BaseStrategy:
         """Get a standard ArgumentParser with common arguments."""
         parser = argparse.ArgumentParser(description=description)
         parser.add_argument("--symbol", type=str, help="Trading Symbol")
+        parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY, GOLD)")
+        parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
+        parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
+        parser.add_argument("--sector", type=str, help="Sector Benchmark")
         parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
         parser.add_argument("--api_key", type=str, help="API Key")
         parser.add_argument("--host", type=str, help="Host")
@@ -366,12 +406,10 @@ class BaseStrategy:
             "api_key": args.api_key,
             "host": args.host,
             "ignore_time": args.ignore_time,
-            "log_file": args.logfile
+            "log_file": args.logfile,
+            "exchange": args.exchange,
+            "sector_benchmark": args.sector
         }
-
-        # Add exchange if available in args (it's not in standard parser but might be added)
-        if hasattr(args, 'exchange') and args.exchange:
-            kwargs['exchange'] = args.exchange
 
         return kwargs
 
