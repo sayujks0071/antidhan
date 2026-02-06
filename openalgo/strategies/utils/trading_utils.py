@@ -3,7 +3,7 @@ import logging
 import os
 import time
 import time as time_module
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import time as dt_time
 from functools import lru_cache
 from pathlib import Path
@@ -331,6 +331,54 @@ class PositionManager:
         qty = min(qty, max_qty_capital)
 
         return int(qty)
+
+    def calculate_adaptive_quantity_monthly_atr(
+        self, capital, risk_per_trade_pct, client, exchange="NSE"
+    ):
+        """
+        Calculate position size based on Monthly ATR (calculated from Daily data).
+        Fetches last 40 days of daily data to calculate ATR.
+        """
+        try:
+            # Calculate start date (40 days ago)
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=45)
+
+            # Fetch daily data
+            df = client.history(
+                self.symbol,
+                exchange=exchange,
+                interval="D",
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d"),
+            )
+
+            if df.empty or len(df) < 15:
+                logger.warning(
+                    f"Insufficient daily data for {self.symbol} to calculate Monthly ATR"
+                )
+                return 0
+
+            # Calculate ATR
+            atr_series = calculate_atr(df, period=14)
+            current_atr = atr_series.iloc[-1]
+            price = df.iloc[-1]["close"]
+
+            if pd.isna(current_atr) or pd.isna(price):
+                logger.warning(f"NaN ATR/Price for {self.symbol}")
+                return 0
+
+            logger.info(
+                f"Sizing {self.symbol}: Price={price:.2f}, Daily ATR={current_atr:.2f}"
+            )
+
+            return self.calculate_adaptive_quantity(
+                capital, risk_per_trade_pct, current_atr, price
+            )
+
+        except Exception as e:
+            logger.error(f"Error in calculate_adaptive_quantity_monthly_atr: {e}")
+            return 0
 
     def has_position(self):
         return self.position != 0
