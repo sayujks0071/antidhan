@@ -54,12 +54,24 @@ class GapFadeStrategy(BaseStrategy):
         target_symbol = f"{self.symbol} 50" if self.symbol == "NIFTY" else self.symbol
 
         # 1. Get Previous Close
-        # Get daily candles
-        df = self.fetch_history(days=5, interval="day", symbol=target_symbol)
+        # Get daily candles (Increase lookback to 40 days for ADX calculation)
+        df = self.fetch_history(days=40, interval="day", symbol=target_symbol)
 
         if df.empty or len(df) < 1:
             self.logger.error("Could not fetch history for previous close.")
             return
+
+        # Calculate ADX to check trend strength
+        # IMPROVEMENT: Avoid fading if trend is too strong (ADX > 25)
+        # This addresses low win rate in trending markets.
+        try:
+            adx = self.calculate_adx(df)
+            self.logger.info(f"ADX: {adx:.2f}")
+            if adx > 25:
+                self.logger.info(f"ADX {adx:.2f} > 25 indicates strong trend. Skipping Gap Fade trade.")
+                return
+        except Exception as e:
+            self.logger.warning(f"Could not calculate ADX: {e}")
 
         prev_close = df.iloc[-1]['close']
 
