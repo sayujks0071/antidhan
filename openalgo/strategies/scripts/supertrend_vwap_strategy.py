@@ -35,9 +35,9 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             host=host,
             ignore_time=ignore_time,
             log_file=log_file,
-            client=client
+            client=client,
+            sector_benchmark=sector_benchmark
         )
-        self.sector_benchmark = sector_benchmark
 
         # Optimization Parameters
         self.threshold = 150 # Note: This parameter was previously unused in logic. Keeping for compatibility but ignoring.
@@ -48,20 +48,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         # State
         self.trailing_stop = 0.0
         self.atr = 0.0
-
-    @classmethod
-    def add_arguments(cls, parser):
-        parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
-        parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
-        parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
-        parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
-
-    @classmethod
-    def parse_arguments(cls, args):
-        kwargs = super().parse_arguments(args)
-        kwargs['sector_benchmark'] = args.sector
-        # BaseStrategy already extracts log_file from args.logfile
-        return kwargs
 
     def cycle(self):
         """
@@ -148,22 +134,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 self.execute_trade('BUY', adj_qty, last['close'])
                 sl_mult = getattr(self, 'ATR_SL_MULTIPLIER', 3.0)
                 self.trailing_stop = last['close'] - (sl_mult * self.atr)
-
-    def check_sector_correlation(self):
-        try:
-            sector_symbol = normalize_symbol(self.sector_benchmark)
-
-            df = self.fetch_history(days=30, symbol=sector_symbol, interval="D", exchange="NSE_INDEX")
-
-            if not df.empty and len(df) > 15:
-                rsi = self.calculate_rsi(df['close'])
-                last_rsi = rsi.iloc[-1]
-                self.logger.info(f"Sector {self.sector_benchmark} RSI: {last_rsi:.2f}")
-                return last_rsi > 50
-            return False
-        except Exception as e:
-            self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True (Allow) to prevent blocking on data issues.")
-            return True
 
     def generate_signal(self, df):
         """
