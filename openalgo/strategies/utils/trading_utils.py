@@ -148,12 +148,22 @@ def calculate_atr(df, period=14):
     return tr.rolling(period).mean()
 
 
+def calculate_sma(series, window=20):
+    """Calculate Simple Moving Average."""
+    return series.rolling(window=window).mean()
+
+
+def calculate_ema(series, span=20):
+    """Calculate Exponential Moving Average."""
+    return series.ewm(span=span, adjust=False).mean()
+
+
 def calculate_bollinger_bands(series, window=20, num_std=2):
     """
     Calculate Bollinger Bands.
     Returns: sma, upper, lower
     """
-    sma = series.rolling(window=window).mean()
+    sma = calculate_sma(series, window)
     std = series.rolling(window=window).std()
     upper = sma + (std * num_std)
     lower = sma - (std * num_std)
