@@ -188,7 +188,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         dev_threshold = 0.03
 
         # Logic
-        df['ema200'] = df['close'].ewm(span=200, adjust=False).mean()
+        df['ema200'] = self.calculate_ema(df['close'], span=200)
         is_uptrend = True
         if not pd.isna(last['ema200']):
             is_uptrend = last['close'] > last['ema200']
