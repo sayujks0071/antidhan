@@ -1,4 +1,5 @@
 """OpenAlgo API mock for backtesting using AITRAPP historical data"""
+import math
 import os
 import sys
 from datetime import datetime, timedelta

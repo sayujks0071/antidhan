@@ -317,6 +317,31 @@ class BaseStrategy:
         """Find Point of Control (POC)."""
         return analyze_volume_profile(df, n_bins)
 
+    def check_sector_correlation(self, sector_benchmark=None, period=30, threshold=50):
+        """Check sector correlation using RSI."""
+        target_sector = sector_benchmark or getattr(self, 'sector_benchmark', None)
+        if not target_sector:
+            self.logger.warning("No sector benchmark provided for correlation check.")
+            return True
+
+        try:
+            sector_symbol = normalize_symbol(target_sector)
+            # Fetch daily data for sector
+            # Usually sector data is on NSE_INDEX
+            exchange = "NSE_INDEX" if "NIFTY" in sector_symbol.upper() or "BANK" in sector_symbol.upper() else "NSE"
+
+            df = self.fetch_history(days=period, symbol=sector_symbol, interval="D", exchange=exchange)
+
+            if not df.empty and len(df) > 15:
+                rsi = self.calculate_rsi(df['close'])
+                last_rsi = rsi.iloc[-1]
+                self.logger.info(f"Sector {target_sector} RSI: {last_rsi:.2f}")
+                return last_rsi > threshold
+            return False
+        except Exception as e:
+            self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True (Allow) to prevent blocking on data issues.")
+            return True
+
     @staticmethod
     def get_standard_parser(description="Strategy"):
         """Get a standard ArgumentParser with common arguments."""
