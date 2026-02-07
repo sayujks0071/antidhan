@@ -73,6 +73,17 @@ class GapFadeStrategy(BaseStrategy):
         except Exception as e:
             self.logger.warning(f"Could not calculate ADX: {e}")
 
+        # Calculate RSI for Mean Reversion confirmation
+        # Added to address low win rate by ensuring we don't fade strong trends
+        # We only want to Fade (Mean Revert) if RSI confirms Overbought/Oversold
+        try:
+            rsi_series = self.calculate_rsi(df['close'])
+            current_rsi = rsi_series.iloc[-1]
+            self.logger.info(f"RSI: {current_rsi:.2f}")
+        except Exception as e:
+            self.logger.warning(f"Could not calculate RSI: {e}")
+            current_rsi = 50 # Default to neutral
+
         prev_close = df.iloc[-1]['close']
 
         quote = self.client.get_quote(target_symbol, "NSE")
@@ -101,12 +112,20 @@ class GapFadeStrategy(BaseStrategy):
 
         if gap_pct > self.gap_threshold:
             # Gap UP -> Fade (Sell/Short or Buy Put)
+            if current_rsi < 70:
+                self.logger.info(f"Gap Up but RSI {current_rsi:.2f} < 70. Not overbought. Skipping Fade.")
+                return
+
             self.logger.info("Gap UP detected. Looking to FADE (Short).")
             action = "SELL"
             option_type = "PE"
 
         elif gap_pct < -self.gap_threshold:
             # Gap DOWN -> Fade (Buy/Long or Buy Call)
+            if current_rsi > 30:
+                self.logger.info(f"Gap Down but RSI {current_rsi:.2f} > 30. Not oversold. Skipping Fade.")
+                return
+
             self.logger.info("Gap DOWN detected. Looking to FADE (Long).")
             action = "BUY"
             option_type = "CE"
