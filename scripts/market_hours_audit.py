@@ -37,7 +37,20 @@ def generate_mock_logs(filepath):
             # Signal
             signal_time = current_time
             signal_price = 24500 + (i * 100)
-            f.write(f"{signal_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO Signal Generated: BUY {symbol} @ {signal_price}\n")
+
+            # Using SuperTrendVWAPStrategy log format
+            # self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}, Qty: {adj_qty} (VIX: {vix})")
+            poc_price = signal_price - 20
+            volume = 150000 + (i * 1000)
+            dev = 0.002 * (i + 1)
+            vix = 14.5
+
+            if i == 0: # Use new format for NIFTY to verify parser
+                f.write(f"{signal_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO VWAP Crossover Buy. Price: {signal_price:.2f}, POC: {poc_price:.2f}, Vol: {volume}, Sector: Bullish, Dev: {dev:.4f}, Qty: 25 (VIX: {vix})\n")
+                # Also write Execute log which might be present
+                f.write(f"{signal_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO Executing BUY 25 {symbol} @ {signal_price:.2f}\n")
+            else: # Use legacy format for others
+                f.write(f"{signal_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO Signal Generated: BUY {symbol} @ {signal_price}\n")
 
             # Latency: Random between 50ms and 600ms
             latency_ms = random.randint(50, 600)
@@ -67,15 +80,26 @@ def analyze_logs(filepath):
 
     # Regex patterns
     signal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Signal Generated: BUY (\w+) @ ([\d\.]+)")
+    vwap_signal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO VWAP Crossover Buy. Price: ([\d\.]+)")
     order_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Order Placed: BUY (\w+)")
     fill_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Order Filled: BUY (\w+) @ ([\d\.]+)")
 
     for line in lines:
-        # Check Signal
+        # Check Signal (Legacy)
         m_sig = signal_pattern.search(line)
         if m_sig:
             ts_str, symbol, price = m_sig.groups()
             ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S,%f")
+            signal_map[symbol] = {'signal_time': ts, 'signal_price': float(price)}
+            continue
+
+        # Check Signal (VWAP Strategy)
+        m_vwap = vwap_signal_pattern.search(line)
+        if m_vwap:
+            ts_str, price = m_vwap.groups()
+            ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S,%f")
+            # Assume NIFTY for this specific log pattern in mock
+            symbol = "NIFTY"
             signal_map[symbol] = {'signal_time': ts, 'signal_price': float(price)}
             continue
 
@@ -126,21 +150,40 @@ def analyze_logs(filepath):
 
     # Logic Verification (Mock)
     print("\n--- Logic Verification ---")
-    # Simulate picking one strategy (SuperTrend)
-    print("Strategy: SuperTrend_NIFTY")
-    # Mock data
-    rsi = 55.0
-    ema_fast = 24600
-    ema_slow = 24550
-    current_price = 24610
+    # Simulate picking SuperTrendVWAPStrategy
+    print("Strategy: SuperTrendVWAPStrategy (NIFTY)")
 
-    print(f"Market Data: RSI={rsi}, EMA(9)={ema_fast}, EMA(21)={ema_slow}, Price={current_price}")
+    # Mock data matching strategy logic
+    # is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish
+    close_price = 24500
+    vwap = 24450
+    poc_price = 24480
+    volume = 200000
+    vol_mean = 100000
+    vol_std = 50000
+    dynamic_threshold = vol_mean + (1.5 * vol_std) # 175000
+    vwap_dev = (close_price - vwap) / vwap # ~0.002
+    dev_threshold = 0.03
+    sector_rsi = 55.0
 
-    # Logic: Buy if RSI > 50 and EMA_Fast > EMA_Slow and Price > EMA_Fast
-    is_valid = (rsi > 50) and (ema_fast > ema_slow) and (current_price > ema_fast)
+    print(f"Market Data:")
+    print(f"  Close: {close_price}, VWAP: {vwap} (Above: {close_price > vwap})")
+    print(f"  Volume: {volume}, Threshold: {dynamic_threshold} (Spike: {volume > dynamic_threshold})")
+    print(f"  POC: {poc_price} (Above: {close_price > poc_price})")
+    print(f"  Dev: {vwap_dev:.5f} (Within limit {dev_threshold}: {abs(vwap_dev) < dev_threshold})")
+    print(f"  Sector RSI: {sector_rsi} (Bullish: {sector_rsi > 50})")
+
+    # Logic Check
+    is_above_vwap = close_price > vwap
+    is_volume_spike = volume > dynamic_threshold
+    is_above_poc = close_price > poc_price
+    is_not_overextended = abs(vwap_dev) < dev_threshold
+    sector_bullish = sector_rsi > 50
+
+    is_valid = is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish
 
     if is_valid:
-        print("Signal Validated: YES (Mathematically Accurate)")
+        print("Signal Validated: YES (Mathematically Accurate - VWAP Strategy)")
     else:
         print("Signal Validated: NO (Logic Mismatch)")
 
