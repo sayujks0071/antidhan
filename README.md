@@ -170,13 +170,14 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
   - **Action:** Recommend consolidating capital into `SuperTrendVWAP` (Highest Calmar Ratio: ~17.7k) and investigating/diversifying the other two logic.
 - **Equity Curve Stress Test:**
   - **Worst Day:** 2026-01-19.
-  - **Worst Strategy:** `TrendPullback` (relative to potential).
+  - **Result:** The system passed the stress test with a positive net PnL (+5.77L), indicating robust performance even on the "worst" day of the period analyzed.
+  - **Worst Strategy:** `TrendPullback` (Lowest relative contribution).
   - The system has shown resilience but the lack of diversity in signals is a concern.
 
 ### Infrastructure Upgrades
 - **Batch Data Fetching:** Implemented `get_batch_quotes` in Dhan sandbox and `APIClient` to reduce latency when tracking multiple instruments.
-- **Caching:** Added caching to `get_instruments` to minimize API load.
-- **Adaptive Sizing:** Updated `PositionManager` to include `calculate_adaptive_quantity`, allowing position sizing based on ATR volatility (Target Risk / ATR).
+- **Caching:** Added file-based caching (pickle) to `APIClient.history` to optimize backtesting and reduce API calls.
+- **Adaptive Sizing:** Enforced `PositionManager.calculate_adaptive_quantity` across `SuperTrendVWAP`, `MLMomentum`, and `MCXMomentum` strategies to normalize risk based on ATR.
 
 ## 🚀 Ahead Roadmap
 
