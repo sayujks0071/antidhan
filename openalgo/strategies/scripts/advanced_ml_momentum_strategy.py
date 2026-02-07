@@ -123,15 +123,6 @@ class MLMomentumStrategy(BaseStrategy):
                 self.logger.info(f"Strong Momentum Signal (ROC: {last['roc']:.3f}, RS: {rs_excess:.3f}). BUY.")
                 self.execute_trade('BUY', self.quantity, current_price)
 
-    def calculate_relative_strength(self, df, index_df):
-        if index_df.empty: return 1.0
-        try:
-            stock_roc = df['close'].pct_change(10).iloc[-1]
-            index_roc = index_df['close'].pct_change(10).iloc[-1]
-            return stock_roc - index_roc
-        except:
-            return 0.0
-
     def get_news_sentiment(self):
         # Simulated
         return 0.5

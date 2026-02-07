@@ -803,3 +803,30 @@ def calculate_supertrend(df, period=10, multiplier=3):
                 supertrend[i] = final_upperband_val
 
     return pd.Series(supertrend, index=df.index), pd.Series(direction, index=df.index)
+
+
+def calculate_sma(series, period=20):
+    """Calculate Simple Moving Average."""
+    return series.rolling(window=period).mean()
+
+
+def calculate_ema(series, period=20):
+    """Calculate Exponential Moving Average."""
+    return series.ewm(span=period, adjust=False).mean()
+
+
+def calculate_relative_strength(df, index_df, window=10):
+    """
+    Calculate Relative Strength vs Index.
+    Returns: float (Current Stock ROC - Current Index ROC)
+    """
+    if index_df.empty:
+        return 0.0
+    try:
+        # Calculate ROC for both
+        stock_roc = df['close'].pct_change(periods=window).iloc[-1]
+        index_roc = index_df['close'].pct_change(periods=window).iloc[-1]
+        return stock_roc - index_roc
+    except Exception as e:
+        logger.error(f"Relative Strength calculation failed: {e}")
+        return 0.0

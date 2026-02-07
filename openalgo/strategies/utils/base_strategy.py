@@ -35,6 +35,9 @@ try:
         calculate_intraday_vwap,
         calculate_rsi,
         calculate_supertrend,
+        calculate_sma,
+        calculate_ema,
+        calculate_relative_strength,
         is_market_open,
         normalize_symbol,
     )
@@ -53,6 +56,9 @@ except ImportError:
             calculate_intraday_vwap,
             calculate_rsi,
             calculate_supertrend,
+            calculate_sma,
+            calculate_ema,
+            calculate_relative_strength,
             is_market_open,
             normalize_symbol,
         )
@@ -71,6 +77,9 @@ except ImportError:
             calculate_intraday_vwap,
             calculate_rsi,
             calculate_supertrend,
+            calculate_sma,
+            calculate_ema,
+            calculate_relative_strength,
             is_market_open,
             normalize_symbol,
         )
@@ -309,6 +318,18 @@ class BaseStrategy:
     def calculate_atr(self, df, period=14):
         """Calculate Average True Range."""
         return calculate_atr(df, period).iloc[-1]
+
+    def calculate_sma(self, series, period=20):
+        """Calculate Simple Moving Average."""
+        return calculate_sma(series, period)
+
+    def calculate_ema(self, series, period=20):
+        """Calculate Exponential Moving Average."""
+        return calculate_ema(series, period)
+
+    def calculate_relative_strength(self, df, index_df, window=10):
+        """Calculate Relative Strength."""
+        return calculate_relative_strength(df, index_df, window)
 
     def get_monthly_atr(self, symbol=None):
         """
