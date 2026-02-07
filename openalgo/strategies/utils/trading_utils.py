@@ -136,6 +136,16 @@ def calculate_rsi(series, period=14):
     return 100 - (100 / (1 + rs))
 
 
+def calculate_sma(series, period):
+    """Calculate Simple Moving Average."""
+    return series.rolling(window=period).mean()
+
+
+def calculate_ema(series, period):
+    """Calculate Exponential Moving Average."""
+    return series.ewm(span=period, adjust=False).mean()
+
+
 def calculate_atr(df, period=14):
     """Calculate Average True Range (Returns Series)."""
     high = df['high']
