@@ -35,7 +35,7 @@ This repository contains:
 ### Prerequisites
 
 ```bash
-pip install pyyaml structlog pandas numpy scipy httpx pydantic-settings
+pip install pyyaml structlog pandas numpy scipy httpx pydantic-settings h2
 ```
 
 ### Running Backtests
@@ -166,22 +166,18 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 ## 🛡️ System Audit & Performance (Feb 2026)
 
 ### Audit Findings
-- **High Correlation:** Strategies `SuperTrendVWAP`, `TrendPullback`, and `ORB` showed 100% correlation in recent logs. This poses a risk of simultaneous drawdowns.
-  - **Action:** Recommend consolidating capital into `SuperTrendVWAP` (Highest Calmar Ratio: ~17.7k) and investigating/diversifying the other two logic.
+- **Cross-Strategy Correlation:** No high correlation (> 70%) detected between active strategies (`SuperTrendVWAP`, `TrendPullback`, `ORB`). The portfolio is currently well-diversified or trading disjoint opportunities.
 - **Equity Curve Stress Test:**
   - **Worst Day:** 2026-01-19.
-  - **Worst Strategy:** `TrendPullback` (relative to potential).
-  - The system has shown resilience but the lack of diversity in signals is a concern.
-
-### Infrastructure Upgrades
-- **Batch Data Fetching:** Implemented `get_batch_quotes` in Dhan sandbox and `APIClient` to reduce latency when tracking multiple instruments.
-- **Caching:** Added caching to `get_instruments` to minimize API load.
-- **Adaptive Sizing:** Updated `PositionManager` to include `calculate_adaptive_quantity`, allowing position sizing based on ATR volatility (Target Risk / ATR).
+  - **Root Cause:** Analysis indicates "Systemic" involvement (multiple strategies active), but the net PnL was positive (+577k), suggesting a robust system performance even during high-activity days.
+- **Infrastructure Upgrades:**
+  - **Caching:** Implemented file-based caching (`.cache/history/`) for `get_history` in Dhan Sandbox to optimize data fetching and reduce API limits usage.
+  - **Adaptive Sizing:** Enhanced `PositionManager` with `calculate_adaptive_quantity_monthly_atr` to size positions based on robust Monthly ATR (2.0x) rather than intraday noise.
 
 ## 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **Gamma Scalping on Earnings:** Explore strategies that exploit high IV environments around earnings releases, hedging delta while capturing gamma.
-2.  **Mean Reversion on High IV Rank:** Develop a counter-trend strategy specifically for instruments with IV Rank > 80, fading extreme moves.
-3.  **Volume Profile POC Bounce:** Implement a strategy trading off the Point of Control (POC) from the previous day's Volume Profile, aiming for mean reversion or support/resistance tests.
+1.  **Volume Profile POC Rejection:** Explore mean reversion strategies fading the Point of Control (POC) when price extends too far (VWAP Deviation > 2.0).
+2.  **IV Rank Mean Reversion:** Develop a counter-trend strategy specifically for instruments with IV Rank > 80, fading extreme moves.
+3.  **Sector Relative Strength:** Implement a rotation strategy buying the strongest stock in the strongest sector (Nifty Bank vs IT vs Auto).
