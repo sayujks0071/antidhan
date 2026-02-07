@@ -31,6 +31,7 @@ try:
         analyze_volume_profile,
         calculate_adx,
         calculate_atr,
+        calculate_bollinger_bands,
         calculate_intraday_vwap,
         calculate_rsi,
         calculate_supertrend,
@@ -48,6 +49,7 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_bollinger_bands,
             calculate_intraday_vwap,
             calculate_rsi,
             calculate_supertrend,
@@ -65,6 +67,7 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_bollinger_bands,
             calculate_intraday_vwap,
             calculate_rsi,
             calculate_supertrend,
@@ -307,6 +310,26 @@ class BaseStrategy:
         """Calculate Average True Range."""
         return calculate_atr(df, period).iloc[-1]
 
+    def get_monthly_atr(self, symbol=None):
+        """
+        Fetch daily data (30+ days) and calculate ATR for adaptive sizing.
+        """
+        try:
+            target_symbol = symbol or self.symbol
+            # Ensure we fetch enough data for ATR calculation (e.g. 35 days for 14 period + buffer)
+            df = self.fetch_history(days=40, symbol=target_symbol, interval="D")
+
+            if df.empty or len(df) < 15:
+                self.logger.warning(f"Insufficient daily data for Monthly ATR calculation: {len(df)}")
+                return 0.0
+
+            atr_series = calculate_atr(df, period=14)
+            monthly_atr = atr_series.iloc[-1]
+            return monthly_atr
+        except Exception as e:
+            self.logger.error(f"Error calculating Monthly ATR: {e}")
+            return 0.0
+
     def calculate_adx(self, df, period=14):
         """Calculate ADX."""
         result = calculate_adx(df, period)
@@ -357,6 +380,7 @@ class BaseStrategy:
         parser.add_argument("--host", type=str, help="Host")
         parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours")
         parser.add_argument("--logfile", type=str, help="Log file path")
+        parser.add_argument("--sector", type=str, help="Sector Benchmark (e.g., NIFTY 50)")
         return parser
 
     @classmethod
@@ -402,6 +426,10 @@ class BaseStrategy:
         # Add exchange if available in args (it's not in standard parser but might be added)
         if hasattr(args, 'exchange') and args.exchange:
             kwargs['exchange'] = args.exchange
+
+        # Add sector if available
+        if hasattr(args, 'sector') and args.sector:
+            kwargs['sector'] = args.sector
 
         return kwargs
 
