@@ -199,21 +199,25 @@ def analyze_volume_profile(df, n_bins=20):
     """Find Point of Control (POC)."""
     price_min = df['low'].min()
     price_max = df['high'].max()
-    if price_min == price_max: return 0, 0
+    if price_min == price_max:
+        return 0, 0
     bins = np.linspace(price_min, price_max, n_bins)
 
     df = df.copy()
     df['bin'] = pd.cut(df['close'], bins=bins, labels=False)
     volume_profile = df.groupby('bin')['volume'].sum()
 
-    if volume_profile.empty: return 0, 0
+    if volume_profile.empty:
+        return 0, 0
 
     poc_bin = volume_profile.idxmax()
     poc_volume = volume_profile.max()
-    if pd.isna(poc_bin): return 0, 0
+    if pd.isna(poc_bin):
+        return 0, 0
 
     poc_bin = int(poc_bin)
-    if poc_bin >= len(bins)-1: poc_bin = len(bins)-2
+    if poc_bin >= len(bins) - 1:
+        poc_bin = len(bins) - 2
 
     poc_price = bins[poc_bin] + (bins[1] - bins[0]) / 2
     return poc_price, poc_volume
@@ -402,12 +406,12 @@ class SmartOrder:
         )
 
         order_type = "LIMIT" if limit_price else "MARKET"
-        price = limit_price if limit_price else 0
+        # price = limit_price if limit_price else 0
 
         # Override based on urgency
         if urgency == "HIGH":
             order_type = "MARKET"
-            price = 0
+            # price is already 0
         elif urgency == "LOW" and not limit_price:
             # Low urgency but no limit price provided? Fallback to Market but warn
             logger.warning(
@@ -585,9 +589,8 @@ class APIClient:
 
         return None  # Failed to fetch quote
 
-    @lru_cache(maxsize=4)
     def get_instruments(self, exchange="NSE", max_retries=3):
-        """Fetch instruments list (Cached)"""
+        """Fetch instruments list"""
         url = f"{self.host}/instruments/{exchange}"
 
         try:
@@ -737,3 +740,66 @@ class APIClient:
         # Fallback to a default or raise error?
         # For safety, return None so caller handles it
         return None
+
+
+def calculate_supertrend(df, period=10, multiplier=3):
+    """
+    Calculate SuperTrend.
+    Returns: supertrend (Series), direction (Series)
+    """
+    # Calculate ATR
+    # Note: calculate_atr in this file returns Series
+    atr = calculate_atr(df, period)
+
+    # Basic Upper and Lower Bands
+    hl2 = (df['high'] + df['low']) / 2
+    basic_upperband = hl2 + (multiplier * atr)
+    basic_lowerband = hl2 - (multiplier * atr)
+
+    # SuperTrend Calculation
+    # We need to iterate because current value depends on previous close and previous band
+    # Using a loop for correctness (vectorized SuperTrend is complex/approximate)
+
+    supertrend = [0] * len(df)
+    direction = [1] * len(df)  # 1: Up, -1: Down
+
+    # Convert to arrays for speed
+    close_arr = df['close'].values
+    bu_arr = basic_upperband.values
+    bl_arr = basic_lowerband.values
+
+    # Initialize first values
+    final_upperband_val = 0
+    final_lowerband_val = 0
+
+    for i in range(1, len(df)):
+        # Upper Band Logic
+        if bu_arr[i] < final_upperband_val or close_arr[i - 1] > final_upperband_val:
+            final_upperband_val = bu_arr[i]
+        else:
+            final_upperband_val = final_upperband_val  # Unchanged
+
+        # Lower Band Logic
+        if bl_arr[i] > final_lowerband_val or close_arr[i - 1] < final_lowerband_val:
+            final_lowerband_val = bl_arr[i]
+        else:
+            final_lowerband_val = final_lowerband_val
+
+        # Trend Direction
+        # If previous trend was UP (1)
+        if direction[i - 1] == 1:
+            if close_arr[i] <= final_lowerband_val:
+                direction[i] = -1
+                supertrend[i] = final_upperband_val
+            else:
+                direction[i] = 1
+                supertrend[i] = final_lowerband_val
+        else:  # Previous trend was DOWN (-1)
+            if close_arr[i] >= final_upperband_val:
+                direction[i] = 1
+                supertrend[i] = final_lowerband_val
+            else:
+                direction[i] = -1
+                supertrend[i] = final_upperband_val
+
+    return pd.Series(supertrend, index=df.index), pd.Series(direction, index=df.index)
