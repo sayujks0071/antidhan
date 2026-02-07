@@ -38,6 +38,8 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             client=client
         )
         self.sector_benchmark = sector_benchmark
+        self.capital = kwargs.get('capital', 100000)
+        self.risk_pct = kwargs.get('risk_pct', 1.0)
 
         # Optimization Parameters
         self.threshold = 150 # Note: This parameter was previously unused in logic. Keeping for compatibility but ignoring.
@@ -55,11 +57,15 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
         parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
         parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
+        parser.add_argument("--capital", type=float, default=100000, help="Capital Allocation")
+        parser.add_argument("--risk_pct", type=float, default=1.0, help="Risk per Trade %%")
 
     @classmethod
     def parse_arguments(cls, args):
         kwargs = super().parse_arguments(args)
         kwargs['sector_benchmark'] = args.sector
+        kwargs['capital'] = args.capital
+        kwargs['risk_pct'] = args.risk_pct
         # BaseStrategy already extracts log_file from args.logfile
         return kwargs
 
@@ -141,7 +147,11 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             sector_bullish = self.check_sector_correlation()
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
-                adj_qty = int(self.quantity * size_multiplier)
+                # Adaptive Sizing
+                adj_qty = self.pm.calculate_adaptive_quantity(self.capital, self.risk_pct, self.atr, last['close'])
+                # Apply VIX multiplier
+                adj_qty = int(adj_qty * size_multiplier)
+
                 if adj_qty < 1: adj_qty = 1
                 self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}, Qty: {adj_qty} (VIX: {vix})")
 

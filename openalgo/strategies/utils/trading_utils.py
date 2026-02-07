@@ -3,6 +3,8 @@ import logging
 import os
 import time
 import time as time_module
+import pickle
+import hashlib
 from datetime import datetime
 from datetime import time as dt_time
 from functools import lru_cache
@@ -330,6 +332,10 @@ class PositionManager:
 
         qty = min(qty, max_qty_capital)
 
+        # Ensure minimum 1 qty if capital allows
+        if qty < 1 and max_qty_capital >= 1:
+            qty = 1
+
         return int(qty)
 
     def has_position(self):
@@ -443,6 +449,16 @@ class APIClient:
         self.api_key = api_key
         self.host = host.rstrip("/")
 
+        # Setup Cache
+        self.cache_dir = Path(__file__).resolve().parent.parent / ".cache" / "history"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _get_cache_path(self, symbol, exchange, interval, start_date, end_date):
+        """Generate a unique cache file path."""
+        key_str = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
+        key_hash = hashlib.md5(key_str.encode()).hexdigest()
+        return self.cache_dir / f"{key_hash}.pkl"
+
     def history(
         self,
         symbol,
@@ -451,8 +467,31 @@ class APIClient:
         start_date=None,
         end_date=None,
         max_retries=3,
+        use_cache=True
     ):
-        """Fetch historical data with retry logic and exponential backoff"""
+        """Fetch historical data with local caching and retry logic."""
+
+        # Determine if we can use cache
+        today_str = datetime.now().strftime("%Y-%m-%d")
+
+        # Only cache if end_date is before today (historical data is static)
+        # If end_date is today or None (implies today), data is dynamic -> No Cache
+        should_cache = False
+        if end_date and end_date < today_str:
+            should_cache = True
+
+        cache_path = None
+        if use_cache and should_cache and start_date and end_date:
+            cache_path = self._get_cache_path(symbol, exchange, interval, start_date, end_date)
+            if cache_path.exists():
+                try:
+                    with open(cache_path, 'rb') as f:
+                        df = pickle.load(f)
+                    logger.debug(f"Loaded history from cache for {symbol}")
+                    return df
+                except Exception as e:
+                    logger.warning(f"Failed to load cache for {symbol}: {e}")
+
         url = f"{self.host}/api/v1/history"
         payload = {
             "symbol": symbol,
@@ -484,6 +523,15 @@ class APIClient:
                     logger.debug(
                         f"Successfully fetched {len(df)} rows for {symbol} on {exchange}"
                     )
+
+                    # Save to cache if applicable
+                    if should_cache and cache_path and not df.empty:
+                        try:
+                            with open(cache_path, 'wb') as f:
+                                pickle.dump(df, f)
+                        except Exception as e:
+                            logger.warning(f"Failed to save cache for {symbol}: {e}")
+
                     return df
                 else:
                     error_msg = data.get("message", "Unknown error")
@@ -499,6 +547,10 @@ class APIClient:
             logger.error(f"API Error for {symbol}: {e}")
 
         return pd.DataFrame()
+
+    def get_batch_quotes(self, symbols, exchange="NSE", max_retries=3):
+        """Fetch real-time quotes for multiple symbols."""
+        return self.get_quote(symbols, exchange, max_retries)
 
     def get_quote(self, symbol, exchange="NSE", max_retries=3):
         """Fetch real-time quote from Kite API via OpenAlgo. Supports single symbol or list."""
