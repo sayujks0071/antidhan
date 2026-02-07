@@ -24,7 +24,7 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Smart order delay
-SMART_ORDER_DELAY = "0.5"  # Default value, can be overridden by environment variable
+SMART_ORDER_DELAY = "0.1"  # Reduced to 0.1s to fix latency bottleneck (>500ms)
 
 
 def emit_analyzer_error(request_data: dict[str, Any], error_message: str) -> dict[str, Any]:
