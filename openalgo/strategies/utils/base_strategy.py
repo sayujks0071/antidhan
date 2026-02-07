@@ -304,6 +304,26 @@ class BaseStrategy:
         """Calculate Average True Range."""
         return calculate_atr(df, period).iloc[-1]
 
+    def get_monthly_atr(self, symbol=None):
+        """
+        Fetch daily data (30+ days) and calculate ATR for adaptive sizing.
+        """
+        try:
+            target_symbol = symbol or self.symbol
+            # Ensure we fetch enough data for ATR calculation (e.g. 35 days for 14 period + buffer)
+            df = self.fetch_history(days=40, symbol=target_symbol, interval="D")
+
+            if df.empty or len(df) < 15:
+                self.logger.warning(f"Insufficient daily data for Monthly ATR calculation: {len(df)}")
+                return 0.0
+
+            atr_series = calculate_atr(df, period=14)
+            monthly_atr = atr_series.iloc[-1]
+            return monthly_atr
+        except Exception as e:
+            self.logger.error(f"Error calculating Monthly ATR: {e}")
+            return 0.0
+
     def calculate_adx(self, df, period=14):
         """Calculate ADX."""
         result = calculate_adx(df, period)
