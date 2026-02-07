@@ -21,25 +21,26 @@ utils_dir = os.path.join(strategies_dir, 'utils')
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open
+    from trading_utils import APIClient, PositionManager, is_market_open, calculate_atr
 except ImportError:
     try:
         # Try absolute import
         sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open
+        from trading_utils import APIClient, PositionManager, is_market_open, calculate_atr
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_atr
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
             APIClient = None
             PositionManager = None
             is_market_open = lambda: True
+            calculate_atr = lambda df, p: pd.Series([0]*len(df))
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 class MLMomentumStrategy:
-    def __init__(self, symbol, api_key, port, threshold=0.01, stop_pct=1.0, sector='NIFTY 50', vol_multiplier=0.5):
+    def __init__(self, symbol, api_key, port, threshold=0.01, stop_pct=1.0, sector='NIFTY 50', vol_multiplier=0.5, capital=100000, risk_pct=1.0):
         self.symbol = symbol
         self.host = f"http://127.0.0.1:{port}"
         self.client = APIClient(api_key=api_key, host=self.host)
@@ -50,6 +51,8 @@ class MLMomentumStrategy:
         self.stop_pct = stop_pct
         self.sector = sector
         self.vol_multiplier = vol_multiplier
+        self.capital = capital
+        self.risk_pct = risk_pct
 
     def calculate_signal(self, df):
         """Calculate signal for backtesting."""
@@ -234,8 +237,13 @@ class MLMomentumStrategy:
                     # Volume check
                     avg_vol = df['volume'].rolling(20).mean().iloc[-1]
                     if last['volume'] > avg_vol * 0.5: # At least decent volume
-                        self.logger.info(f"Strong Momentum Signal (ROC: {last['roc']:.3f}, RS: {rs_excess:.3f}). BUY.")
-                        self.pm.update_position(100, current_price, 'BUY')
+                        # Adaptive Sizing
+                        atr_series = calculate_atr(df)
+                        atr_val = atr_series.iloc[-1]
+                        qty = self.pm.calculate_adaptive_quantity(self.capital, self.risk_pct, atr_val, current_price)
+
+                        self.logger.info(f"Strong Momentum Signal (ROC: {last['roc']:.3f}, RS: {rs_excess:.3f}, ATR: {atr_val:.2f}, Qty: {qty}). BUY.")
+                        self.pm.update_position(qty, current_price, 'BUY')
 
             except Exception as e:
                 self.logger.error(f"Error in ML Momentum strategy for {self.symbol}: {e}", exc_info=True)
@@ -250,6 +258,8 @@ def run_strategy():
     parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
     parser.add_argument('--threshold', type=float, default=0.01, help='ROC Threshold')
     parser.add_argument('--sector', type=str, default='NIFTY 50', help='Sector Benchmark')
+    parser.add_argument('--capital', type=float, default=100000, help='Capital')
+    parser.add_argument('--risk_pct', type=float, default=1.0, help='Risk %%')
 
     args = parser.parse_args()
     
@@ -264,7 +274,11 @@ def run_strategy():
     api_key = args.api_key or os.getenv('OPENALGO_APIKEY', 'demo_key')
     threshold = args.threshold or float(os.getenv('THRESHOLD', '0.01'))
 
-    strategy = MLMomentumStrategy(symbol, api_key, port, threshold=threshold, sector=args.sector)
+    strategy = MLMomentumStrategy(
+        symbol, api_key, port,
+        threshold=threshold, sector=args.sector,
+        capital=args.capital, risk_pct=args.risk_pct
+    )
     strategy.run()
 
 # Module level wrapper for SimpleBacktestEngine

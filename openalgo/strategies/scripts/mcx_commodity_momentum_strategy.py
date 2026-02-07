@@ -57,6 +57,8 @@ class MCXMomentumStrategy(BaseStrategy):
     def add_arguments(cls, parser):
         parser.add_argument('--underlying', type=str, help='Commodity Name (e.g., GOLD, SILVER)')
         parser.add_argument('--port', type=int, help='API Port (Override host)')
+        parser.add_argument('--capital', type=float, default=100000, help='Capital')
+        parser.add_argument('--risk_pct', type=float, default=1.0, help='Risk %%')
         # Custom Factors
         parser.add_argument('--usd_inr_trend', type=str, default='Neutral', help='USD/INR Trend')
         parser.add_argument('--usd_inr_volatility', type=float, default=0.0, help='USD/INR Volatility %%')
@@ -76,6 +78,8 @@ class MCXMomentumStrategy(BaseStrategy):
         kwargs['usd_inr_volatility'] = args.usd_inr_volatility
         kwargs['seasonality_score'] = args.seasonality_score
         kwargs['global_alignment_score'] = args.global_alignment_score
+        kwargs['capital'] = args.capital
+        kwargs['risk_pct'] = args.risk_pct
 
         return kwargs
 
@@ -116,7 +120,10 @@ class MCXMomentumStrategy(BaseStrategy):
         usd_vol_high = self.params.get('usd_inr_volatility', 0) > 1.0
 
         # Adjust Position Size
-        base_qty = self.quantity
+        # Adaptive Sizing
+        atr_val = df['atr'].iloc[-1]
+        base_qty = self.pm.calculate_adaptive_quantity(self.params.get('capital', 100000), self.params.get('risk_pct', 1.0), atr_val, current['close'])
+
         if usd_vol_high:
             self.logger.warning("⚠️ High USD/INR Volatility (>1.0%): Reducing position size by 30%.")
             base_qty = max(1, int(base_qty * 0.7))
