@@ -15,23 +15,31 @@ from datetime import datetime, timedelta
 # Add repo root to path
 script_dir = os.path.dirname(os.path.abspath(__file__))
 strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, "utils")
-sys.path.insert(0, utils_dir)
+openalgo_root = os.path.dirname(strategies_dir)
+repo_root = os.path.dirname(openalgo_root)
+
+# Add paths for imports
+sys.path.insert(0, utils_dir := os.path.join(strategies_dir, "utils"))
+sys.path.insert(0, openalgo_root)
+sys.path.insert(0, repo_root)
 
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open
+    from trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_sma
 except ImportError:
     try:
         sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open
+        from utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_sma
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_sma
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
             APIClient = None
             PositionManager = None
             is_market_open = lambda *args, **kwargs: True
+            calculate_rsi = lambda *args, **kwargs: pd.Series()
+            calculate_atr = lambda *args, **kwargs: pd.Series()
+            calculate_sma = lambda *args, **kwargs: pd.Series()
 
 # Setup Logging
 logging.basicConfig(
@@ -89,22 +97,13 @@ class MCXStrategy:
         df = self.data.copy()
 
         # RSI
-        delta = df["close"].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=self.params["period_rsi"]).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=self.params["period_rsi"]).mean()
-        rs = gain / loss
-        df["rsi"] = 100 - (100 / (1 + rs))
+        df["rsi"] = calculate_rsi(df["close"], period=self.params["period_rsi"])
 
         # ATR
-        high_low = df["high"] - df["low"]
-        high_close = (df["high"] - df["close"].shift()).abs()
-        low_close = (df["low"] - df["close"].shift()).abs()
-        ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        true_range = ranges.max(axis=1)
-        df["atr"] = true_range.rolling(window=self.params["period_atr"]).mean()
+        df["atr"] = calculate_atr(df, period=self.params["period_atr"])
 
         # SMA 50
-        df["sma_50"] = df["close"].rolling(window=50).mean()
+        df["sma_50"] = calculate_sma(df["close"], period=50)
 
         self.data = df
 

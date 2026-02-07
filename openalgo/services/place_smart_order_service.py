@@ -293,6 +293,15 @@ def place_smart_order_with_auth(
 
         # Log successful order immediately after placement
         if res and res.status == 200:
+            # Fix: Check if order_id is present. If None, it means order was rejected even with HTTP 200.
+            if order_id is None:
+                message = response_data.get("message", "Order rejected by broker (no Order ID returned)")
+                error_response = {"status": "error", "message": message}
+                executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+                # Determine status code - if it was a rejection, maybe return 400 or keep 200 with success=False
+                # Returning 200 with success=False is consistent with HTTP level success but business failure
+                return False, error_response, 200
+
             order_response_data = {"status": "success", "orderid": order_id}
             executor.submit(
                 async_log_order, "placesmartorder", order_request_data, order_response_data

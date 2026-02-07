@@ -160,6 +160,16 @@ def calculate_bollinger_bands(series, window=20, num_std=2):
     return sma, upper, lower
 
 
+def calculate_sma(series, period=14):
+    """Calculate Simple Moving Average."""
+    return series.rolling(window=period).mean()
+
+
+def calculate_ema(series, period=14):
+    """Calculate Exponential Moving Average."""
+    return series.ewm(span=period, adjust=False).mean()
+
+
 def calculate_adx(df, period=14):
     """Calculate ADX (Returns Series)."""
     try:

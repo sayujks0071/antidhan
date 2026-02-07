@@ -195,6 +195,7 @@ def place_order_api(data, auth):
 
     Returns:
         tuple: (response_object, response_dict, order_id)
+            order_id will be None if the order is rejected.
     """
     # 1. Error handling for Invalid Token (Auth Token)
     if not auth:
@@ -290,6 +291,7 @@ def place_smartorder_api(data, auth):
 
     Returns:
         tuple: (response_object, response_dict, order_id)
+            order_id will be None if the order is rejected.
     """
     # 1. Error handling for Invalid Token (Auth Token)
     if not auth:

@@ -660,7 +660,7 @@ if __name__ == "__main__":
 
     init_db()
 
-    check_interval = int(get_config("order_check_interval", "5"))
+    check_interval = int(os.getenv("order_check_interval", "5"))
     logger.info(f"Order check interval: {check_interval} seconds")
 
     try:
