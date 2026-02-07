@@ -33,6 +33,8 @@ try:
         calculate_atr,
         calculate_intraday_vwap,
         calculate_rsi,
+        calculate_sma,
+        calculate_ema,
         is_market_open,
         normalize_symbol,
     )
@@ -49,6 +51,8 @@ except ImportError:
             calculate_atr,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_sma,
+            calculate_ema,
             is_market_open,
             normalize_symbol,
         )
@@ -65,13 +69,15 @@ except ImportError:
             calculate_atr,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_sma,
+            calculate_ema,
             is_market_open,
             normalize_symbol,
         )
 
 class BaseStrategy:
     def __init__(self, name, symbol, quantity, interval="5m", exchange="NSE",
-                 api_key=None, host=None, ignore_time=False, log_file=None, client=None):
+                 api_key=None, host=None, ignore_time=False, log_file=None, client=None, sleep_time=60):
         """
         Base Strategy Class for Dhan Sandbox Strategies.
         """
@@ -81,6 +87,7 @@ class BaseStrategy:
         self.interval = interval
         self.exchange = exchange
         self.ignore_time = ignore_time
+        self.sleep_time = sleep_time
 
         # Ensure project root is in path for DB access
         self._add_project_root_to_path()
@@ -184,8 +191,8 @@ class BaseStrategy:
             try:
                 # Use split to handle NSE_INDEX -> NSE
                 if not self.ignore_time and not is_market_open(self.exchange.split('_')[0]):
-                    self.logger.info("Market closed. Sleeping...")
-                    time.sleep(60)
+                    self.logger.info(f"Market closed. Sleeping {self.sleep_time}s...")
+                    time.sleep(self.sleep_time)
                     continue
 
                 self.cycle()
@@ -193,7 +200,7 @@ class BaseStrategy:
             except Exception as e:
                 self.logger.error(f"Error in execution loop: {e}", exc_info=True)
 
-            time.sleep(60)
+            time.sleep(self.sleep_time)
 
     def execute_trade(self, action, quantity, price=None, urgency="MEDIUM"):
         """
@@ -296,17 +303,45 @@ class BaseStrategy:
             self.logger.warning(f"Could not fetch VIX: {e}. Defaulting to 15.0.")
         return 15.0
 
+    def check_sector_correlation(self, sector_symbol=None, threshold=50):
+        """
+        Check if the sector is bullish based on RSI > threshold.
+        """
+        try:
+            target = sector_symbol or getattr(self, 'sector_benchmark', 'NIFTY BANK')
+            target = normalize_symbol(target)
+
+            # Default to NSE_INDEX for indices
+            exch = "NSE_INDEX"
+
+            df = self.fetch_history(days=30, symbol=target, interval="D", exchange=exch)
+
+            if not df.empty and len(df) > 15:
+                rsi = self.calculate_rsi(df['close'])
+                last_rsi = rsi.iloc[-1]
+                self.logger.info(f"Sector {target} RSI: {last_rsi:.2f}")
+                return last_rsi > threshold
+            return False
+        except Exception as e:
+            self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True (Allow) to prevent blocking on data issues.")
+            return True
+
     def calculate_rsi(self, series, period=14):
         """Calculate Relative Strength Index."""
         return calculate_rsi(series, period)
 
-    def calculate_atr(self, df, period=14):
+    def calculate_atr(self, df, period=14, mode='scalar'):
         """Calculate Average True Range."""
-        return calculate_atr(df, period).iloc[-1]
+        series = calculate_atr(df, period)
+        if mode == 'series':
+            return series
+        return series.iloc[-1]
 
-    def calculate_adx(self, df, period=14):
+    def calculate_adx(self, df, period=14, mode='scalar'):
         """Calculate ADX."""
         result = calculate_adx(df, period)
+        if mode == 'series':
+            return result
         return result.iloc[-1] if not result.empty else 0
 
     def calculate_intraday_vwap(self, df):
@@ -316,6 +351,14 @@ class BaseStrategy:
     def analyze_volume_profile(self, df, n_bins=20):
         """Find Point of Control (POC)."""
         return analyze_volume_profile(df, n_bins)
+
+    def calculate_sma(self, series, period):
+        """Calculate Simple Moving Average."""
+        return calculate_sma(series, period)
+
+    def calculate_ema(self, series, period):
+        """Calculate Exponential Moving Average."""
+        return calculate_ema(series, period)
 
     @staticmethod
     def get_standard_parser(description="Strategy"):
