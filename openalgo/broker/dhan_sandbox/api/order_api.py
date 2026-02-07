@@ -291,6 +291,22 @@ def place_smartorder_api(data, auth):
     Returns:
         tuple: (response_object, response_dict, order_id)
     """
+    # 1. Error handling for Invalid Token (Auth Token)
+    if not auth:
+        logger.error("Invalid Token: Authentication token is missing or empty")
+        return None, {"status": "error", "message": "Invalid Token"}, None
+
+    # 2. Error handling for SecurityId Required
+    token = get_token(data.get("symbol"), data.get("exchange"))
+    if not token:
+        logger.error(
+            f"SecurityId Required: Token not found for {data.get('symbol')} {data.get('exchange')}"
+        )
+        return None, {"status": "error", "message": "SecurityId Required"}, None
+
+    # Note: Automatic retry mechanism for 500-level API responses is implemented
+    # in the shared request() function used by get_open_position and place_order_api.
+
     AUTH_TOKEN = auth
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
     # If no API call is made in this function then res will return None
