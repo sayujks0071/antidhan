@@ -370,6 +370,20 @@ class BaseStrategy:
             self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True (Allow) to prevent blocking on data issues.")
             return True
 
+    def check_market_open(self):
+        """Check if market is open for the strategy's exchange."""
+        # Split handle NSE_INDEX -> NSE
+        exch = self.exchange.split('_')[0]
+        return is_market_open(exch)
+
+    def calculate_bollinger_bands(self, series, window=20, num_std=2):
+        """Calculate Bollinger Bands."""
+        return calculate_bollinger_bands(series, window, num_std)
+
+    def calculate_sma(self, series, window):
+        """Calculate Simple Moving Average."""
+        return series.rolling(window=window).mean()
+
     @staticmethod
     def get_standard_parser(description="Strategy"):
         """Get a standard ArgumentParser with common arguments."""
