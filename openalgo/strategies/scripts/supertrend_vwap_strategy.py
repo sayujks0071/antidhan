@@ -149,22 +149,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 sl_mult = getattr(self, 'ATR_SL_MULTIPLIER', 3.0)
                 self.trailing_stop = last['close'] - (sl_mult * self.atr)
 
-    def check_sector_correlation(self):
-        try:
-            sector_symbol = normalize_symbol(self.sector_benchmark)
-
-            df = self.fetch_history(days=30, symbol=sector_symbol, interval="D", exchange="NSE_INDEX")
-
-            if not df.empty and len(df) > 15:
-                rsi = self.calculate_rsi(df['close'])
-                last_rsi = rsi.iloc[-1]
-                self.logger.info(f"Sector {self.sector_benchmark} RSI: {last_rsi:.2f}")
-                return last_rsi > 50
-            return False
-        except Exception as e:
-            self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True (Allow) to prevent blocking on data issues.")
-            return True
-
     def generate_signal(self, df):
         """
         Generate signal for backtesting (Legacy Support)
