@@ -219,7 +219,7 @@ class WebSocketProxy:
                         aio.gather(*close_tasks, return_exceptions=True),
                         timeout=2.0,  # 2 second timeout
                     )
-                except TimeoutError:
+                except aio.TimeoutError:
                     logger.warning("Timeout waiting for client connections to close")
 
             # Disconnect all broker adapters
