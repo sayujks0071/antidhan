@@ -1,0 +1,25 @@
+Generating mock logs at logs/mock_openalgo.log...
+
+Analyzing logs from logs/mock_openalgo.log...
+
+--- Latency Audit ---
+Symbol: NIFTY, Latency: 409.00 ms
+Symbol: BANKNIFTY, Latency: 190.00 ms
+Symbol: RELIANCE, Latency: 256.00 ms
+Average Latency: 285.00 ms
+
+--- Slippage Check ---
+Symbol: NIFTY, Slippage: 1.66 pts
+Symbol: BANKNIFTY, Slippage: 1.99 pts
+Symbol: RELIANCE, Slippage: 0.30 pts
+Average Slippage: 1.32 pts
+
+--- Logic Verification ---
+Strategy: SuperTrendVWAPStrategy (NIFTY)
+Market Data:
+  Close: 24500, VWAP: 24450 (Above: True)
+  Volume: 200000, Threshold: 175000.0 (Spike: True)
+  POC: 24480 (Above: True)
+  Dev: 0.00204 (Within limit 0.03: True)
+  Sector RSI: 55.0 (Bullish: True)
+Signal Validated: YES (Mathematically Accurate - VWAP Strategy)
