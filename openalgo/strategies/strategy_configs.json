@@ -85,22 +85,16 @@
     "schedule_start": "09:15",
     "schedule_stop": "15:30"
   },
-  "MCX_NATURALGAS_TREND": {
-    "id": "MCX_NATURALGAS_TREND",
-    "name": "MCX Natural Gas Trend",
-    "description": "MCX Natural Gas Trend Strategy using SMA, RSI, and ADX",
-    "file_path": "strategies/scripts/mcx_natural_gas_trend.py",
+  "MCX_GOLD_MOMENTUM": {
+    "id": "MCX_GOLD_MOMENTUM",
+    "name": "MCX Gold Momentum",
+    "description": "MCX Gold momentum strategy using RSI and SMA",
+    "file_path": "strategies/scripts/mcx_gold_momentum.py",
     "user_id": "system",
-    "created_at": "2026-02-03T12:00:00",
-    "underlying": "NATURALGAS",
+    "created_at": "2025-05-22T10:00:00",
+    "underlying": "GOLD",
     "schedule_enabled": true,
-    "schedule_days": [
-      "mon",
-      "tue",
-      "wed",
-      "thu",
-      "fri"
-    ],
+    "schedule_days": ["mon", "tue", "wed", "thu", "fri"],
     "params": {
       "seasonality_score": 60,
       "global_alignment_score": 55,
