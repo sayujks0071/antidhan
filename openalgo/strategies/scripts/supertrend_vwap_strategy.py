@@ -25,43 +25,19 @@ except ImportError:
     from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
 
 class SuperTrendVWAPStrategy(BaseStrategy):
-    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
-                 sector_benchmark='NIFTY BANK', log_file=None, client=None, **kwargs):
-        super().__init__(
-            name=f"VWAP_{symbol}",
-            symbol=symbol,
-            quantity=quantity,
-            api_key=api_key,
-            host=host,
-            ignore_time=ignore_time,
-            log_file=log_file,
-            client=client
-        )
-        self.sector_benchmark = sector_benchmark
+    # Strategy-specific Parameters (Defaults)
+    # These can be overridden by passing arguments with same name
+    threshold = 150
+    stop_pct = 1.8
+    adx_threshold = 20
+    adx_period = 14
 
-        # Optimization Parameters
-        self.threshold = 150 # Note: This parameter was previously unused in logic. Keeping for compatibility but ignoring.
-        self.stop_pct = 1.8
-        self.adx_threshold = 20
-        self.adx_period = 14
+    # State variables
+    trailing_stop = 0.0
+    atr = 0.0
 
-        # State
-        self.trailing_stop = 0.0
-        self.atr = 0.0
-
-    @classmethod
-    def add_arguments(cls, parser):
-        parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
-        parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
-        parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
-        parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
-
-    @classmethod
-    def parse_arguments(cls, args):
-        kwargs = super().parse_arguments(args)
-        kwargs['sector_benchmark'] = args.sector
-        # BaseStrategy already extracts log_file from args.logfile
-        return kwargs
+    # Note: BaseStrategy handles __init__, argument parsing, and initialization.
+    # We only need to implement the core logic cycle.
 
     def cycle(self):
         """
@@ -128,7 +104,10 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 self.trailing_stop = 0.0
         else:
             # Entry Logic
-            sector_bullish = self.check_sector_correlation(self.sector_benchmark)
+            # Use self.sector (managed by BaseStrategy) instead of self.sector_benchmark
+            # If self.sector is None, check_sector_correlation handles it (defaults to NIFTY BANK or passed value)
+            # BaseStrategy sets self.sector from --sector argument
+            sector_bullish = self.check_sector_correlation(self.sector or "NIFTY BANK")
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
                 adj_qty = int(self.quantity * size_multiplier)
@@ -198,14 +177,11 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
 # Module level wrapper for SimpleBacktestEngine
 def generate_signal(df, client=None, symbol=None, params=None):
-    strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test", client=client)
+    # Pass params as kwargs to __init__ which BaseStrategy handles
+    kwargs = params or {}
+    strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test", client=client, **kwargs)
     strat.logger.handlers = []
     strat.logger.addHandler(logging.NullHandler())
-
-    if params:
-        if 'threshold' in params: strat.threshold = params['threshold']
-        if 'stop_pct' in params: strat.stop_pct = params['stop_pct']
-        if 'adx_threshold' in params: strat.adx_threshold = params['adx_threshold']
 
     setattr(strat, 'BREAKEVEN_TRIGGER_R', 1.5)
     setattr(strat, 'ATR_SL_MULTIPLIER', 3.0)
