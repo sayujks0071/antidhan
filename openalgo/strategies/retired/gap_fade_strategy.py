@@ -73,6 +73,15 @@ class GapFadeStrategy(BaseStrategy):
         except Exception as e:
             self.logger.warning(f"Could not calculate ADX: {e}")
 
+        # Calculate RSI for Mean Reversion Confirmation
+        try:
+            rsi_series = self.calculate_rsi(df['close'])
+            rsi = rsi_series.iloc[-1]
+            self.logger.info(f"RSI: {rsi:.2f}")
+        except Exception as e:
+            self.logger.warning(f"Could not calculate RSI: {e}")
+            rsi = 50 # Default to neutral
+
         prev_close = df.iloc[-1]['close']
 
         quote = self.client.get_quote(target_symbol, "NSE")
@@ -101,15 +110,25 @@ class GapFadeStrategy(BaseStrategy):
 
         if gap_pct > self.gap_threshold:
             # Gap UP -> Fade (Sell/Short or Buy Put)
-            self.logger.info("Gap UP detected. Looking to FADE (Short).")
-            action = "SELL"
-            option_type = "PE"
+            # Filter: RSI must be Overbought (> 60) to justify shorting
+            if rsi > 60:
+                self.logger.info(f"Gap UP detected & RSI {rsi:.2f} > 60. FADE (Short) confirm.")
+                action = "SELL"
+                option_type = "PE"
+            else:
+                self.logger.info(f"Gap UP but RSI {rsi:.2f} < 60. Skipping FADE (Momentum Risk).")
+                return
 
         elif gap_pct < -self.gap_threshold:
             # Gap DOWN -> Fade (Buy/Long or Buy Call)
-            self.logger.info("Gap DOWN detected. Looking to FADE (Long).")
-            action = "BUY"
-            option_type = "CE"
+            # Filter: RSI must be Oversold (< 40) to justify buying
+            if rsi < 40:
+                self.logger.info(f"Gap DOWN detected & RSI {rsi:.2f} < 40. FADE (Long) confirm.")
+                action = "BUY"
+                option_type = "CE"
+            else:
+                self.logger.info(f"Gap DOWN but RSI {rsi:.2f} > 40. Skipping FADE (Momentum Risk).")
+                return
 
         # 3. Select Option Strike (ATM)
         atm = round(current_price / 50) * 50
