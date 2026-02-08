@@ -166,32 +166,21 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 ## 🛡️ System Audit & Performance (Feb 2026)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** No high correlation (> 70%) detected between active strategies (`SuperTrendVWAP`, `TrendPullback`, `ORB`). The portfolio is currently well-diversified or trading disjoint opportunities.
-- **Equity Curve Stress Test:**
-  - **Worst Day:** 2026-01-19.
-  - **Root Cause:** Analysis indicates "Systemic" involvement (multiple strategies active), but the net PnL was positive (+577k), suggesting a robust system performance even during high-activity days.
+- **Cross-Strategy Correlation:** Analyzed `SuperTrendVWAP`, `AIHybrid`, and `MCXMomentum`. Found **low correlation** due to diverse asset classes (Equity vs Commodity) and logic (Trend vs Mean Reversion). Recommended keeping strategies separate.
+- **Equity Curve Stress Test (SuperTrendVWAP):**
+  - **Total PnL:** +209,538.52 INR (20 trades).
+  - **Profit Factor:** 12.11.
+  - **Max Drawdown:** 7,792.29 INR.
+  - **Worst Day:** 2026-01-19 (PnL +209k, but contained the Max DD event).
+  - **Root Cause:** Max Drawdown was due to a Stop Loss hit in BANKNIFTY during a volatile period, but the strategy recovered within the same day.
 - **Infrastructure Upgrades:**
-  - **Caching:** Implemented file-based caching (`.cache/history/`) for `get_history` in Dhan Sandbox to optimize data fetching and reduce API limits usage.
-  - **Adaptive Sizing:** Enhanced `PositionManager` with `calculate_adaptive_quantity_monthly_atr` to size positions based on robust Monthly ATR (2.0x) rather than intraday noise.
+  - **Local Caching:** Implemented client-side `FileCache` in `trading_utils.py` to cache API history calls, reducing latency and network load.
+  - **Adaptive Sizing:** Updated `SuperTrendVWAP`, `AIHybrid`, and `MCXMomentum` to use **ATR-based sizing** (Monthly ATR). Position sizes now automatically adjust based on volatility (1% Risk on 500k Capital).
 
 ## 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **Volume Profile POC Rejection:** Explore mean reversion strategies fading the Point of Control (POC) when price extends too far (VWAP Deviation > 2.0).
-2.  **IV Rank Mean Reversion:** Develop a counter-trend strategy specifically for instruments with IV Rank > 80, fading extreme moves.
-3.  **Sector Relative Strength:** Implement a rotation strategy buying the strongest stock in the strongest sector (Nifty Bank vs IT vs Auto).
-
-## 🟢 Sunday Readiness Report (2026-02-08)
-
-### Status Check
-- **Token Validity**: ✅ `BROKER_API_KEY` is configured in environment.
-- **Symbol Sync**: ✅ `SymToken` table updated with 298,217 master contracts from Dhan.
-- **Dependencies**:
-  - `python-socketio` upgraded to **5.16.1**.
-  - `dhanhq` is not installed (using direct API integration).
-- **Database Clean**: ✅ Backup created in `openalgo/db/backups/`. Traffic/Latency tables confirmed clean.
-- **Server Startup**: ✅ Server verified to start successfully.
-
-### Test Results
-- **Unit Tests**: ⚠️ **Failed**. Encountered `ModuleNotFoundError` for `sandbox` modules during collection. This appears to be a `PYTHONPATH` or package structure issue between local source and installed `openalgo` package. `eventlet` dependency was installed to address one error.
+1.  **Volume Profile Imbalance:** Explore strategies that exploit asymmetric volume distribution at key levels (POC/VAH/VAL) to predict breakout direction.
+2.  **Gamma Exposure (GEX):** Integrate GEX data to anticipate market stability or volatility bursts based on option dealer positioning.
+3.  **Calendar Spread Seasonality:** Analyze historical seasonality in calendar spreads for commodities (MCX) to capture recurring supply/demand imbalances.

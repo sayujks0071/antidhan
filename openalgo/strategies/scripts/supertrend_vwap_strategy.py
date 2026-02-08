@@ -25,19 +25,43 @@ except ImportError:
     from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
 
 class SuperTrendVWAPStrategy(BaseStrategy):
-    # Strategy-specific Parameters (Defaults)
-    # These can be overridden by passing arguments with same name
-    threshold = 150
-    stop_pct = 1.8
-    adx_threshold = 20
-    adx_period = 14
+    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
+                 sector_benchmark='NIFTY BANK', log_file=None, client=None, **kwargs):
+        super().__init__(
+            name=f"VWAP_{symbol}",
+            symbol=symbol,
+            quantity=quantity,
+            api_key=api_key,
+            host=host,
+            ignore_time=ignore_time,
+            log_file=log_file,
+            client=client
+        )
+        self.sector_benchmark = sector_benchmark
 
-    # State variables
-    trailing_stop = 0.0
-    atr = 0.0
+        # Optimization Parameters
+        self.threshold = 150 # Note: This parameter was previously unused in logic. Keeping for compatibility but ignoring.
+        self.stop_pct = 1.8
+        self.adx_threshold = 20
+        self.adx_period = 14
 
-    # Note: BaseStrategy handles __init__, argument parsing, and initialization.
-    # We only need to implement the core logic cycle.
+        # State
+        self.trailing_stop = 0.0
+        self.atr = 0.0
+
+    @classmethod
+    def add_arguments(cls, parser):
+        parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
+        parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
+        parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
+        # sector is already in BaseStrategy
+
+    @classmethod
+    def parse_arguments(cls, args):
+        kwargs = super().parse_arguments(args)
+        kwargs['sector_benchmark'] = args.sector
+        # BaseStrategy already extracts log_file from args.logfile
+        return kwargs
 
     def cycle(self):
         """
@@ -63,6 +87,14 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         self.atr = self.calculate_atr(df)
         last = df.iloc[-1]
+
+        # Adaptive Sizing (Monthly ATR)
+        monthly_atr = self.get_monthly_atr()
+        base_qty = self.quantity
+        if monthly_atr > 0 and self.pm:
+            # Adaptive Sizing: 1% Risk on 500,000 Capital
+            base_qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, last['close'])
+            self.logger.info(f"Adaptive Base Qty: {base_qty} (Monthly ATR: {monthly_atr:.2f})")
 
         # Volume Profile
         poc_price, poc_vol = self.analyze_volume_profile(df)
@@ -110,7 +142,8 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             sector_bullish = self.check_sector_correlation(self.sector or "NIFTY BANK")
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
-                adj_qty = int(self.quantity * size_multiplier)
+                # Use base_qty calculated from adaptive sizing
+                adj_qty = int(base_qty * size_multiplier)
                 if adj_qty < 1: adj_qty = 1
                 self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}, Qty: {adj_qty} (VIX: {vix})")
 
