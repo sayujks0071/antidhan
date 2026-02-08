@@ -7,6 +7,8 @@ from datetime import datetime
 from datetime import time as dt_time
 from functools import lru_cache
 from pathlib import Path
+import pickle
+import hashlib
 
 import httpx
 import numpy as np
@@ -463,6 +465,35 @@ class SmartOrder:
             return (self.entry_price - current_price) * abs(self.position)
 
 
+class FileCache:
+    def __init__(self, cache_dir=".cache/api_client_history"):
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _get_cache_path(self, key):
+        key_hash = hashlib.md5(key.encode()).hexdigest()
+        return self.cache_dir / f"{key_hash}.pkl"
+
+    def get(self, key):
+        cache_path = self._get_cache_path(key)
+        if cache_path.exists():
+            try:
+                with open(cache_path, "rb") as f:
+                    logger.debug(f"Cache hit for {key}")
+                    return pickle.load(f)
+            except Exception as e:
+                logger.warning(f"Cache read failed for {key}: {e}")
+        return None
+
+    def set(self, key, data):
+        cache_path = self._get_cache_path(key)
+        try:
+            with open(cache_path, "wb") as f:
+                pickle.dump(data, f)
+        except Exception as e:
+            logger.warning(f"Cache write failed for {key}: {e}")
+
+
 class APIClient:
     """
     Fallback API Client using httpx if openalgo package is missing.
@@ -471,6 +502,7 @@ class APIClient:
     def __init__(self, api_key, host="http://127.0.0.1:5002"):
         self.api_key = api_key
         self.host = host.rstrip("/")
+        self.cache = FileCache()
 
     def history(
         self,
@@ -482,6 +514,15 @@ class APIClient:
         max_retries=3,
     ):
         """Fetch historical data with retry logic and exponential backoff"""
+        # Check Cache first
+        cache_key = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
+        cached_df = self.cache.get(cache_key)
+        if cached_df is not None and not cached_df.empty:
+            # Only use cache if end_date is in the past (not today)
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            if end_date and end_date < today_str:
+                return cached_df
+
         url = f"{self.host}/api/v1/history"
         payload = {
             "symbol": symbol,
@@ -513,6 +554,12 @@ class APIClient:
                     logger.debug(
                         f"Successfully fetched {len(df)} rows for {symbol} on {exchange}"
                     )
+
+                    # Save to Cache if valid and historical
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    if end_date and end_date < today_str and not df.empty:
+                        self.cache.set(cache_key, df)
+
                     return df
                 else:
                     error_msg = data.get("message", "Unknown error")
