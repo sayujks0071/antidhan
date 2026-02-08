@@ -135,5 +135,34 @@
     "is_scheduled": true,
     "schedule_start": "09:15",
     "schedule_stop": "15:30"
+  },
+  "NSE_RSI_EMA_CROSSOVER": {
+    "id": "NSE_RSI_EMA_CROSSOVER",
+    "name": "NSE RSI EMA Crossover",
+    "description": "NSE Equity Trend Following Strategy using EMA (9/21) Crossover and RSI",
+    "file_path": "strategies/scripts/nse_rsi_ema_crossover.py",
+    "user_id": "system",
+    "created_at": "2026-02-02T14:00:00",
+    "symbol": "RELIANCE",
+    "schedule_enabled": true,
+    "schedule_days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri"
+    ],
+    "params": {
+      "fast_ema": 9,
+      "slow_ema": 21,
+      "rsi_period": 14,
+      "rsi_buy": 55.0,
+      "rsi_sell": 45.0,
+      "quantity": 1
+    },
+    "is_running": false,
+    "is_scheduled": true,
+    "schedule_start": "09:15",
+    "schedule_stop": "15:30"
   }
 }
