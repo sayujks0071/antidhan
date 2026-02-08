@@ -13,7 +13,7 @@ import pandas as pd
 # Add repo root to path to allow imports (if running as script)
 try:
     from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+    from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
 except ImportError:
     # Try setting path to find utils
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +22,7 @@ except ImportError:
     if utils_dir not in sys.path:
         sys.path.insert(0, utils_dir)
     from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+    from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
 
 class SuperTrendVWAPStrategy(BaseStrategy):
     def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
@@ -54,12 +54,13 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
         parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
         parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
-        parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
+        # --sector is already added by BaseStrategy
 
     @classmethod
     def parse_arguments(cls, args):
         kwargs = super().parse_arguments(args)
-        kwargs['sector_benchmark'] = args.sector
+        # Use provided sector or default to 'NIFTY BANK'
+        kwargs['sector_benchmark'] = args.sector if args.sector else 'NIFTY BANK'
         # BaseStrategy already extracts log_file from args.logfile
         return kwargs
 
@@ -88,22 +89,20 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         self.atr = self.calculate_atr(df)
         last = df.iloc[-1]
 
+        # Adaptive Sizing (Monthly ATR)
+        monthly_atr = self.get_monthly_atr()
+        base_qty = self.quantity
+        if monthly_atr > 0 and self.pm:
+            # Adaptive Sizing: 1% Risk on 500,000 Capital
+            base_qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, last['close'])
+            self.logger.info(f"Adaptive Base Qty: {base_qty} (Monthly ATR: {monthly_atr:.2f})")
+
         # Volume Profile
         poc_price, poc_vol = self.analyze_volume_profile(df)
 
         # Dynamic Deviation based on VIX
         vix = self.get_vix()
-        dev_threshold = 0.03 # Increased from 0.02 to allow more entries
-        size_multiplier = 1.0
-
-        # Relaxed VIX thresholds to prevent total rejection
-        if vix > 25:
-            dev_threshold = 0.012 # Increased from 0.008
-            size_multiplier = 0.5
-        elif vix > 20:
-            dev_threshold = 0.025 # Increased from 0.015
-        elif vix < 12:
-            dev_threshold = 0.04 # Increased from 0.03
+        size_multiplier, dev_threshold = calculate_vix_volatility_multiplier(vix)
 
         # Indicators
         is_above_vwap = last['close'] > last['vwap']
@@ -138,10 +137,14 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 self.trailing_stop = 0.0
         else:
             # Entry Logic
-            sector_bullish = self.check_sector_correlation(self.sector_benchmark)
+            # Use self.sector (managed by BaseStrategy) instead of self.sector_benchmark
+            # If self.sector is None, check_sector_correlation handles it (defaults to NIFTY BANK or passed value)
+            # BaseStrategy sets self.sector from --sector argument
+            sector_bullish = self.check_sector_correlation(self.sector or "NIFTY BANK")
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
-                adj_qty = int(self.quantity * size_multiplier)
+                # Use base_qty calculated from adaptive sizing
+                adj_qty = int(base_qty * size_multiplier)
                 if adj_qty < 1: adj_qty = 1
                 self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}, Qty: {adj_qty} (VIX: {vix})")
 
@@ -163,7 +166,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             return 'HOLD', {}, {}
 
         self.atr = self.calculate_atr(df)
-        last = df.iloc[-1]
 
         poc_price, poc_vol = self.analyze_volume_profile(df)
 
@@ -173,7 +175,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         dev_threshold = 0.03
 
         # Logic
-        df['ema200'] = df['close'].ewm(span=200, adjust=False).mean()
+        df['ema200'] = self.calculate_ema(df['close'], period=200)
         is_uptrend = True
         if not pd.isna(last['ema200']):
             is_uptrend = last['close'] > last['ema200']
@@ -208,14 +210,11 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
 # Module level wrapper for SimpleBacktestEngine
 def generate_signal(df, client=None, symbol=None, params=None):
-    strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test", client=client)
+    # Pass params as kwargs to __init__ which BaseStrategy handles
+    kwargs = params or {}
+    strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test", client=client, **kwargs)
     strat.logger.handlers = []
     strat.logger.addHandler(logging.NullHandler())
-
-    if params:
-        if 'threshold' in params: strat.threshold = params['threshold']
-        if 'stop_pct' in params: strat.stop_pct = params['stop_pct']
-        if 'adx_threshold' in params: strat.adx_threshold = params['adx_threshold']
 
     setattr(strat, 'BREAKEVEN_TRIGGER_R', 1.5)
     setattr(strat, 'ATR_SL_MULTIPLIER', 3.0)
