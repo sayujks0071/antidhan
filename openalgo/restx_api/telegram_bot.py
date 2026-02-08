@@ -212,6 +212,7 @@ class StartBot(Resource):
 
             # Start bot
             if config.get("polling_mode", True):
+                # start_bot runs in a separate thread and is synchronous
                 success, message = telegram_bot_service.start_bot()
             else:
                 # Webhook mode would be configured separately

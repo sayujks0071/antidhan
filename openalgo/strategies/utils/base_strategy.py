@@ -53,8 +53,10 @@ except ImportError:
             calculate_adx,
             calculate_atr,
             calculate_bollinger_bands,
+            calculate_ema,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_sma,
             calculate_supertrend,
             calculate_sma,
             calculate_ema,
@@ -343,6 +345,14 @@ class BaseStrategy:
     def calculate_atr(self, df, period=14):
         """Calculate Average True Range."""
         return calculate_atr(df, period).iloc[-1]
+
+    def calculate_sma(self, series, period=14):
+        """Calculate Simple Moving Average."""
+        return calculate_sma(series, period)
+
+    def calculate_ema(self, series, period=14):
+        """Calculate Exponential Moving Average."""
+        return calculate_ema(series, period)
 
     def get_monthly_atr(self, symbol=None):
         """

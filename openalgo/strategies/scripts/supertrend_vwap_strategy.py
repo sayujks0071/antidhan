@@ -54,12 +54,13 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
         parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
         parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
-        # sector is already in BaseStrategy
+        # --sector is already added by BaseStrategy
 
     @classmethod
     def parse_arguments(cls, args):
         kwargs = super().parse_arguments(args)
-        kwargs['sector_benchmark'] = args.sector
+        # Use provided sector or default to 'NIFTY BANK'
+        kwargs['sector_benchmark'] = args.sector if args.sector else 'NIFTY BANK'
         # BaseStrategy already extracts log_file from args.logfile
         return kwargs
 
@@ -174,11 +175,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         dev_threshold = 0.03
 
         # Logic
-        df['ema200'] = df['close'].ewm(span=200, adjust=False).mean()
-
-        # Update last row reference after adding indicators
-        last = df.iloc[-1]
-
+        df['ema200'] = self.calculate_ema(df['close'], period=200)
         is_uptrend = True
         if not pd.isna(last['ema200']):
             is_uptrend = last['close'] > last['ema200']
