@@ -383,9 +383,9 @@ class BrokerData:
                     continue
 
                 # Get exchange_token from database
-                with db_session() as session:
+                with db_session() as dbsession:
                     symbol_info = (
-                        session.query(SymToken)
+                        dbsession.query(SymToken)
                         .filter(SymToken.exchange == exchange, SymToken.brsymbol == br_symbol)
                         .first()
                     )
@@ -542,9 +542,9 @@ class BrokerData:
             if not exchange_segment:
                 raise Exception(f"Unsupported exchange: {exchange}")
             # Get exchange_token from database
-            with db_session() as session:
+            with db_session() as dbsession:
                 symbol_info = (
-                    session.query(SymToken)
+                    dbsession.query(SymToken)
                     .filter(SymToken.exchange == exchange, SymToken.brsymbol == br_symbol)
                     .first()
                 )

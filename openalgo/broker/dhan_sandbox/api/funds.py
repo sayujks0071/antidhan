@@ -15,7 +15,17 @@ logger = get_logger(__name__)
 
 
 def test_auth_token(auth_token):
-    """Test if the auth token is valid by making a simple API call to funds endpoint."""
+    """
+    Test if the auth token is valid by making a simple API call to funds endpoint.
+
+    Args:
+        auth_token (str): The authentication token (access-token) to validate.
+
+    Returns:
+        tuple: (is_valid, error_message)
+               - is_valid (bool): True if token is valid, False otherwise.
+               - error_message (str or None): Error description if invalid, None if valid.
+    """
     api_key = os.getenv("BROKER_API_KEY")
 
     # Get the shared httpx client with connection pooling
@@ -52,7 +62,21 @@ def test_auth_token(auth_token):
 
 
 def get_margin_data(auth_token):
-    """Fetch margin data from Dhan API using the provided auth token."""
+    """
+    Fetch margin (funds) data from Dhan API using the provided auth token.
+
+    Args:
+        auth_token (str): Authentication token.
+
+    Returns:
+        dict: A dictionary containing fund details:
+              - 'availablecash': Available balance.
+              - 'collateral': Collateral amount.
+              - 'm2munrealized': Unrealized M2M PnL.
+              - 'm2mrealized': Realized M2M PnL.
+              - 'utiliseddebits': Utilized amount.
+              Returns default zero values on error.
+    """
     api_key = os.getenv("BROKER_API_KEY")
 
     # Get the shared httpx client with connection pooling
