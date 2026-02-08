@@ -35,6 +35,9 @@ try:
         calculate_intraday_vwap,
         calculate_rsi,
         calculate_supertrend,
+        calculate_sma,
+        calculate_ema,
+        calculate_relative_strength,
         is_market_open,
         normalize_symbol,
     )
@@ -53,6 +56,9 @@ except ImportError:
             calculate_intraday_vwap,
             calculate_rsi,
             calculate_supertrend,
+            calculate_sma,
+            calculate_ema,
+            calculate_relative_strength,
             is_market_open,
             normalize_symbol,
         )
@@ -71,6 +77,9 @@ except ImportError:
             calculate_intraday_vwap,
             calculate_rsi,
             calculate_supertrend,
+            calculate_sma,
+            calculate_ema,
+            calculate_relative_strength,
             is_market_open,
             normalize_symbol,
         )
@@ -305,6 +314,18 @@ class BaseStrategy:
     def calculate_rsi(self, series, period=14):
         """Calculate Relative Strength Index."""
         return calculate_rsi(series, period)
+
+    def calculate_sma(self, series, period=50):
+        """Calculate SMA."""
+        return calculate_sma(series, period)
+
+    def calculate_ema(self, series, period=20):
+        """Calculate EMA."""
+        return calculate_ema(series, period)
+
+    def calculate_relative_strength(self, df, index_df, period=10):
+        """Calculate Relative Strength."""
+        return calculate_relative_strength(df, index_df, period)
 
     def calculate_atr(self, df, period=14):
         """Calculate Average True Range."""
