@@ -43,7 +43,7 @@ class AIHybridStrategy(BaseStrategy):
     def add_arguments(cls, parser):
         parser.add_argument('--rsi_lower', type=float, default=35.0, help='RSI Lower Threshold')
         parser.add_argument('--rsi_upper', type=float, default=60.0, help='RSI Upper Threshold')
-        parser.add_argument('--stop_pct', type=float, default=1.0, help='Stop Loss %')
+        parser.add_argument('--stop_pct', type=float, default=1.0, help='Stop Loss %%')
         parser.add_argument('--earnings_date', type=str, help='Earnings Date YYYY-MM-DD')
         # sector is already in BaseStrategy
 
@@ -80,6 +80,23 @@ class AIHybridStrategy(BaseStrategy):
             self.logger.info(f"Sector {self.sector} Weak. Skipping.")
             return
 
+        # Adaptive Sizing
+        monthly_atr = self.get_monthly_atr()
+        base_qty = self.quantity # Default from init
+
+        # Override default 100 with adaptive
+        if monthly_atr > 0 and self.pm:
+            # 1% Risk on 500k Capital
+            quote = self.client.get_quote(self.symbol, self.exchange)
+            ltp = quote.get('ltp', 0) if quote else 0
+            if ltp > 0:
+                adaptive_qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, ltp)
+                if adaptive_qty > 0:
+                    base_qty = adaptive_qty
+                    self.logger.info(f"Adaptive Base Qty: {base_qty} (Monthly ATR: {monthly_atr:.2f})")
+        else:
+            base_qty = 100 # Fallback default used in original code
+
         # Fetch Data
         exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
         df = self.fetch_history(days=30, interval="5m", exchange=exchange)
@@ -114,16 +131,18 @@ class AIHybridStrategy(BaseStrategy):
         if last['rsi'] < self.rsi_lower and last['close'] < last['lower']:
             avg_vol = df['volume'].rolling(20).mean().iloc[-1]
             if last['volume'] > avg_vol * 1.2:
-                qty = int(100 * size_multiplier) # Fixed 100 in original code
-                self.logger.info("Oversold Reversion Signal (RSI<30, <LowerBB, Vol>1.2x). BUY.")
+                qty = int(base_qty * size_multiplier)
+                if qty < 1: qty = 1
+                self.logger.info(f"Oversold Reversion Signal. Qty: {qty}")
                 self.execute_trade('BUY', qty, current_price)
 
         # Breakout Logic
         elif last['rsi'] > self.rsi_upper and last['close'] > last['upper']:
             avg_vol = df['volume'].rolling(20).mean().iloc[-1]
             if last['volume'] > avg_vol * 2.0:
-                 qty = int(100 * size_multiplier)
-                 self.logger.info("Breakout Signal (RSI>60, >UpperBB, Vol>2x). BUY.")
+                 qty = int(base_qty * size_multiplier)
+                 if qty < 1: qty = 1
+                 self.logger.info(f"Breakout Signal. Qty: {qty}")
                  self.execute_trade('BUY', qty, current_price)
 
 
