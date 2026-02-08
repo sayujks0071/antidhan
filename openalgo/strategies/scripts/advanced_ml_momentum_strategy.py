@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 # Add project root to path
 try:
     from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+    from trading_utils import normalize_symbol, calculate_relative_strength, calculate_roc
 except ImportError:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     strategies_dir = os.path.dirname(script_dir)
@@ -21,7 +21,7 @@ except ImportError:
     if utils_dir not in sys.path:
         sys.path.insert(0, utils_dir)
     from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+    from trading_utils import normalize_symbol, calculate_relative_strength, calculate_roc
 
 class MLMomentumStrategy(BaseStrategy):
     def __init__(self, symbol, quantity=10, api_key=None, host=None, threshold=0.01, stop_pct=1.0, sector='NIFTY 50', vol_multiplier=0.5, **kwargs):
@@ -73,7 +73,7 @@ class MLMomentumStrategy(BaseStrategy):
         sector_df = self.fetch_history(days=30, symbol=self.sector, interval="15m", exchange="NSE_INDEX")
 
         # Indicators
-        df['roc'] = df['close'].pct_change(periods=10)
+        df['roc'] = calculate_roc(df['close'], period=10)
         df['rsi'] = self.calculate_rsi(df['close'])
         df['sma50'] = self.calculate_sma(df['close'], 50)
 
@@ -81,13 +81,13 @@ class MLMomentumStrategy(BaseStrategy):
         current_price = last['close']
 
         # Relative Strength vs NIFTY
-        rs_excess = self.calculate_relative_strength(df, index_df)
+        rs_excess = calculate_relative_strength(df, index_df)
 
         # Sector Momentum Overlay
         sector_outperformance = 0.0
         if not sector_df.empty:
             try:
-                 sector_roc = sector_df['close'].pct_change(10).iloc[-1]
+                 sector_roc = calculate_roc(sector_df['close'], period=10).iloc[-1]
                  sector_outperformance = last['roc'] - sector_roc
             except: pass
         else:
@@ -123,15 +123,6 @@ class MLMomentumStrategy(BaseStrategy):
                 self.logger.info(f"Strong Momentum Signal (ROC: {last['roc']:.3f}, RS: {rs_excess:.3f}). BUY.")
                 self.execute_trade('BUY', self.quantity, current_price)
 
-    def calculate_relative_strength(self, df, index_df):
-        if index_df.empty: return 1.0
-        try:
-            stock_roc = df['close'].pct_change(10).iloc[-1]
-            index_roc = index_df['close'].pct_change(10).iloc[-1]
-            return stock_roc - index_roc
-        except:
-            return 0.0
-
     def get_news_sentiment(self):
         # Simulated
         return 0.5
@@ -149,7 +140,7 @@ class MLMomentumStrategy(BaseStrategy):
             return 'HOLD', 0.0, {}
 
         # Indicators
-        df['roc'] = df['close'].pct_change(periods=10)
+        df['roc'] = calculate_roc(df['close'], period=10)
         df['rsi'] = self.calculate_rsi(df['close'])
         df['sma50'] = self.calculate_sma(df['close'], 50)
 

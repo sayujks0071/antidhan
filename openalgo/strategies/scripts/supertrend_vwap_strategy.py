@@ -13,7 +13,7 @@ import pandas as pd
 # Add repo root to path to allow imports (if running as script)
 try:
     from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+    from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
 except ImportError:
     # Try setting path to find utils
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +22,7 @@ except ImportError:
     if utils_dir not in sys.path:
         sys.path.insert(0, utils_dir)
     from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+    from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
 
 class SuperTrendVWAPStrategy(BaseStrategy):
     def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
@@ -93,17 +93,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Dynamic Deviation based on VIX
         vix = self.get_vix()
-        dev_threshold = 0.03 # Increased from 0.02 to allow more entries
-        size_multiplier = 1.0
-
-        # Relaxed VIX thresholds to prevent total rejection
-        if vix > 25:
-            dev_threshold = 0.012 # Increased from 0.008
-            size_multiplier = 0.5
-        elif vix > 20:
-            dev_threshold = 0.025 # Increased from 0.015
-        elif vix < 12:
-            dev_threshold = 0.04 # Increased from 0.03
+        size_multiplier, dev_threshold = calculate_vix_volatility_multiplier(vix)
 
         # Indicators
         is_above_vwap = last['close'] > last['vwap']
