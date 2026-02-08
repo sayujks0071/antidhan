@@ -1,7 +1,10 @@
 import json
 import os
 import urllib.parse
+import pickle
+import hashlib
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import httpx
 import jwt
@@ -17,6 +20,21 @@ logger = get_logger(__name__)
 
 
 def get_api_response(endpoint, auth, method="POST", payload=""):
+    """
+    Helper function to make API requests to the Dhan Sandbox for data endpoints.
+
+    Args:
+        endpoint (str): API endpoint (e.g., "/v2/charts/historical").
+        auth (str): Authentication token.
+        method (str, optional): HTTP method ("GET", "POST"). Defaults to "POST".
+        payload (str, optional): JSON string payload. Defaults to "".
+
+    Returns:
+        dict: The JSON response from the API.
+
+    Raises:
+        Exception: If the API returns a failed status or invalid response.
+    """
     AUTH_TOKEN = auth
     client_id = os.getenv("BROKER_API_KEY")
 
@@ -89,6 +107,18 @@ class BrokerData:
             # Daily
             "D": "D",  # Daily data
         }
+
+        # Setup Cache
+        self.cache_dir = Path(".cache/history")
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _get_cache_path(self, symbol, exchange, interval, start_date, end_date):
+        """Generate a unique cache file path."""
+        # Normalize keys
+        key_str = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
+        # Use hash to avoid filesystem issues with characters
+        key_hash = hashlib.md5(key_str.encode()).hexdigest()
+        return self.cache_dir / f"{key_hash}.pkl"
 
     def _convert_to_dhan_request(self, symbol, exchange):
         """Convert symbol and exchange to Dhan format"""
@@ -301,7 +331,7 @@ class BrokerData:
             start_date: Start date (YYYY-MM-DD) in IST
             end_date: End date (YYYY-MM-DD) in IST
         Returns:
-            pd.DataFrame: Historical data with columns [timestamp, open, high, low, close, volume]
+            pd.DataFrame: Historical data with columns [timestamp, open, high, low, close, volume, oi]
         """
         try:
             # Check if interval is supported
@@ -319,6 +349,25 @@ class BrokerData:
 
             # Adjust dates for trading days
             start_date, end_date = self._adjust_dates(start_date, end_date)
+
+            # Check Cache
+            cache_path = self._get_cache_path(symbol, exchange, interval, start_date, end_date)
+            if cache_path.exists():
+                # Check if cache is fresh enough?
+                # For historical data with fixed start/end, it shouldn't change unless corrected.
+                # However, if end_date is Today, the data is incomplete until market close.
+                # Simplification: If end_date is strictly in the past (yesterday or before), use cache.
+                # If end_date is today, do not use cache (or check modified time).
+
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                if end_date < today_str:
+                    try:
+                        with open(cache_path, 'rb') as f:
+                            df = pickle.load(f)
+                        logger.info(f"Loaded {len(df)} rows from cache for {symbol}")
+                        return df
+                    except Exception as e:
+                        logger.warning(f"Failed to load cache for {symbol}: {e}")
 
             # If both dates are weekends, return empty DataFrame
             if not self._is_trading_day(start_date) and not self._is_trading_day(end_date):
@@ -572,6 +621,17 @@ class BrokerData:
                     .reset_index(drop=True)
                 )
 
+            # Save to Cache if data is valid and end_date is in past
+            if not df.empty:
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                if end_date < today_str:
+                    try:
+                        with open(cache_path, 'wb') as f:
+                            pickle.dump(df, f)
+                        logger.info(f"Saved cache for {symbol} ({len(df)} rows)")
+                    except Exception as e:
+                        logger.warning(f"Failed to save cache for {symbol}: {e}")
+
             return df
 
         except Exception as e:
@@ -652,7 +712,7 @@ class BrokerData:
             symbol: Trading symbol or List of symbols
             exchange: Exchange (e.g., NSE, BSE)
         Returns:
-            dict: Quote data with required fields
+            dict: Quote data with fields: ltp, open, high, low, volume, oi, bid, ask, prev_close
         """
         if isinstance(symbol, list):
             return self.get_batch_quotes(symbol, exchange)
@@ -744,7 +804,7 @@ class BrokerData:
             symbol: Trading symbol
             exchange: Exchange (e.g., NSE, BSE)
         Returns:
-            dict: Market depth data with bids and asks
+            dict: Market depth data with bids, asks, ltp, ltq, volume, open, high, low, prev_close, oi, totalbuyqty, totalsellqty
         """
         try:
             security_id = get_token(symbol, exchange)

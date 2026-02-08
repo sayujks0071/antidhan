@@ -1,19 +1,13 @@
-# SANDBOX LEADERBOARD (2026-02-03)
+# SANDBOX LEADERBOARD (2026-02-06)
 
-No trades executed today.
-| Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Status |
-|------|----------|---------------|--------------|----------|--------|
-| - | SuperTrendVWAP | N/A | N/A | N/A | No Trades (Data/Market Closed) |
-| - | AdvancedMLMomentum | N/A | N/A | N/A | No Trades (Data/Market Closed) |
-| - | ORB | N/A | N/A | N/A | No Trades (Data/Market Closed) |
-| - | TrendPullback | N/A | N/A | N/A | No Trades (Data/Market Closed) |
+| Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |
+|------|----------|---------------|--------------|----------|--------------|
+| 1 | AdvancedMLMomentum | Inf | 0.00 | 100.0% | 5 |
+| 2 | SuperTrendVWAP | 0.58 | -342.00 | 50.0% | 10 |
+| 3 | GapFadeStrategy | 0.34 | -908.00 | 30.0% | 10 |
 
 ## Analysis & Improvements
 
-### SuperTrendVWAP
-- **Win Rate**: N/A (No Trades)
-- **Suggestion**: Strategy failed to execute trades. Likely due to insufficient data lookback for indicators (VWAP/ATR) in Sandbox environment. Increasing `fetch_history` lookback to 30 days is recommended.
-
-### AdvancedMLMomentum
-- **Win Rate**: N/A (No Trades)
-- **Suggestion**: Strategy failed to execute trades. Likely due to strict data requirements (50 days) and insufficient history fetching. Increasing `fetch_history` lookback to 30 days is recommended.
+### GapFadeStrategy
+- **Win Rate**: 30.0% (< 40%)
+- **Suggestion**: Analyze entry conditions. Check log for rejections or stop loss tightness.

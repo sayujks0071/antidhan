@@ -119,12 +119,19 @@ def calculate_margin_api(positions, auth, api_key=None):
     so we make multiple API calls and aggregate the results.
 
     Args:
-        positions: List of positions in OpenAlgo format
-        auth: Authentication token for Dhan Sandbox
-        api_key: OpenAlgo API key (optional, for client ID lookup)
+        positions (list): List of position dictionaries in OpenAlgo format.
+                          Each dict should contain: 'symbol', 'exchange', 'product',
+                          'quantity', 'price' (optional), 'action' (BUY/SELL).
+        auth (str): Authentication token for Dhan Sandbox (access-token).
+        api_key (str, optional): OpenAlgo API key, used to look up the client ID
+                                 if not provided in headers. Defaults to None.
 
     Returns:
-        Tuple of (response, response_data)
+        tuple: (last_response_object, aggregated_response_data)
+               - last_response_object: The HTTP response object from the last API call.
+               - aggregated_response_data (dict): Aggregated margin data containing:
+                 'total_margin', 'span_margin', 'exposure_margin', 'available_margin',
+                 'margin_shortfall', 'status', etc.
     """
     # Get client ID
     client_id = get_client_id(api_key)
