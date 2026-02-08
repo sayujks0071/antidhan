@@ -656,11 +656,11 @@ if __name__ == "__main__":
     logger.info("Starting Sandbox Execution Engine")
 
     # Get check interval from config
-    from database.sandbox_db import init_db
+    from database.sandbox_db import init_db, get_config
 
     init_db()
 
-    check_interval = int(get_config("order_check_interval", "5"))
+    check_interval = int(os.getenv("order_check_interval", "5"))
     logger.info(f"Order check interval: {check_interval} seconds")
 
     try:

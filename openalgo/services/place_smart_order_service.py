@@ -25,7 +25,7 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Smart order delay
-SMART_ORDER_DELAY = "0.5"  # Default value, can be overridden by environment variable
+SMART_ORDER_DELAY = "0.1"  # Default value, can be overridden by environment variable
 
 
 def emit_analyzer_error(request_data: dict[str, Any], error_message: str) -> dict[str, Any]:
@@ -119,7 +119,7 @@ def validate_smart_order(order_data: dict[str, Any]) -> tuple[bool, str | None]:
     if "symbol" in order_data and "exchange" in order_data:
         token = get_token(order_data["symbol"], order_data["exchange"])
         if not token:
-            return False, "SecurityId Required: Symbol not found or invalid"
+            return False, "SecurityId Required"
 
     return True, None
 
@@ -212,7 +212,7 @@ def place_smart_order_with_auth(
     if not auth_token:
         error_response = {
             "status": "error",
-            "message": "Invalid Token: Authentication token is missing",
+            "message": "Invalid Token",
         }
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 401
@@ -234,7 +234,11 @@ def place_smart_order_with_auth(
             # Check for 500-level errors to retry
             if res and hasattr(res, "status") and res.status >= 500:
                 if attempt < max_retries:
-                    time.sleep(retry_delay * (2**attempt))
+                    wait_time = retry_delay * (2**attempt)
+                    logger.warning(
+                        f"API call failed with status {res.status}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(wait_time)
                     continue
 
             # If successful or non-retriable error, break loop
@@ -242,7 +246,11 @@ def place_smart_order_with_auth(
 
         except Exception as e:
             if attempt < max_retries:
-                time.sleep(retry_delay * (2**attempt))
+                wait_time = retry_delay * (2**attempt)
+                logger.warning(
+                    f"API call raised exception: {e}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                )
+                time.sleep(wait_time)
                 continue
 
             # If all retries failed with exception
@@ -293,6 +301,15 @@ def place_smart_order_with_auth(
 
         # Log successful order immediately after placement
         if res and res.status == 200:
+            # Fix: Check if order_id is present. If None, it means order was rejected even with HTTP 200.
+            if order_id is None:
+                message = response_data.get("message", "Order rejected by broker (no Order ID returned)")
+                error_response = {"status": "error", "message": message}
+                executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+                # Determine status code - if it was a rejection, maybe return 400 or keep 200 with success=False
+                # Returning 200 with success=False is consistent with HTTP level success but business failure
+                return False, error_response, 200
+
             order_response_data = {"status": "success", "orderid": order_id}
             executor.submit(
                 async_log_order, "placesmartorder", order_request_data, order_response_data
