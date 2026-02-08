@@ -41,7 +41,7 @@ class MLMomentumStrategy(BaseStrategy):
     @classmethod
     def add_arguments(cls, parser):
         parser.add_argument('--threshold', type=float, default=0.01, help='ROC Threshold')
-        parser.add_argument('--stop_pct', type=float, default=1.0, help='Stop Loss %')
+        parser.add_argument('--stop_pct', type=float, default=1.0, help='Stop Loss %%')
         parser.add_argument('--vol_multiplier', type=float, default=0.5, help='Volume Multiplier')
 
     @classmethod
