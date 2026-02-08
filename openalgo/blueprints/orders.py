@@ -588,6 +588,10 @@ def close_position():
         # Use placesmartorder service for live mode as well
         from services.place_smart_order_service import place_smart_order
 
+        # Delegate to service which handles:
+        # 1. Validation (SecurityId Required)
+        # 2. Auth checks (Invalid Token)
+        # 3. Automatic retry mechanism for 500-level errors
         success, response_data, status_code = place_smart_order(
             order_data=order_data,
             api_key=api_key,
