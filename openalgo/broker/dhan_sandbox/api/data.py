@@ -331,7 +331,7 @@ class BrokerData:
             start_date: Start date (YYYY-MM-DD) in IST
             end_date: End date (YYYY-MM-DD) in IST
         Returns:
-            pd.DataFrame: Historical data with columns [timestamp, open, high, low, close, volume]
+            pd.DataFrame: Historical data with columns [timestamp, open, high, low, close, volume, oi]
         """
         try:
             # Check if interval is supported
@@ -712,7 +712,7 @@ class BrokerData:
             symbol: Trading symbol or List of symbols
             exchange: Exchange (e.g., NSE, BSE)
         Returns:
-            dict: Quote data with required fields
+            dict: Quote data with fields: ltp, open, high, low, volume, oi, bid, ask, prev_close
         """
         if isinstance(symbol, list):
             return self.get_batch_quotes(symbol, exchange)
@@ -804,7 +804,7 @@ class BrokerData:
             symbol: Trading symbol
             exchange: Exchange (e.g., NSE, BSE)
         Returns:
-            dict: Market depth data with bids and asks
+            dict: Market depth data with bids, asks, ltp, ltq, volume, open, high, low, prev_close, oi, totalbuyqty, totalsellqty
         """
         try:
             security_id = get_token(symbol, exchange)
