@@ -181,3 +181,17 @@ Based on the audit, the following areas are prioritized for the next iteration:
 1.  **Volume Profile POC Rejection:** Explore mean reversion strategies fading the Point of Control (POC) when price extends too far (VWAP Deviation > 2.0).
 2.  **IV Rank Mean Reversion:** Develop a counter-trend strategy specifically for instruments with IV Rank > 80, fading extreme moves.
 3.  **Sector Relative Strength:** Implement a rotation strategy buying the strongest stock in the strongest sector (Nifty Bank vs IT vs Auto).
+
+## 🟢 Sunday Readiness Report (2026-02-08)
+
+### Status Check
+- **Token Validity**: ✅ `BROKER_API_KEY` is configured in environment.
+- **Symbol Sync**: ✅ `SymToken` table updated with 298,217 master contracts from Dhan.
+- **Dependencies**:
+  - `python-socketio` upgraded to **5.16.1**.
+  - `dhanhq` is not installed (using direct API integration).
+- **Database Clean**: ✅ Backup created in `openalgo/db/backups/`. Traffic/Latency tables confirmed clean.
+- **Server Startup**: ✅ Server verified to start successfully.
+
+### Test Results
+- **Unit Tests**: ⚠️ **Failed**. Encountered `ModuleNotFoundError` for `sandbox` modules during collection. This appears to be a `PYTHONPATH` or package structure issue between local source and installed `openalgo` package. `eventlet` dependency was installed to address one error.
