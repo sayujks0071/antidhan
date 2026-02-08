@@ -163,7 +163,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             return 'HOLD', {}, {}
 
         self.atr = self.calculate_atr(df)
-        last = df.iloc[-1]
 
         poc_price, poc_vol = self.analyze_volume_profile(df)
 
@@ -174,6 +173,10 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Logic
         df['ema200'] = df['close'].ewm(span=200, adjust=False).mean()
+
+        # Update last row reference after adding indicators
+        last = df.iloc[-1]
+
         is_uptrend = True
         if not pd.isna(last['ema200']):
             is_uptrend = last['close'] > last['ema200']
