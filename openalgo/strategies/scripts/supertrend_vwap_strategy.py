@@ -54,7 +54,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
         parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
         parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
-        parser.add_argument("--sector", type=str, default="NIFTY BANK", help="Sector Benchmark")
+        # sector is already in BaseStrategy
 
     @classmethod
     def parse_arguments(cls, args):
@@ -87,6 +87,14 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         self.atr = self.calculate_atr(df)
         last = df.iloc[-1]
+
+        # Adaptive Sizing (Monthly ATR)
+        monthly_atr = self.get_monthly_atr()
+        base_qty = self.quantity
+        if monthly_atr > 0 and self.pm:
+            # Adaptive Sizing: 1% Risk on 500,000 Capital
+            base_qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, last['close'])
+            self.logger.info(f"Adaptive Base Qty: {base_qty} (Monthly ATR: {monthly_atr:.2f})")
 
         # Volume Profile
         poc_price, poc_vol = self.analyze_volume_profile(df)
@@ -141,7 +149,8 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             sector_bullish = self.check_sector_correlation(self.sector_benchmark)
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
-                adj_qty = int(self.quantity * size_multiplier)
+                # Use base_qty calculated from adaptive sizing
+                adj_qty = int(base_qty * size_multiplier)
                 if adj_qty < 1: adj_qty = 1
                 self.logger.info(f"VWAP Crossover Buy. Price: {last['close']:.2f}, POC: {poc_price:.2f}, Vol: {last['volume']}, Sector: Bullish, Dev: {last['vwap_dev']:.4f}, Qty: {adj_qty} (VIX: {vix})")
 
