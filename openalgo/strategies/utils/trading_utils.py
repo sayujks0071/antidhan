@@ -223,6 +223,61 @@ def analyze_volume_profile(df, n_bins=20):
     return poc_price, poc_volume
 
 
+def calculate_relative_strength(df, index_df):
+    """
+    Calculate Relative Strength (RS) of a stock against an index.
+    Returns the difference in ROC (10-period) between the stock and index.
+    """
+    if index_df.empty:
+        return 0.0
+    try:
+        stock_roc = df['close'].pct_change(10).iloc[-1]
+        index_roc = index_df['close'].pct_change(10).iloc[-1]
+        return stock_roc - index_roc
+    except Exception:
+        return 0.0
+
+
+def calculate_roc(series, period=10):
+    """Calculate Rate of Change (ROC)."""
+    return series.pct_change(periods=period)
+
+
+def calculate_vix_volatility_multiplier(vix, thresholds=None):
+    """
+    Calculate dynamic volatility multiplier based on VIX.
+
+    Args:
+        vix (float): Current VIX value.
+        thresholds (dict, optional): thresholds for VIX levels.
+            Default: {
+                'high': {'level': 25, 'multiplier': 0.5, 'dev_threshold': 0.012},
+                'medium': {'level': 20, 'multiplier': 1.0, 'dev_threshold': 0.025},
+                'low': {'level': 12, 'multiplier': 1.0, 'dev_threshold': 0.04},
+                'default': {'multiplier': 1.0, 'dev_threshold': 0.03}
+            }
+
+    Returns:
+        tuple: (size_multiplier, dev_threshold)
+    """
+    if thresholds is None:
+        thresholds = {
+            'high': {'level': 25, 'multiplier': 0.5, 'dev_threshold': 0.012},
+            'medium': {'level': 20, 'multiplier': 1.0, 'dev_threshold': 0.025},
+            'low': {'level': 12, 'multiplier': 1.0, 'dev_threshold': 0.04},
+            'default': {'multiplier': 1.0, 'dev_threshold': 0.03}
+        }
+
+    if vix > thresholds['high']['level']:
+        return thresholds['high']['multiplier'], thresholds['high']['dev_threshold']
+    elif vix > thresholds['medium']['level']:
+        return thresholds['medium']['multiplier'], thresholds['medium']['dev_threshold']
+    elif vix < thresholds['low']['level']:
+        return thresholds['low']['multiplier'], thresholds['low']['dev_threshold']
+    else:
+        return thresholds['default']['multiplier'], thresholds['default']['dev_threshold']
+
+
 class PositionManager:
     """
     Persistent position manager to track trades and prevent duplicate orders.
