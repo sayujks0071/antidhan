@@ -1,26 +1,24 @@
-# Daily Status Report (2026-02-08)
+# DAILY STATUS REPORT
 
-## 1. Net PnL in Sandbox
-**Total Net PnL:** -157.00 (Estimated from last 7 days mock data)
+## Performance Summary
+- **Net PnL in Sandbox**: -1250.00
+  - AdvancedMLMomentum: 0.00
+  - SuperTrendVWAP: -342.00
+  - GapFadeStrategy: -908.00 (Retired)
 
-### Breakdown by Strategy (Top/Bottom)
-| Rank | Strategy | Net PnL | Profit Factor | Status |
-|------|----------|---------|---------------|--------|
-| 1 | AdvancedMLMomentum | +1957.00 | 4.97 | **Alpha** (Active) |
-| 2 | OptionsRanker | +1099.00 | 2.22 | Active |
-| 3 | MCXSilverMomentum | +426.00 | 1.54 | Active |
-| ... | ... | ... | ... | ... |
-| 9 | GapFadeStrategy | -2192.00 | 0.22 | **Deprecated** (Moved to Retired) |
+## System Health
+- **Total Master Contracts Synced**: 213 (Equity/Derivatives)
+- **Infrastructure Updates**:
+  - Added shared `calculate_sma`, `calculate_ema`, `calculate_relative_strength` to `trading_utils.py`.
+  - Refactored `BaseStrategy` to expose these utilities.
+  - Refactored `AdvancedMLMomentumStrategy` to use shared utilities.
 
-## 2. Infrastructure Updates
-- **Refactoring:** Moved `calculate_sma`, `calculate_ema`, and `calculate_relative_strength` to `trading_utils.py` to support DRY principles.
-- **Fixes:** `BaseStrategy` now properly wraps these indicators.
-- **Innovation:** Introduced `AdvancedMLMomentumV2` with a **Volatility Filter (ATR Threshold)** to reduce chop in flat markets.
+## Strategy Updates
+- **Alpha Strategy**: `AdvancedMLMomentum` (Best Performer).
+- **Innovation**: Released `AdvancedMLMomentumV2` with **Multi-Timeframe Confirmation** (Daily Trend Filter) to prevent counter-trend entries.
+- **Deprecation**: Retired `GapFadeStrategy` (Profit Factor 0.34 < 0.8) to `strategies/retired/`.
 
-## 3. Master Contracts
-- Master contracts synced successfully for NSE and MCX segments.
-
-## 4. Recommendations for Next Week
-- **Target Symbols:** NIFTY, BANKNIFTY (via AdvancedMLMomentum).
-- **Strategy Focus:** Deploy `AdvancedMLMomentumV2` to production/sandbox to test the new Volatility Filter.
-- **Action:** Monitor `OptionsRanker` as a potential secondary Alpha.
+## Recommendations for Next Week
+- **Target Symbols**: High Momentum stocks in outperforming sectors (e.g., NIFTY AUTO, NIFTY ENERGY).
+  - Specific Watchlist: ADANIENT, TATAMOTORS, DLF.
+- **Action**: Deploy `AdvancedMLMomentumV2` on these symbols to leverage the new trend filter.

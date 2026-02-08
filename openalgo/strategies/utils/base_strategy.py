@@ -346,13 +346,17 @@ class BaseStrategy:
         """Calculate Average True Range."""
         return calculate_atr(df, period).iloc[-1]
 
-    def calculate_sma(self, series, period=14):
+    def calculate_sma(self, series, period=20):
         """Calculate Simple Moving Average."""
         return calculate_sma(series, period)
 
-    def calculate_ema(self, series, period=14):
+    def calculate_ema(self, series, period=20):
         """Calculate Exponential Moving Average."""
         return calculate_ema(series, period)
+
+    def calculate_relative_strength(self, df, index_df, window=10):
+        """Calculate Relative Strength."""
+        return calculate_relative_strength(df, index_df, window)
 
     def get_monthly_atr(self, symbol=None):
         """
