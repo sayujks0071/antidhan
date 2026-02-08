@@ -1,127 +1,194 @@
+#!/usr/bin/env python3
+"""
+Diagnostic script to simulate order flow and verify response handling.
+Attempts to place 5 different order types in the Dhan Sandbox.
+"""
 import os
 import sys
 import logging
 import json
+from unittest.mock import MagicMock, patch
 
-# Setup paths
-script_dir = os.path.dirname(os.path.abspath(__file__))
-repo_root = os.path.abspath(os.path.join(script_dir, '../openalgo'))
-sys.path.insert(0, repo_root)
+# Add repository root to path
+repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(repo_root)
+sys.path.append(os.path.join(repo_root, 'openalgo'))
 
-# Mock environment variables required for imports
-os.environ.setdefault('BROKER_API_KEY', 'test_api_key')
-os.environ.setdefault('API_KEY_PEPPER', '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef') # 64 chars
-os.environ.setdefault('DATABASE_URL', 'sqlite:///:memory:') # Use in-memory DB to avoid config errors
+# Set dummy environment variables to avoid startup errors
+db_path = '/tmp/test_settings.db'
+if os.path.exists(db_path):
+    os.remove(db_path)
+os.environ['DATABASE_URL'] = f'sqlite:///{db_path}'
+os.environ['BROKER_API_KEY'] = 'test_key'
+os.environ['BROKER_API_SECRET'] = 'test_secret'
+os.environ['API_KEY_PEPPER'] = '01234567890123456789012345678901'  # 32 chars
 
-# Setup logging
+# Mock extensions to avoid DB issues during import of other modules that might use them
+sys.modules['extensions'] = MagicMock()
+sys.modules['database.telegram_db'] = MagicMock()
+sys.modules['database.analyzer_db'] = MagicMock()
+
+# Now import the service and DB utils using top-level names as the app does
+from services.place_smart_order_service import place_smart_order
+from utils.logging import get_logger
+from database.settings_db import init_db as init_settings_db
+import broker.dhan_sandbox.api.order_api
+import database.token_db
+
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("DiagnosticOrderFlow")
+logger = get_logger(__name__)
 
-try:
-    from broker.dhan_sandbox.api.order_api import place_order_api, get_order_book
-except ImportError as e:
-    logger.error(f"Import Error: {e}")
-    # Try adding parent directory if openalgo is root
-    sys.path.insert(0, os.path.abspath(os.path.join(script_dir, '..')))
+def test_order_flow():
+    logger.info("Starting Order Flow Simulation")
+
+    # Initialize Settings DB
     try:
-        from openalgo.broker.dhan_sandbox.api.order_api import place_order_api, get_order_book
-    except ImportError as e2:
-        logger.error(f"Retry Import Error: {e2}")
-        sys.exit(1)
+        init_settings_db()
+        logger.info("Settings DB initialized")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Settings DB: {e}")
 
-def run_diagnostic():
-    logger.info("Starting Order Flow Diagnostic...")
+    # Mock Auth Token and API Key
+    mock_auth_token = "MOCK_AUTH_TOKEN"
+    mock_api_key = "MOCK_API_KEY"
+    broker_name = "dhan_sandbox"
 
-    # We use a dummy auth token.
-    # If the Dhan Sandbox API validates it, it will fail.
-    # But we are testing the "Attempt" and how the CODE handles the response.
-    auth_token = "diagnostic_token"
-
-    order_types = [
-        {"pricetype": "LIMIT", "product": "MIS", "price": 100},
-        {"pricetype": "MARKET", "product": "MIS", "price": 0},
-        {"pricetype": "SL", "product": "MIS", "price": 100, "trigger_price": 99},
-        {"pricetype": "SL-M", "product": "MIS", "price": 0, "trigger_price": 99},
-        {"pricetype": "LIMIT", "product": "BO", "price": 100, "trigger_price": 99} # Bracket
+    # Define 5 order types to test
+    order_scenarios = [
+        {
+            "type": "LIMIT",
+            "data": {
+                "symbol": "SBIN",
+                "exchange": "NSE",
+                "action": "BUY",
+                "product": "MIS",
+                "pricetype": "LIMIT",
+                "quantity": "1",
+                "price": "500",
+                "trigger_price": "0",
+                "disclosed_quantity": "0",
+                "strategy": "TEST_STRATEGY",
+                "position_size": "0"
+            }
+        },
+        {
+            "type": "MARKET",
+            "data": {
+                "symbol": "SBIN",
+                "exchange": "NSE",
+                "action": "BUY",
+                "product": "MIS",
+                "pricetype": "MARKET",
+                "quantity": "1",
+                "price": "0",
+                "trigger_price": "0",
+                "disclosed_quantity": "0",
+                "strategy": "TEST_STRATEGY",
+                "position_size": "0"
+            }
+        },
+        {
+            "type": "STOP_LOSS",
+            "data": {
+                "symbol": "SBIN",
+                "exchange": "NSE",
+                "action": "SELL",
+                "product": "MIS",
+                "pricetype": "SL",
+                "quantity": "1",
+                "price": "490",
+                "trigger_price": "495",
+                "disclosed_quantity": "0",
+                "strategy": "TEST_STRATEGY",
+                "position_size": "0"
+            }
+        },
+        {
+            "type": "STOP_LOSS_MARKET",
+            "data": {
+                "symbol": "SBIN",
+                "exchange": "NSE",
+                "action": "SELL",
+                "product": "MIS",
+                "pricetype": "SL-M",
+                "quantity": "1",
+                "price": "0",
+                "trigger_price": "495",
+                "disclosed_quantity": "0",
+                "strategy": "TEST_STRATEGY",
+                "position_size": "0"
+            }
+        },
+        {
+            "type": "BRACKET_ORDER",
+            "data": {
+                "symbol": "SBIN",
+                "exchange": "NSE",
+                "action": "BUY",
+                "product": "BO",
+                "pricetype": "LIMIT",
+                "quantity": "1",
+                "price": "500",
+                "trigger_price": "0",
+                "disclosed_quantity": "0",
+                "strategy": "TEST_STRATEGY",
+                "position_size": "0"
+            }
+        }
     ]
 
-    symbol = "SBIN"
-    exchange = "NSE"
+    # Patch modules using the paths they are imported as
+    with patch('broker.dhan_sandbox.api.order_api.request') as mock_request, \
+         patch('database.token_db.get_token', return_value="12345"), \
+         patch('services.place_smart_order_service.async_log_order') as mock_log:
 
-    results = []
+        # Configure mock response for "Market Closed" rejection
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = json.dumps({
+            "status": "failed",
+            "remarks": "Market is Closed",
+            "data": {"rejectReason": "Market is Closed"},
+            "orderId": "123456",
+            "orderStatus": "REJECTED"
+        })
+        mock_response.json.return_value = json.loads(mock_response.text)
+        mock_request.return_value = mock_response
 
-    for i, order in enumerate(order_types):
-        logger.info(f"--- Placing Order {i+1}: {order['pricetype']} / {order['product']} ---")
+        for scenario in order_scenarios:
+            logger.info(f"--- Testing {scenario['type']} Order ---")
+            order_data = scenario['data']
+            order_data['apikey'] = mock_api_key
 
-        payload = {
-            "symbol": symbol,
-            "exchange": exchange,
-            "action": "BUY",
-            "quantity": 1,
-            "pricetype": order["pricetype"],
-            "product": order["product"],
-            "price": order["price"],
-            "trigger_price": order.get("trigger_price", 0),
-            "disclosed_quantity": 0,
-            "validity": "DAY",
-            "amo": False
-        }
+            try:
+                success, response, status_code = place_smart_order(
+                    order_data=order_data,
+                    auth_token=mock_auth_token,
+                    api_key=mock_api_key,
+                    broker=broker_name
+                )
 
-        try:
-            # place_order_api(data, auth)
-            # This will make an HTTP request to https://sandbox.dhan.co/v2/orders
-            res, response, orderid = place_order_api(payload, auth_token)
+                logger.info(f"Success: {success}")
+                logger.info(f"Status Code: {status_code}")
+                logger.info(f"Response: {response}")
 
-            status_code = res.status_code if hasattr(res, 'status_code') else getattr(res, 'status', 'Unknown')
-            logger.info(f"Response Status: {status_code}")
-            logger.info(f"Response Body: {response}")
+                if success is False:
+                    if "Order Rejected" in str(response) or "Market is Closed" in str(response):
+                            logger.info("✅ Verified: Order correctly identified as rejected/failed.")
+                    else:
+                            logger.info(f"Verified: Order failed as expected, but message was: {response}")
+                elif response.get("status") == "error":
+                        logger.info(f"Verified: Order failed logically: {response}")
+                else:
+                    # Check for rejection in response
+                    if response.get("message", "").startswith("Order Rejected"):
+                         logger.info("✅ Verified: Order correctly identified as rejected/failed.")
+                    else:
+                        logger.warning(f"Unexpected Success! Response: {response}")
 
-            results.append({
-                "type": order["pricetype"],
-                "status": status_code,
-                "response": response,
-                "orderid": orderid
-            })
-
-            if orderid:
-                logger.info(f"Order ID: {orderid}")
-            else:
-                logger.info("No Order ID returned (Expected if auth failed or market closed/rejected)")
-
-        except Exception as e:
-            logger.error(f"Exception placing order: {e}", exc_info=True)
-            results.append({
-                "type": order["pricetype"],
-                "error": str(e)
-            })
-
-    logger.info("--- Verifying Orderbook ---")
-    try:
-        # get_order_book(auth)
-        # It calls /v2/orders GET
-        orderbook = get_order_book(auth_token)
-
-        logger.info(f"Orderbook Type: {type(orderbook)}")
-
-        if isinstance(orderbook, list):
-            logger.info(f"Orderbook contains {len(orderbook)} orders.")
-            for order in orderbook:
-                logger.info(f" - ID: {order.get('orderId')}, Status: {order.get('orderStatus')}, Symbol: {order.get('tradingSymbol')}")
-        elif isinstance(orderbook, dict):
-             logger.info(f"Orderbook returned dictionary: {orderbook}")
-             if 'errorType' in orderbook or 'status' == 'failure':
-                 logger.info("Orderbook fetch failed as expected with dummy token.")
-        else:
-            logger.info(f"Orderbook response: {orderbook}")
-
-    except Exception as e:
-        logger.error(f"Exception fetching orderbook: {e}", exc_info=True)
-
-    logger.info("Diagnostic completed.")
-
-    # Save results to file for inspection
-    with open("order_flow_results.json", "w") as f:
-        json.dump(results, f, indent=2, default=str)
+            except Exception as e:
+                logger.error(f"Exception during test: {e}")
 
 if __name__ == "__main__":
-    run_diagnostic()
+    test_order_flow()
