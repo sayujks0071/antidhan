@@ -7,6 +7,8 @@ from datetime import datetime
 from datetime import time as dt_time
 from functools import lru_cache
 from pathlib import Path
+import pickle
+import hashlib
 
 import httpx
 import numpy as np
@@ -160,6 +162,16 @@ def calculate_bollinger_bands(series, window=20, num_std=2):
     return sma, upper, lower
 
 
+def calculate_sma(series, period=14):
+    """Calculate Simple Moving Average."""
+    return series.rolling(window=period).mean()
+
+
+def calculate_ema(series, period=14):
+    """Calculate Exponential Moving Average."""
+    return series.ewm(span=period, adjust=False).mean()
+
+
 def calculate_adx(df, period=14):
     """Calculate ADX (Returns Series)."""
     try:
@@ -199,24 +211,83 @@ def analyze_volume_profile(df, n_bins=20):
     """Find Point of Control (POC)."""
     price_min = df['low'].min()
     price_max = df['high'].max()
-    if price_min == price_max: return 0, 0
+    if price_min == price_max:
+        return 0, 0
     bins = np.linspace(price_min, price_max, n_bins)
 
     df = df.copy()
     df['bin'] = pd.cut(df['close'], bins=bins, labels=False)
     volume_profile = df.groupby('bin')['volume'].sum()
 
-    if volume_profile.empty: return 0, 0
+    if volume_profile.empty:
+        return 0, 0
 
     poc_bin = volume_profile.idxmax()
     poc_volume = volume_profile.max()
-    if pd.isna(poc_bin): return 0, 0
+    if pd.isna(poc_bin):
+        return 0, 0
 
     poc_bin = int(poc_bin)
-    if poc_bin >= len(bins)-1: poc_bin = len(bins)-2
+    if poc_bin >= len(bins) - 1:
+        poc_bin = len(bins) - 2
 
     poc_price = bins[poc_bin] + (bins[1] - bins[0]) / 2
     return poc_price, poc_volume
+
+
+def calculate_relative_strength(df, index_df):
+    """
+    Calculate Relative Strength (RS) of a stock against an index.
+    Returns the difference in ROC (10-period) between the stock and index.
+    """
+    if index_df.empty:
+        return 0.0
+    try:
+        stock_roc = df['close'].pct_change(10).iloc[-1]
+        index_roc = index_df['close'].pct_change(10).iloc[-1]
+        return stock_roc - index_roc
+    except Exception:
+        return 0.0
+
+
+def calculate_roc(series, period=10):
+    """Calculate Rate of Change (ROC)."""
+    return series.pct_change(periods=period)
+
+
+def calculate_vix_volatility_multiplier(vix, thresholds=None):
+    """
+    Calculate dynamic volatility multiplier based on VIX.
+
+    Args:
+        vix (float): Current VIX value.
+        thresholds (dict, optional): thresholds for VIX levels.
+            Default: {
+                'high': {'level': 25, 'multiplier': 0.5, 'dev_threshold': 0.012},
+                'medium': {'level': 20, 'multiplier': 1.0, 'dev_threshold': 0.025},
+                'low': {'level': 12, 'multiplier': 1.0, 'dev_threshold': 0.04},
+                'default': {'multiplier': 1.0, 'dev_threshold': 0.03}
+            }
+
+    Returns:
+        tuple: (size_multiplier, dev_threshold)
+    """
+    if thresholds is None:
+        thresholds = {
+            'high': {'level': 25, 'multiplier': 0.5, 'dev_threshold': 0.012},
+            'medium': {'level': 20, 'multiplier': 1.0, 'dev_threshold': 0.025},
+            'low': {'level': 12, 'multiplier': 1.0, 'dev_threshold': 0.04},
+            'default': {'multiplier': 1.0, 'dev_threshold': 0.03}
+        }
+
+    if vix > thresholds['high']['level']:
+        return thresholds['high']['multiplier'], thresholds['high']['dev_threshold']
+    elif vix > thresholds['medium']['level']:
+        return thresholds['medium']['multiplier'], thresholds['medium']['dev_threshold']
+    elif vix < thresholds['low']['level']:
+        return thresholds['low']['multiplier'], thresholds['low']['dev_threshold']
+    else:
+        return thresholds['default']['multiplier'], thresholds['default']['dev_threshold']
 
 
 class PositionManager:
@@ -332,6 +403,31 @@ class PositionManager:
 
         return int(qty)
 
+    def calculate_adaptive_quantity_monthly_atr(self, capital, risk_per_trade_pct, monthly_atr, price):
+        """
+        Calculate position size based on Monthly ATR (Robust Volatility).
+        Risk Amount = Capital * (risk_per_trade_pct/100)
+        Stop Distance = Monthly ATR * 2.0 (Wider stop for robustness)
+        Qty = Risk Amount / Stop Distance
+        """
+        if monthly_atr <= 0 or price <= 0:
+            logger.warning(f"Invalid Monthly ATR ({monthly_atr}) or Price ({price}) for sizing.")
+            return 0
+
+        risk_amount = capital * (risk_per_trade_pct / 100.0)
+        stop_loss_dist = monthly_atr * 2.0
+
+        if stop_loss_dist == 0:
+            qty = 0
+        else:
+            qty = risk_amount / stop_loss_dist
+
+        max_qty_capital = capital / price
+        qty = min(qty, max_qty_capital)
+
+        logger.info(f"Adaptive Sizing (Monthly ATR): Price={price}, MATR={monthly_atr:.2f}, Risk={risk_amount:.2f}, Qty={int(qty)}")
+        return int(qty)
+
     def has_position(self):
         return self.position != 0
 
@@ -377,12 +473,12 @@ class SmartOrder:
         )
 
         order_type = "LIMIT" if limit_price else "MARKET"
-        price = limit_price if limit_price else 0
+        # price = limit_price if limit_price else 0
 
         # Override based on urgency
         if urgency == "HIGH":
             order_type = "MARKET"
-            price = 0
+            # price is already 0
         elif urgency == "LOW" and not limit_price:
             # Low urgency but no limit price provided? Fallback to Market but warn
             logger.warning(
@@ -434,6 +530,35 @@ class SmartOrder:
             return (self.entry_price - current_price) * abs(self.position)
 
 
+class FileCache:
+    def __init__(self, cache_dir=".cache/api_client_history"):
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _get_cache_path(self, key):
+        key_hash = hashlib.md5(key.encode()).hexdigest()
+        return self.cache_dir / f"{key_hash}.pkl"
+
+    def get(self, key):
+        cache_path = self._get_cache_path(key)
+        if cache_path.exists():
+            try:
+                with open(cache_path, "rb") as f:
+                    logger.debug(f"Cache hit for {key}")
+                    return pickle.load(f)
+            except Exception as e:
+                logger.warning(f"Cache read failed for {key}: {e}")
+        return None
+
+    def set(self, key, data):
+        cache_path = self._get_cache_path(key)
+        try:
+            with open(cache_path, "wb") as f:
+                pickle.dump(data, f)
+        except Exception as e:
+            logger.warning(f"Cache write failed for {key}: {e}")
+
+
 class APIClient:
     """
     Fallback API Client using httpx if openalgo package is missing.
@@ -442,6 +567,7 @@ class APIClient:
     def __init__(self, api_key, host="http://127.0.0.1:5002"):
         self.api_key = api_key
         self.host = host.rstrip("/")
+        self.cache = FileCache()
 
     def history(
         self,
@@ -453,6 +579,15 @@ class APIClient:
         max_retries=3,
     ):
         """Fetch historical data with retry logic and exponential backoff"""
+        # Check Cache first
+        cache_key = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
+        cached_df = self.cache.get(cache_key)
+        if cached_df is not None and not cached_df.empty:
+            # Only use cache if end_date is in the past (not today)
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            if end_date and end_date < today_str:
+                return cached_df
+
         url = f"{self.host}/api/v1/history"
         payload = {
             "symbol": symbol,
@@ -484,6 +619,12 @@ class APIClient:
                     logger.debug(
                         f"Successfully fetched {len(df)} rows for {symbol} on {exchange}"
                     )
+
+                    # Save to Cache if valid and historical
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    if end_date and end_date < today_str and not df.empty:
+                        self.cache.set(cache_key, df)
+
                     return df
                 else:
                     error_msg = data.get("message", "Unknown error")
@@ -560,9 +701,8 @@ class APIClient:
 
         return None  # Failed to fetch quote
 
-    @lru_cache(maxsize=4)
     def get_instruments(self, exchange="NSE", max_retries=3):
-        """Fetch instruments list (Cached)"""
+        """Fetch instruments list"""
         url = f"{self.host}/instruments/{exchange}"
 
         try:
@@ -712,3 +852,93 @@ class APIClient:
         # Fallback to a default or raise error?
         # For safety, return None so caller handles it
         return None
+
+
+def calculate_supertrend(df, period=10, multiplier=3):
+    """
+    Calculate SuperTrend.
+    Returns: supertrend (Series), direction (Series)
+    """
+    # Calculate ATR
+    # Note: calculate_atr in this file returns Series
+    atr = calculate_atr(df, period)
+
+    # Basic Upper and Lower Bands
+    hl2 = (df['high'] + df['low']) / 2
+    basic_upperband = hl2 + (multiplier * atr)
+    basic_lowerband = hl2 - (multiplier * atr)
+
+    # SuperTrend Calculation
+    # We need to iterate because current value depends on previous close and previous band
+    # Using a loop for correctness (vectorized SuperTrend is complex/approximate)
+
+    supertrend = [0] * len(df)
+    direction = [1] * len(df)  # 1: Up, -1: Down
+
+    # Convert to arrays for speed
+    close_arr = df['close'].values
+    bu_arr = basic_upperband.values
+    bl_arr = basic_lowerband.values
+
+    # Initialize first values
+    final_upperband_val = 0
+    final_lowerband_val = 0
+
+    for i in range(1, len(df)):
+        # Upper Band Logic
+        if bu_arr[i] < final_upperband_val or close_arr[i - 1] > final_upperband_val:
+            final_upperband_val = bu_arr[i]
+        else:
+            final_upperband_val = final_upperband_val  # Unchanged
+
+        # Lower Band Logic
+        if bl_arr[i] > final_lowerband_val or close_arr[i - 1] < final_lowerband_val:
+            final_lowerband_val = bl_arr[i]
+        else:
+            final_lowerband_val = final_lowerband_val
+
+        # Trend Direction
+        # If previous trend was UP (1)
+        if direction[i - 1] == 1:
+            if close_arr[i] <= final_lowerband_val:
+                direction[i] = -1
+                supertrend[i] = final_upperband_val
+            else:
+                direction[i] = 1
+                supertrend[i] = final_lowerband_val
+        else:  # Previous trend was DOWN (-1)
+            if close_arr[i] >= final_upperband_val:
+                direction[i] = 1
+                supertrend[i] = final_lowerband_val
+            else:
+                direction[i] = -1
+                supertrend[i] = final_upperband_val
+
+    return pd.Series(supertrend, index=df.index), pd.Series(direction, index=df.index)
+
+
+def calculate_sma(series, period=20):
+    """Calculate Simple Moving Average."""
+    return series.rolling(window=period).mean()
+
+
+def calculate_ema(series, period=20):
+    """Calculate Exponential Moving Average."""
+    return series.ewm(span=period, adjust=False).mean()
+
+
+def calculate_relative_strength(df, index_df, window=10):
+    """
+    Calculate Relative Strength vs Index.
+    Returns: float (Current Stock ROC - Current Index ROC)
+    """
+    if index_df.empty:
+        return 0.0
+    try:
+        # Calculate ROC for both
+        stock_roc = df['close'].pct_change(periods=window).iloc[-1]
+        index_roc = index_df['close'].pct_change(periods=window).iloc[-1]
+        return stock_roc - index_roc
+    except Exception as e:
+        logger.error(f"Relative Strength calculation failed: {e}")
+        return 0.0

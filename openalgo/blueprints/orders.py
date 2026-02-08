@@ -563,25 +563,20 @@ def close_position():
         if not auth_token or not broker_name:
             return jsonify({"status": "error", "message": "Authentication error"}), 401
 
-        # Dynamically import broker-specific modules for API
-        api_funcs = dynamic_import(
-            broker_name, "api.order_api", ["place_smartorder_api", "get_open_position"]
-        )
+        # Get API key for validation purposes
+        from database.auth_db import get_api_key_for_tradingview
 
-        if not api_funcs:
-            logger.error(f"Error loading broker-specific modules for {broker_name}")
-            return jsonify({"status": "error", "message": "Error loading broker modules"}), 500
+        api_key = get_api_key_for_tradingview(login_username)
 
-        # Get the functions we need
-        place_smartorder_api = api_funcs["place_smartorder_api"]
-
-        # Prepare order data for direct broker API call
+        # Prepare order data for smart order service
         order_data = {
+            "apikey": api_key,
             "strategy": "UI Exit Position",
             "exchange": exchange,
             "symbol": symbol,
-            "action": "BUY",  # Will be determined by the smart order API based on current position
+            "action": "BUY",  # Will be determined by smart order logic
             "product": product,
+            "product_type": product,  # Add product_type for validation
             "pricetype": "MARKET",
             "quantity": "0",
             "price": "0",
@@ -590,31 +585,19 @@ def close_position():
             "position_size": "0",  # Setting to 0 to close the position
         }
 
-        # Call the broker API directly
-        res, response, orderid = place_smartorder_api(order_data, auth_token)
+        # Use placesmartorder service for live mode as well
+        from services.place_smart_order_service import place_smart_order
 
-        # Format the response based on presence of orderid and broker's response
-        if orderid:
-            response_data = {
-                "status": "success",
-                "message": response.get("message")
-                if response and "message" in response
-                else "Position close order placed successfully.",
-                "orderid": orderid,
-            }
-            status_code = 200
-        else:
-            # No orderid, definite error
-            response_data = {
-                "status": "error",
-                "message": response.get("message")
-                if response and "message" in response
-                else "Failed to close position (broker did not return order ID).",
-            }
-            if res and hasattr(res, "status") and isinstance(res.status, int) and res.status >= 400:
-                status_code = res.status  # Use broker's HTTP error code if available
-            else:
-                status_code = 400  # Default to Bad Request
+        # Delegate to service which handles:
+        # 1. Validation (SecurityId Required)
+        # 2. Auth checks (Invalid Token)
+        # 3. Automatic retry mechanism for 500-level errors
+        success, response_data, status_code = place_smart_order(
+            order_data=order_data,
+            api_key=api_key,
+            auth_token=auth_token,
+            broker=broker_name,
+        )
 
         return jsonify(response_data), status_code
 

@@ -8,6 +8,7 @@ from database.analyzer_db import async_log_analyzer
 from database.apilog_db import async_log_order, executor
 from database.auth_db import get_auth_token_broker
 from database.settings_db import get_analyze_mode
+from database.token_db import get_token
 from extensions import socketio
 from services.telegram_alert_service import telegram_alert_service
 from utils.api_analyzer import analyze_request, generate_order_id
@@ -24,7 +25,7 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Smart order delay
-SMART_ORDER_DELAY = "0.5"  # Default value, can be overridden by environment variable
+SMART_ORDER_DELAY = "0.1"  # Default value, can be overridden by environment variable
 
 
 def emit_analyzer_error(request_data: dict[str, Any], error_message: str) -> dict[str, Any]:
@@ -114,6 +115,12 @@ def validate_smart_order(order_data: dict[str, Any]) -> tuple[bool, str | None]:
     if "product_type" in order_data and order_data["product_type"] not in VALID_PRODUCT_TYPES:
         return False, f"Invalid product type. Must be one of: {', '.join(VALID_PRODUCT_TYPES)}"
 
+    # Validate symbol and exchange exist (SecurityId check)
+    if "symbol" in order_data and "exchange" in order_data:
+        token = get_token(order_data["symbol"], order_data["exchange"])
+        if not token:
+            return False, "SecurityId Required"
+
     return True, None
 
 
@@ -201,9 +208,62 @@ def place_smart_order_with_auth(
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 404
 
-    try:
-        res, response_data, order_id = broker_module.place_smartorder_api(order_data, auth_token)
+    # Check if auth_token is valid
+    if not auth_token:
+        error_response = {
+            "status": "error",
+            "message": "Invalid Token",
+        }
+        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+        return False, error_response, 401
 
+    # Retry mechanism for 500-level errors
+    max_retries = 3
+    retry_delay = 0.5
+
+    res = None
+    response_data = {}
+    order_id = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            res, response_data, order_id = broker_module.place_smartorder_api(
+                order_data, auth_token
+            )
+
+            # Check for 500-level errors to retry
+            if res and hasattr(res, "status") and res.status >= 500:
+                if attempt < max_retries:
+                    wait_time = retry_delay * (2**attempt)
+                    logger.warning(
+                        f"API call failed with status {res.status}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(wait_time)
+                    continue
+
+            # If successful or non-retriable error, break loop
+            break
+
+        except Exception as e:
+            if attempt < max_retries:
+                wait_time = retry_delay * (2**attempt)
+                logger.warning(
+                    f"API call raised exception: {e}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                )
+                time.sleep(wait_time)
+                continue
+
+            # If all retries failed with exception
+            logger.error(f"Error in broker_module.place_smartorder_api after retries: {e}")
+            traceback.print_exc()
+            error_response = {
+                "status": "error",
+                "message": "Failed to place smart order due to internal error",
+            }
+            executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+            return False, error_response, 500
+
+    try:
         # Handle case where position size matches current position
         if (
             res is None
@@ -241,6 +301,15 @@ def place_smart_order_with_auth(
 
         # Log successful order immediately after placement
         if res and res.status == 200:
+            # Fix: Check if order_id is present. If None, it means order was rejected even with HTTP 200.
+            if order_id is None:
+                message = response_data.get("message", "Order rejected by broker (no Order ID returned)")
+                error_response = {"status": "error", "message": message}
+                executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+                # Determine status code - if it was a rejection, maybe return 400 or keep 200 with success=False
+                # Returning 200 with success=False is consistent with HTTP level success but business failure
+                return False, error_response, 200
+
             order_response_data = {"status": "success", "orderid": order_id}
             executor.submit(
                 async_log_order, "placesmartorder", order_request_data, order_response_data
@@ -266,11 +335,11 @@ def place_smart_order_with_auth(
             )
 
     except Exception as e:
-        logger.error(f"Error in broker_module.place_smartorder_api: {e}")
+        logger.error(f"Error processing smart order response: {e}")
         traceback.print_exc()
         error_response = {
             "status": "error",
-            "message": "Failed to place smart order due to internal error",
+            "message": "Failed to process smart order response",
         }
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 500

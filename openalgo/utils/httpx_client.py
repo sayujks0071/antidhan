@@ -6,6 +6,7 @@ Includes Retry-with-Backoff logic for robust error handling.
 
 import os
 import time
+from functools import wraps
 from typing import Optional
 
 import httpx
@@ -38,8 +39,38 @@ def get_httpx_client() -> httpx.Client:
     return _httpx_client
 
 
+def retry_with_backoff(max_retries: int = 3, backoff_factor: float = 0.5):
+    """
+    Decorator to add retry with backoff logic to a function.
+
+    Args:
+        max_retries: Number of retries on failure (default 3)
+        backoff_factor: Factor for exponential backoff (default 0.5)
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    if attempt < max_retries:
+                        wait_time = backoff_factor * (2**attempt)
+                        logger.warning(
+                            f"Function {func.__name__} failed: {e}. Retrying in {wait_time}s..."
+                        )
+                        time.sleep(wait_time)
+            # If we exhausted retries, raise the last exception
+            logger.error(f"Function {func.__name__} failed after {max_retries} retries: {last_exception}")
+            raise last_exception
+        return wrapper
+    return decorator
+
+
 def request(
-    method: str, url: str, max_retries: int = 0, backoff_factor: float = 0.5, **kwargs
+    method: str, url: str, max_retries: int = 3, backoff_factor: float = 0.5, **kwargs
 ) -> httpx.Response:
     """
     Make an HTTP request using the shared client with automatic protocol negotiation.
@@ -47,7 +78,7 @@ def request(
     Args:
         method: HTTP method (GET, POST, etc.)
         url: URL to request
-        max_retries: Number of retries on failure (default 0)
+        max_retries: Number of retries on failure (default 3)
         backoff_factor: Factor for exponential backoff (default 0.5)
         **kwargs: Additional arguments to pass to the request
 
