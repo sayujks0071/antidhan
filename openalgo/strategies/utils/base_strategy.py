@@ -31,8 +31,13 @@ try:
         analyze_volume_profile,
         calculate_adx,
         calculate_atr,
+        calculate_bollinger_bands,
         calculate_intraday_vwap,
         calculate_rsi,
+        calculate_supertrend,
+        calculate_sma,
+        calculate_ema,
+        calculate_relative_strength,
         is_market_open,
         normalize_symbol,
     )
@@ -47,8 +52,15 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_bollinger_bands,
+            calculate_ema,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_sma,
+            calculate_supertrend,
+            calculate_sma,
+            calculate_ema,
+            calculate_relative_strength,
             is_market_open,
             normalize_symbol,
         )
@@ -63,24 +75,38 @@ except ImportError:
             analyze_volume_profile,
             calculate_adx,
             calculate_atr,
+            calculate_bollinger_bands,
             calculate_intraday_vwap,
             calculate_rsi,
+            calculate_supertrend,
+            calculate_sma,
+            calculate_ema,
+            calculate_relative_strength,
             is_market_open,
             normalize_symbol,
         )
 
 class BaseStrategy:
-    def __init__(self, name, symbol, quantity, interval="5m", exchange="NSE",
-                 api_key=None, host=None, ignore_time=False, log_file=None, client=None):
+    def __init__(self, name=None, symbol=None, quantity=1, interval="5m", exchange="NSE",
+                 api_key=None, host=None, ignore_time=False, log_file=None, client=None,
+                 sector=None, underlying=None, type="EQUITY", **kwargs):
         """
         Base Strategy Class for Dhan Sandbox Strategies.
+        Accepts standard parameters and kwargs for flexibility.
         """
-        self.name = name
-        self.symbol = normalize_symbol(symbol)
+        self.symbol = normalize_symbol(symbol) if symbol else None
+        self.name = name or (f"Strategy_{self.symbol}" if self.symbol else "Strategy")
         self.quantity = quantity
         self.interval = interval
         self.exchange = exchange
         self.ignore_time = ignore_time
+        self.sector = sector
+        self.underlying = underlying
+        self.type = type
+
+        # Set any additional kwargs as attributes (e.g. threshold, stop_pct)
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
         # Ensure project root is in path for DB access
         self._add_project_root_to_path()
@@ -95,7 +121,10 @@ class BaseStrategy:
         self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5002')
 
         if not self.api_key and not client:
-             raise ValueError("API Key must be provided via argument, OPENALGO_APIKEY env var, or database.")
+             # Warn but don't fail immediately, allowing for test/mock scenarios
+             # However, for real trading it is required.
+             if not os.getenv('PYTEST_CURRENT_TEST'):
+                 print("Warning: API Key not found. Strategy may fail to connect.")
 
         self.setup_logging(log_file)
 
@@ -104,7 +133,7 @@ class BaseStrategy:
         else:
             self.client = APIClient(api_key=self.api_key, host=self.host)
 
-        self.pm = PositionManager(self.symbol) if PositionManager else None
+        self.pm = PositionManager(self.symbol) if (PositionManager and self.symbol) else None
         self.smart_order = SmartOrder(self.client) if SmartOrder else None
 
     def _add_project_root_to_path(self):
@@ -135,6 +164,7 @@ class BaseStrategy:
 
         # 2. Try database
         try:
+            # This requires 'database' to be importable (path fixed by _add_project_root_to_path)
             from database.auth_db import get_first_available_api_key
             key = get_first_available_api_key()
             if key:
@@ -148,7 +178,7 @@ class BaseStrategy:
             if hasattr(self, 'logger'):
                 self.logger.warning(f"Failed to fetch API key from DB: {e}")
             else:
-                print(f"Warning: Failed to fetch API key from DB: {e}")
+                pass
 
         return None
 
@@ -300,9 +330,53 @@ class BaseStrategy:
         """Calculate Relative Strength Index."""
         return calculate_rsi(series, period)
 
+    def calculate_sma(self, series, period=50):
+        """Calculate SMA."""
+        return calculate_sma(series, period)
+
+    def calculate_ema(self, series, period=20):
+        """Calculate EMA."""
+        return calculate_ema(series, period)
+
+    def calculate_relative_strength(self, df, index_df, period=10):
+        """Calculate Relative Strength."""
+        return calculate_relative_strength(df, index_df, period)
+
     def calculate_atr(self, df, period=14):
         """Calculate Average True Range."""
         return calculate_atr(df, period).iloc[-1]
+
+    def calculate_sma(self, series, period=20):
+        """Calculate Simple Moving Average."""
+        return calculate_sma(series, period)
+
+    def calculate_ema(self, series, period=20):
+        """Calculate Exponential Moving Average."""
+        return calculate_ema(series, period)
+
+    def calculate_relative_strength(self, df, index_df, window=10):
+        """Calculate Relative Strength."""
+        return calculate_relative_strength(df, index_df, window)
+
+    def get_monthly_atr(self, symbol=None):
+        """
+        Fetch daily data (30+ days) and calculate ATR for adaptive sizing.
+        """
+        try:
+            target_symbol = symbol or self.symbol
+            # Ensure we fetch enough data for ATR calculation (e.g. 35 days for 14 period + buffer)
+            df = self.fetch_history(days=40, symbol=target_symbol, interval="D")
+
+            if df.empty or len(df) < 15:
+                self.logger.warning(f"Insufficient daily data for Monthly ATR calculation: {len(df)}")
+                return 0.0
+
+            atr_series = calculate_atr(df, period=14)
+            monthly_atr = atr_series.iloc[-1]
+            return monthly_atr
+        except Exception as e:
+            self.logger.error(f"Error calculating Monthly ATR: {e}")
+            return 0.0
 
     def calculate_adx(self, df, period=14):
         """Calculate ADX."""
@@ -313,9 +387,37 @@ class BaseStrategy:
         """Calculate VWAP."""
         return calculate_intraday_vwap(df)
 
+    def calculate_supertrend(self, df, period=10, multiplier=3):
+        """Calculate SuperTrend."""
+        return calculate_supertrend(df, period, multiplier)
+
     def analyze_volume_profile(self, df, n_bins=20):
         """Find Point of Control (POC)."""
         return analyze_volume_profile(df, n_bins)
+
+    def check_sector_correlation(self, sector_benchmark=None, lookback_days=30):
+        """
+        Check sector correlation using RSI logic.
+        """
+        try:
+            # Use provided sector or default to self.sector or fallback
+            sector_symbol = normalize_symbol(sector_benchmark or self.sector or "NIFTY BANK")
+
+            # Use NSE_INDEX for indices
+            exchange = "NSE_INDEX" if "NIFTY" in sector_symbol.upper() or "VIX" in sector_symbol.upper() else "NSE"
+
+            # Fetch data using the existing client
+            df = self.fetch_history(days=lookback_days, symbol=sector_symbol, interval="D", exchange=exchange)
+
+            if not df.empty and len(df) > 15:
+                rsi = self.calculate_rsi(df['close'])
+                last_rsi = rsi.iloc[-1]
+                self.logger.info(f"Sector {sector_symbol} RSI: {last_rsi:.2f}")
+                return last_rsi > 50
+            return False
+        except Exception as e:
+            self.logger.warning(f"Sector Check Failed: {e}. Defaulting to True (Allow) to prevent blocking on data issues.")
+            return True
 
     @staticmethod
     def get_standard_parser(description="Strategy"):
@@ -327,6 +429,10 @@ class BaseStrategy:
         parser.add_argument("--host", type=str, help="Host")
         parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours")
         parser.add_argument("--logfile", type=str, help="Log file path")
+        parser.add_argument("--sector", type=str, help="Sector Benchmark (e.g., NIFTY 50)")
+        parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
+        parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
+        parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
         return parser
 
     @classmethod
@@ -359,19 +465,17 @@ class BaseStrategy:
              except Exception as e:
                  print(f"Symbol resolution failed: {e}")
 
-        # Basic kwargs
-        kwargs = {
-            "symbol": symbol,
-            "quantity": args.quantity,
-            "api_key": args.api_key,
-            "host": args.host,
-            "ignore_time": args.ignore_time,
-            "log_file": args.logfile
-        }
+        # Basic kwargs from all arguments
+        kwargs = vars(args).copy()
 
-        # Add exchange if available in args (it's not in standard parser but might be added)
-        if hasattr(args, 'exchange') and args.exchange:
-            kwargs['exchange'] = args.exchange
+        # Ensure symbol is updated if resolved
+        kwargs['symbol'] = symbol
+
+        # Ensure defaults for key parameters if not present
+        if 'exchange' not in kwargs: kwargs['exchange'] = 'NSE'
+        if 'type' not in kwargs: kwargs['type'] = 'EQUITY'
+        if 'sector' not in kwargs: kwargs['sector'] = None
+        if 'log_file' not in kwargs: kwargs['log_file'] = kwargs.get('logfile')
 
         return kwargs
 
@@ -380,13 +484,7 @@ class BaseStrategy:
         """Standard CLI entry point for strategies."""
         parser = cls.get_standard_parser(cls.__name__)
         cls.add_arguments(parser)
-        args = parser.parse_args()
-
-        if not args.symbol and (not hasattr(args, 'underlying') or not args.underlying):
-             # Try to find symbol from class name or other means?
-             # For now, just error if no symbol.
-             # Subclasses can handle this in parse_arguments if they have other ways.
-             pass
+        args, unknown = parser.parse_known_args() # Use parse_known_args to allow extra args
 
         # Parse arguments into kwargs for __init__
         kwargs = cls.parse_arguments(args)
@@ -397,12 +495,7 @@ class BaseStrategy:
 
         # Instantiate
         try:
-             # Filter kwargs to only pass what __init__ accepts?
-             # Or rely on __init__ accepting **kwargs or the exact arguments returned by parse_arguments.
-             # BaseStrategy.__init__ takes specific args. Subclasses might take more.
-             # It's safest if parse_arguments returns exactly what is needed,
-             # OR if we pass **kwargs and __init__ ignores extras (which python doesn't do by default).
-             # Let's assume the subclass handles its arguments in __init__.
+             # Create strategy instance. kwargs are passed to __init__
              strategy = cls(**kwargs)
              strategy.run()
         except TypeError as e:

@@ -34,7 +34,7 @@ def get_api_response(endpoint, auth, method="GET", payload=""):
         dict: The JSON response from the API, or an error dictionary.
     """
     AUTH_TOKEN = auth
-    api_key = os.getenv("BROKER_API_KEY")
+    # api_key = os.getenv("BROKER_API_KEY")
 
     # Headers for the request
     headers = {
@@ -153,10 +153,21 @@ def get_open_position(tradingsymbol, exchange, product, auth):
         auth (str): Authentication token.
 
     Returns:
-        str: The net quantity as a string (e.g., "10", "-5", "0").
+        str: The net quantity as a string (e.g., "10", "-5", "0") or None on error.
     """
+    # 1. Error handling for Invalid Token (Auth Token)
+    if not auth:
+        logger.error("Invalid Token: Authentication token is missing or empty")
+        return None
+
     # Convert Trading Symbol from OpenAlgo Format to Broker Format Before Search in OpenPosition
-    tradingsymbol = get_br_symbol(tradingsymbol, exchange)
+    br_symbol = get_br_symbol(tradingsymbol, exchange)
+
+    # 2. Error handling for SecurityId Required (Invalid Symbol)
+    if not br_symbol:
+        logger.error(f"SecurityId Required: Broker symbol not found for {tradingsymbol} {exchange}")
+        return None
+
     positions_data = get_positions(auth)
     net_qty = "0"
 
@@ -169,13 +180,13 @@ def get_open_position(tradingsymbol, exchange, product, auth):
         logger.error(
             f"Error getting positions for {tradingsymbol}: {positions_data.get('errorMessage', 'API Error')}"
         )
-        return net_qty
+        return None
 
     # Only process if positions_data is valid and not an error
     if positions_data and isinstance(positions_data, list):
         for position in positions_data:
             if (
-                position.get("tradingSymbol") == tradingsymbol
+                position.get("tradingSymbol") == br_symbol
                 and position.get("exchangeSegment") == map_exchange_type(exchange)
                 and position.get("productType") == product
             ):
@@ -195,6 +206,7 @@ def place_order_api(data, auth):
 
     Returns:
         tuple: (response_object, response_dict, order_id)
+            order_id will be None if the order is rejected.
     """
     # 1. Error handling for Invalid Token (Auth Token)
     if not auth:
@@ -290,9 +302,15 @@ def place_smartorder_api(data, auth):
 
     Returns:
         tuple: (response_object, response_dict, order_id)
+            order_id will be None if the order is rejected.
     """
+    # 1. Error handling for Invalid Token (Auth Token)
+    if not auth:
+        logger.error("Invalid Token: Authentication token is missing or empty")
+        return None, {"status": "error", "message": "Invalid Token"}, None
+
     AUTH_TOKEN = auth
-    BROKER_API_KEY = os.getenv("BROKER_API_KEY")
+    # BROKER_API_KEY = os.getenv("BROKER_API_KEY")
     # If no API call is made in this function then res will return None
     res = None
 
@@ -302,10 +320,24 @@ def place_smartorder_api(data, auth):
     product = data.get("product")
     position_size = int(data.get("position_size", "0"))
 
+    # Get SecurityId (Token) - Check for invalid symbol early
+    token = get_token(symbol, exchange)
+
+    # 2. Error handling for SecurityId Required
+    if not token:
+        logger.error(f"SecurityId Required: Token not found for {symbol} {exchange}")
+        return None, {"status": "error", "message": "SecurityId Required"}, None
+
     # Get current open position for the symbol
-    current_position = int(
-        get_open_position(symbol, exchange, map_product_type(product), AUTH_TOKEN)
-    )
+    open_pos_result = get_open_position(symbol, exchange, map_product_type(product), AUTH_TOKEN)
+
+    # Handle error in getting position
+    if open_pos_result is None:
+        logger.error(f"Failed to get open position for {symbol}")
+        # Return appropriate error - if auth was valid but API failed
+        return None, {"status": "error", "message": "Failed to fetch open position"}, None
+
+    current_position = int(open_pos_result)
 
     logger.info(f"position_size : {position_size}")
     logger.info(f"Open Position : {current_position}")
