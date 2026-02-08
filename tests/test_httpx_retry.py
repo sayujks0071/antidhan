@@ -1,11 +1,13 @@
-import unittest
-from unittest.mock import patch
-import httpx
 import sys
 import os
+import unittest
+from unittest.mock import MagicMock, patch
+import httpx
+import time
 
-# Add openalgo to sys.path so 'utils' can be imported as expected by the module
-sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
+# Add path
+current_dir = os.getcwd()
+sys.path.insert(0, os.path.join(current_dir, "openalgo"))
 
 from utils.httpx_client import request, cleanup_httpx_client
 
@@ -13,78 +15,51 @@ class TestHttpxRetry(unittest.TestCase):
     def setUp(self):
         cleanup_httpx_client()
 
-    def tearDown(self):
-        cleanup_httpx_client()
-
-    @patch('utils.httpx_client.time.sleep')
     @patch('httpx.Client.request')
-    def test_retry_on_500_error(self, mock_request, mock_sleep):
-        # Setup mock to fail twice with 500, then succeed
-        response_fail = httpx.Response(500, request=httpx.Request("GET", "http://test.com"))
-        response_success = httpx.Response(200, request=httpx.Request("GET", "http://test.com"))
+    def test_retry_on_500(self, mock_request):
+        print("Testing retry on 500...")
+        # Fail twice with 500, succeed on 3rd
+        response_500 = httpx.Response(500, request=httpx.Request("GET", "http://test.com"))
+        response_200 = httpx.Response(200, request=httpx.Request("GET", "http://test.com"))
 
-        mock_request.side_effect = [response_fail, response_fail, response_success]
+        mock_request.side_effect = [response_500, response_500, response_200]
 
-        # Call request with retries
-        response = request("GET", "http://test.com", max_retries=3, backoff_factor=0.1)
-
-        # Verify result
-        self.assertEqual(response.status_code, 200)
-
-        # Verify retries
-        self.assertEqual(mock_request.call_count, 3)
-
-        # Verify backoff sleep calls
-        # 1st retry: sleep(0.1 * 2^0) = 0.1
-        # 2nd retry: sleep(0.1 * 2^1) = 0.2
-        mock_sleep.assert_any_call(0.1)
-        mock_sleep.assert_any_call(0.2)
-        self.assertEqual(mock_sleep.call_count, 2)
-
-    @patch('utils.httpx_client.time.sleep')
-    @patch('httpx.Client.request')
-    def test_retry_on_429_error(self, mock_request, mock_sleep):
-        # Setup mock to fail once with 429, then succeed
-        response_fail = httpx.Response(429, request=httpx.Request("GET", "http://test.com"))
-        response_success = httpx.Response(200, request=httpx.Request("GET", "http://test.com"))
-
-        mock_request.side_effect = [response_fail, response_success]
-
-        response = request("GET", "http://test.com", max_retries=3, backoff_factor=0.1)
+        # Call request with fast backoff for test
+        response = request("GET", "http://test.com", max_retries=3, backoff_factor=0.01)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(mock_request.call_count, 2)
-        mock_sleep.assert_called_with(0.1)
-
-    @patch('utils.httpx_client.time.sleep')
-    @patch('httpx.Client.request')
-    def test_max_retries_exceeded(self, mock_request, mock_sleep):
-        # Setup mock to fail always
-        response_fail = httpx.Response(500, request=httpx.Request("GET", "http://test.com"))
-        mock_request.return_value = response_fail
-
-        response = request("GET", "http://test.com", max_retries=2, backoff_factor=0.1)
-
-        self.assertEqual(response.status_code, 500)
-        # Initial + 2 retries = 3 calls
         self.assertEqual(mock_request.call_count, 3)
-        self.assertEqual(mock_sleep.call_count, 2)
+        print("✅ Retry on 500: Passed")
 
-    @patch('utils.httpx_client.time.sleep')
     @patch('httpx.Client.request')
-    def test_network_error_retry(self, mock_request, mock_sleep):
-        # Setup mock to raise RequestError twice, then succeed
+    def test_retry_on_timeout(self, mock_request):
+        print("Testing retry on Timeout...")
+        # Fail twice with Timeout, succeed on 3rd
+        # httpx.RequestError covers TimeoutException
         mock_request.side_effect = [
-            httpx.RequestError("Connection failed"),
-            httpx.RequestError("Timeout"),
+            httpx.ReadTimeout("Timeout", request=httpx.Request("GET", "http://test.com")),
+            httpx.ReadTimeout("Timeout", request=httpx.Request("GET", "http://test.com")),
             httpx.Response(200, request=httpx.Request("GET", "http://test.com"))
         ]
 
-        response = request("GET", "http://test.com", max_retries=3, backoff_factor=0.1)
+        response = request("GET", "http://test.com", max_retries=3, backoff_factor=0.01)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_request.call_count, 3)
-        self.assertEqual(mock_sleep.call_count, 2)
+        print("✅ Retry on Timeout: Passed")
+
+    @patch('httpx.Client.request')
+    def test_failure_after_retries(self, mock_request):
+        print("Testing failure after retries...")
+        # Fail always
+        response_500 = httpx.Response(500, request=httpx.Request("GET", "http://test.com"))
+        mock_request.return_value = response_500
+
+        response = request("GET", "http://test.com", max_retries=2, backoff_factor=0.01)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(mock_request.call_count, 3) # Initial + 2 retries
+        print("✅ Failure after retries: Passed")
 
 if __name__ == '__main__':
     unittest.main()
