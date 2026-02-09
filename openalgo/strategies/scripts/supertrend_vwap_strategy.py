@@ -90,12 +90,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         last = df.iloc[-1]
 
         # Adaptive Sizing (Monthly ATR)
-        monthly_atr = self.get_monthly_atr()
-        base_qty = self.quantity
-        if monthly_atr > 0 and self.pm:
-            # Adaptive Sizing: 1% Risk on 500,000 Capital
-            base_qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, last['close'])
-            self.logger.info(f"Adaptive Base Qty: {base_qty} (Monthly ATR: {monthly_atr:.2f})")
+        base_qty = self.get_adaptive_quantity(last['close'], risk_pct=1.0, capital=500000)
 
         # Volume Profile
         poc_price, poc_vol = self.analyze_volume_profile(df)
