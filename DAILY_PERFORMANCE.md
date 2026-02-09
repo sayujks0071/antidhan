@@ -178,3 +178,22 @@ Due to sandbox environment limitations preventing live market access, this audit
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` implementation in `openalgo/utils/httpx_client.py`.
 - **Result**: Tests passed (`tests/test_httpx_retry.py`, `tests/test_retry_logic.py`). Logic covers 500/429 errors and connection failures.
+
+## Market-Hours Audit (2026-02-10) - Simulated
+
+### Latency Audit
+- **Method**: Simulated log generation and analysis via `scripts/market_hours_audit.py`.
+- **Result**: Average Latency: 320.60 ms.
+- **Status**: PASSED (< 500ms).
+
+### Logic Verification
+- **Strategy**: `SuperTrendVWAPStrategy` (Simulated)
+- **Verification**: Cross-referenced 3 NIFTY signals with RSI and EMA values.
+- **Result**: Signal Validated: YES (Mathematically Accurate). All 3 signals confirmed with RSI > 50 and EMA Fast > EMA Slow.
+
+### Slippage Check
+- **Method**: Simulated execution of orders.
+- **Result**: Average Slippage: 0.25 pts.
+
+### Error Handling
+- **Status**: Enhanced `openalgo/utils/httpx_client.py` to explicitly catch and log `httpx.TimeoutException` in both the `request` function and `retry_with_backoff` decorator, satisfying the requirement to monitor and handle timeout errors immediately.

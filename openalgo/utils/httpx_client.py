@@ -58,9 +58,10 @@ def retry_with_backoff(max_retries: int = 3, backoff_factor: float = 0.5):
                     last_exception = e
                     if attempt < max_retries:
                         wait_time = backoff_factor * (2**attempt)
-                        logger.warning(
-                            f"Function {func.__name__} failed: {e}. Retrying in {wait_time}s..."
-                        )
+                        msg = f"Function {func.__name__} failed: {e}. Retrying in {wait_time}s..."
+                        if isinstance(e, httpx.TimeoutException):
+                            msg = f"Function {func.__name__} timed out: {e}. Retrying in {wait_time}s..."
+                        logger.warning(msg)
                         time.sleep(wait_time)
             # If we exhausted retries, raise the last exception
             logger.error(f"Function {func.__name__} failed after {max_retries} retries: {last_exception}")
@@ -135,6 +136,20 @@ def request(
                 )
 
             return response
+
+        except httpx.TimeoutException as e:
+            last_exception = e
+            if attempt < max_retries:
+                wait_time = backoff_factor * (2**attempt)
+                logger.warning(
+                    f"Request to {url} timed out: {e}. Retrying in {wait_time}s..."
+                )
+                time.sleep(wait_time)
+            else:
+                logger.error(
+                    f"Request to {url} timed out after {max_retries} retries: {e}"
+                )
+                raise last_exception
 
         except httpx.RequestError as e:
             last_exception = e
