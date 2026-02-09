@@ -30,7 +30,8 @@ try:
         normalize_symbol,
         calculate_rsi,
         calculate_bollinger_bands,
-        calculate_intraday_vwap
+                calculate_intraday_vwap,
+                calculate_atr
     )
 except ImportError:
     try:
@@ -53,7 +54,8 @@ except ImportError:
                 normalize_symbol,
                 calculate_rsi,
                 calculate_bollinger_bands,
-                calculate_intraday_vwap
+                    calculate_intraday_vwap,
+                    calculate_atr
             )
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
@@ -64,6 +66,7 @@ except ImportError:
             calculate_rsi = lambda s: s
             calculate_bollinger_bands = lambda s: (s, s, s)
             calculate_intraday_vwap = lambda df: df
+            calculate_atr = lambda df, period=14: pd.Series([0]*len(df))
 
 class NSERsiBolTrendStrategy:
     def __init__(self, symbol, api_key, port, **kwargs):
@@ -92,6 +95,26 @@ class NSERsiBolTrendStrategy:
         self.quantity = int(kwargs.get('quantity', 1))
 
         self.pm = PositionManager(symbol) if PositionManager else None
+
+    def get_monthly_atr(self):
+        """Fetch daily data and calculate ATR for adaptive sizing."""
+        try:
+            exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
+            df = self.client.history(
+                symbol=self.symbol,
+                interval="1d",
+                exchange=exchange,
+                start_date=(datetime.now() - timedelta(days=45)).strftime("%Y-%m-%d"),
+                end_date=datetime.now().strftime("%Y-%m-%d")
+            )
+            if df.empty or len(df) < 15:
+                return 0.0
+
+            atr = calculate_atr(df, period=14).iloc[-1]
+            return atr
+        except Exception as e:
+            self.logger.error(f"Error calculating Monthly ATR: {e}")
+            return 0.0
 
     def calculate_signal(self, df):
         """Calculate signal for backtesting support"""
@@ -184,7 +207,13 @@ class NSERsiBolTrendStrategy:
                     # Entry logic
                     # Buy if Close < Lower Band AND RSI < 30
                     if current_price < current_lower and current_rsi < 30:
+                        # Adaptive Sizing
+                        monthly_atr = self.get_monthly_atr()
                         qty = self.quantity
+                        if monthly_atr > 0 and self.pm:
+                            qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, current_price)
+                            self.logger.info(f"Adaptive Quantity: {qty} (Monthly ATR: {monthly_atr:.2f})")
+
                         self.logger.info(f"Entry signal detected (Oversold). Buying {qty} at {current_price}")
                         self.pm.update_position(qty, current_price, 'BUY')
 

@@ -569,6 +569,7 @@ class APIClient:
         self.host = host.rstrip("/")
         self.cache = FileCache()
 
+    @lru_cache(maxsize=128)
     def history(
         self,
         symbol,
@@ -578,7 +579,7 @@ class APIClient:
         end_date=None,
         max_retries=3,
     ):
-        """Fetch historical data with retry logic and exponential backoff"""
+        """Fetch historical data with retry logic, exponential backoff, and in-memory caching."""
         # Check Cache first
         cache_key = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
         cached_df = self.cache.get(cache_key)
@@ -642,7 +643,18 @@ class APIClient:
         return pd.DataFrame()
 
     def get_quote(self, symbol, exchange="NSE", max_retries=3):
-        """Fetch real-time quote from Kite API via OpenAlgo. Supports single symbol or list."""
+        """
+        Fetch real-time quote from Kite API via OpenAlgo.
+        Supports single symbol or list of symbols (batch request).
+
+        Args:
+            symbol (str or list): Trading symbol(s) e.g., 'INFY' or ['INFY', 'TCS']
+            exchange (str): Exchange (NSE, NFO, MCX)
+            max_retries (int): Retry attempts
+
+        Returns:
+            dict: Quote data (single dict if str input, dict of dicts if list input) or None
+        """
         url = f"{self.host}/api/v1/quotes"
         payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
 

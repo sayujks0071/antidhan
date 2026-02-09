@@ -378,6 +378,23 @@ class BaseStrategy:
             self.logger.error(f"Error calculating Monthly ATR: {e}")
             return 0.0
 
+    def get_adaptive_quantity(self, price, risk_pct=1.0, capital=500000):
+        """
+        Calculate adaptive quantity based on Monthly ATR (Robust Volatility).
+        Delegates to PositionManager.
+        """
+        if not self.pm:
+            self.logger.warning("PositionManager not initialized. Returning default quantity.")
+            return self.quantity
+
+        monthly_atr = self.get_monthly_atr()
+        if monthly_atr > 0:
+            qty = self.pm.calculate_adaptive_quantity_monthly_atr(capital, risk_pct, monthly_atr, price)
+            self.logger.info(f"Adaptive Quantity: {qty} (Monthly ATR: {monthly_atr:.2f})")
+            return qty
+
+        return self.quantity
+
     def calculate_adx(self, df, period=14):
         """Calculate ADX."""
         result = calculate_adx(df, period)
