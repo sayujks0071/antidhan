@@ -201,12 +201,14 @@ def place_order_api(data, auth):
     Place an order via the Dhan API.
 
     Args:
-        data (dict): Order parameters (symbol, quantity, price, etc.).
+        data (dict): Order parameters. Must include 'symbol', 'exchange', 'action', 'quantity', 'pricetype', 'product'.
         auth (str): Authentication token.
 
     Returns:
         tuple: (response_object, response_dict, order_id)
-            order_id will be None if the order is rejected.
+            - response_object: The HTTP response object.
+            - response_dict (dict): The parsed JSON response.
+            - order_id (str or None): The generated Order ID. None if the order is rejected or failed.
     """
     # 1. Error handling for Invalid Token (Auth Token)
     if not auth:
@@ -302,7 +304,9 @@ def place_smartorder_api(data, auth):
 
     Returns:
         tuple: (response_object, response_dict, order_id)
-            order_id will be None if the order is rejected.
+            - response_object: The HTTP response object.
+            - response_dict (dict): The parsed JSON response.
+            - order_id (str or None): The generated Order ID. None if the order is rejected or logic determined no action needed.
     """
     # 1. Error handling for Invalid Token (Auth Token)
     if not auth:

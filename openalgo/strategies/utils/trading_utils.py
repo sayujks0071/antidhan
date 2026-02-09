@@ -162,16 +162,6 @@ def calculate_bollinger_bands(series, window=20, num_std=2):
     return sma, upper, lower
 
 
-def calculate_sma(series, period=14):
-    """Calculate Simple Moving Average."""
-    return series.rolling(window=period).mean()
-
-
-def calculate_ema(series, period=14):
-    """Calculate Exponential Moving Average."""
-    return series.ewm(span=period, adjust=False).mean()
-
-
 def calculate_adx(df, period=14):
     """Calculate ADX (Returns Series)."""
     try:
@@ -233,21 +223,6 @@ def analyze_volume_profile(df, n_bins=20):
 
     poc_price = bins[poc_bin] + (bins[1] - bins[0]) / 2
     return poc_price, poc_volume
-
-
-def calculate_relative_strength(df, index_df):
-    """
-    Calculate Relative Strength (RS) of a stock against an index.
-    Returns the difference in ROC (10-period) between the stock and index.
-    """
-    if index_df.empty:
-        return 0.0
-    try:
-        stock_roc = df['close'].pct_change(10).iloc[-1]
-        index_roc = index_df['close'].pct_change(10).iloc[-1]
-        return stock_roc - index_roc
-    except Exception:
-        return 0.0
 
 
 def calculate_roc(series, period=10):
