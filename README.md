@@ -166,21 +166,20 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 ## 🛡️ System Audit & Performance (Feb 2026)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed `SuperTrendVWAP`, `AIHybrid`, and `MCXMomentum`. Found **low correlation** due to diverse asset classes (Equity vs Commodity) and logic (Trend vs Mean Reversion). Recommended keeping strategies separate.
-- **Equity Curve Stress Test (SuperTrendVWAP):**
-  - **Total PnL:** +209,538.52 INR (20 trades).
-  - **Profit Factor:** 12.11.
-  - **Max Drawdown:** 7,792.29 INR.
-  - **Worst Day:** 2026-01-19 (PnL +209k, but contained the Max DD event).
-  - **Root Cause:** Max Drawdown was due to a Stop Loss hit in BANKNIFTY during a volatile period, but the strategy recovered within the same day.
+- **Cross-Strategy Correlation:** Analyzed **SuperTrendVWAP**, **TrendPullback**, and **ORB**. Found **high correlation** (> 0.99) between them.
+  - **Action Taken:** Merged/Archived `TrendPullback` and `ORB`. Only `SuperTrendVWAP` (Highest Calmar Ratio: 6776.40) remains active in `strategies/scripts`.
+- **Equity Curve Stress Test:**
+  - **SuperTrendVWAP:** Total PnL +209,538.52 INR. Max Drawdown -7,792.29 INR.
+  - **Worst Day:** 2026-01-19 (Global worst day across all strategies).
+  - **Root Cause:** High correlation led to simultaneous drawdowns.
 - **Infrastructure Upgrades:**
-  - **Local Caching:** Implemented client-side `FileCache` in `trading_utils.py` to cache API history calls, reducing latency and network load.
-  - **Adaptive Sizing:** Updated `SuperTrendVWAP`, `AIHybrid`, and `MCXMomentum` to use **ATR-based sizing** (Monthly ATR). Position sizes now automatically adjust based on volatility (1% Risk on 500k Capital).
+  - **Optimization:** Added in-memory `lru_cache` to `APIClient.history` and documented batching in `get_quote`.
+  - **Adaptive Sizing:** Integrated `PositionManager` with `BaseStrategy` to dynamically size positions based on Monthly ATR (Risk normalized to 1% of 500k capital). Updated `SuperTrendVWAP` and `NSERsiBolTrend` to use this feature.
 
 ## 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **Volume Profile Imbalance:** Explore strategies that exploit asymmetric volume distribution at key levels (POC/VAH/VAL) to predict breakout direction.
-2.  **Gamma Exposure (GEX):** Integrate GEX data to anticipate market stability or volatility bursts based on option dealer positioning.
-3.  **Calendar Spread Seasonality:** Analyze historical seasonality in calendar spreads for commodities (MCX) to capture recurring supply/demand imbalances.
+1.  **Volume Delta Analysis:** Analyze buy/sell volume pressure within candle bars.
+2.  **Hurst Exponent:** Quantify the long-term memory of time series to switch between mean-reversion and trend-following modes.
+3.  **Kalman Filter:** Use for dynamic pair trading ratios or trend estimation to reduce lag compared to moving averages.
