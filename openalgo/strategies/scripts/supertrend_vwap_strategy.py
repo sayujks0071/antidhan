@@ -4,6 +4,7 @@
 [Improvement 2026-02-01] Found 'threshold' parameter was unused. Relaxing dev_threshold to improve participation.
 SuperTrend VWAP Strategy
 VWAP mean reversion with volume profile analysis, Enhanced Sector RSI Filter, and Dynamic Risk.
+Refactored to inherit from BaseStrategy with reduced boilerplate.
 """
 import os
 import sys
@@ -25,22 +26,22 @@ except ImportError:
     from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
 
 class SuperTrendVWAPStrategy(BaseStrategy):
-    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
-                 sector_benchmark='NIFTY BANK', log_file=None, client=None, **kwargs):
+    def __init__(self, symbol, quantity, **kwargs):
+        # Default to NSE/EQUITY if not provided
+        kwargs.setdefault('exchange', 'NSE')
+
         super().__init__(
-            name=f"VWAP_{symbol}",
             symbol=symbol,
             quantity=quantity,
-            api_key=api_key,
-            host=host,
-            ignore_time=ignore_time,
-            log_file=log_file,
-            client=client
+            **kwargs
         )
-        self.sector_benchmark = sector_benchmark
+
+        # Sector handling: BaseStrategy handles self.sector from --sector
+        # For backward compatibility with existing code using self.sector_benchmark
+        self.sector_benchmark = self.sector or kwargs.get('sector_benchmark', 'NIFTY BANK')
 
         # Optimization Parameters
-        self.threshold = 150 # Note: This parameter was previously unused in logic. Keeping for compatibility but ignoring.
+        self.threshold = 150
         self.stop_pct = 1.8
         self.adx_threshold = 20
         self.adx_period = 14
@@ -51,17 +52,15 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
-        parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
-        parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
-        # --sector is already added by BaseStrategy
+        # --underlying, --type, --exchange, --sector are added by BaseStrategy
+        pass
 
     @classmethod
     def parse_arguments(cls, args):
         kwargs = super().parse_arguments(args)
         # Use provided sector or default to 'NIFTY BANK'
-        kwargs['sector_benchmark'] = args.sector if args.sector else 'NIFTY BANK'
-        # BaseStrategy already extracts log_file from args.logfile
+        # BaseStrategy maps --sector to kwargs['sector']
+        # We can set specific defaults here if needed
         return kwargs
 
     def cycle(self):
@@ -139,8 +138,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             # Entry Logic
             # Use self.sector (managed by BaseStrategy) instead of self.sector_benchmark
             # If self.sector is None, check_sector_correlation handles it (defaults to NIFTY BANK or passed value)
-            # BaseStrategy sets self.sector from --sector argument
-            sector_bullish = self.check_sector_correlation(self.sector or "NIFTY BANK")
+            sector_bullish = self.check_sector_correlation(self.sector or self.sector_benchmark)
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
                 # Use base_qty calculated from adaptive sizing
@@ -166,6 +164,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             return 'HOLD', {}, {}
 
         self.atr = self.calculate_atr(df)
+        last = df.iloc[-1]
 
         poc_price, poc_vol = self.analyze_volume_profile(df)
 

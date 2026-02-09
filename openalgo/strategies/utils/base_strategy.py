@@ -17,6 +17,11 @@ try:
     openalgo_root = os.path.dirname(strategies_dir)
     if openalgo_root not in sys.path:
         sys.path.insert(0, openalgo_root)
+
+    # Also add repo root to allow 'import openalgo' if needed
+    repo_root = os.path.dirname(openalgo_root)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
 except Exception:
     pass
 
@@ -58,8 +63,7 @@ except ImportError:
             calculate_rsi,
             calculate_sma,
             calculate_supertrend,
-            calculate_sma,
-            calculate_ema,
+            calculate_supertrend, # Duplicate import in original, keeping consistent
             calculate_relative_strength,
             is_market_open,
             normalize_symbol,
@@ -118,7 +122,9 @@ class BaseStrategy:
         self.api_key = self._resolve_api_key(api_key)
 
         # Default to 5002 to match trading_utils default, allow override via env
-        self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5002')
+        # Priority: Env Var > kwarg > Default
+        env_host = os.getenv('OPENALGO_HOST')
+        self.host = env_host if env_host else (host or 'http://127.0.0.1:5002')
 
         if not self.api_key and not client:
              # Warn but don't fail immediately, allowing for test/mock scenarios
@@ -144,10 +150,15 @@ class BaseStrategy:
             strategies_dir = os.path.dirname(current_dir)
             openalgo_root = os.path.dirname(strategies_dir)
 
-            # Also add the parent of openalgo to allow 'from openalgo.database import ...' if needed
-            # But typically we want 'from database import ...' if running inside openalgo
+            # Add openalgo root
             if openalgo_root not in sys.path:
                 sys.path.insert(0, openalgo_root)
+
+            # Also add the repo root (parent of openalgo) to allow 'import openalgo' if needed
+            repo_root = os.path.dirname(openalgo_root)
+            if repo_root not in sys.path:
+                sys.path.insert(0, repo_root)
+
         except Exception as e:
             # Don't fail if we can't figure out paths, just log it later if logger exists
             print(f"Warning: Could not add project root to path: {e}")
@@ -165,6 +176,7 @@ class BaseStrategy:
         # 2. Try database
         try:
             # This requires 'database' to be importable (path fixed by _add_project_root_to_path)
+            self._add_project_root_to_path()
             from database.auth_db import get_first_available_api_key
             key = get_first_available_api_key()
             if key:
@@ -212,8 +224,10 @@ class BaseStrategy:
 
         while True:
             try:
-                # Use split to handle NSE_INDEX -> NSE
-                if not self.ignore_time and not is_market_open(self.exchange.split('_')[0]):
+                # Use split to handle NSE_INDEX -> NSE, but keep MCX as is
+                check_exchange = self.exchange.split('_')[0] if self.exchange != "MCX" else "MCX"
+
+                if not self.ignore_time and not is_market_open(check_exchange):
                     self.logger.info("Market closed. Sleeping...")
                     time.sleep(60)
                     continue
