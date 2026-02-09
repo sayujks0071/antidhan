@@ -41,6 +41,10 @@ def generate_mock_logs(filepath):
         dev = 0.002 * (i + 1)
         vix = 14.5 + (i * 0.1)
         qty = 25
+        # RSI/EMA for verification
+        rsi = 55 + (i * 2) # Rising RSI > 50
+        ema_fast = price - 10
+        ema_slow = price - 40 # EMA Fast > EMA Slow
         nifty_signals.append({
             'symbol': 'NIFTY',
             'time': ts,
@@ -50,7 +54,10 @@ def generate_mock_logs(filepath):
             'vol': vol,
             'dev': dev,
             'vix': vix,
-            'qty': qty
+            'qty': qty,
+            'rsi': rsi,
+            'ema_fast': ema_fast,
+            'ema_slow': ema_slow
         })
 
     # Other Signals (Legacy)
@@ -69,9 +76,9 @@ def generate_mock_logs(filepath):
             signal_price = sig['price']
 
             if symbol == 'NIFTY':
-                # VWAP Strategy Format
-                # log: VWAP Crossover Buy. Price: {price}, POC: {poc}, Vol: {vol}, Sector: Bullish, Dev: {dev}, Qty: {qty} (VIX: {vix})
-                log_line = f"{signal_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO VWAP Crossover Buy. Price: {signal_price:.2f}, POC: {sig['poc']:.2f}, Vol: {sig['vol']}, Sector: Bullish, Dev: {sig['dev']:.4f}, Qty: {sig['qty']} (VIX: {sig['vix']:.1f})\n"
+                # VWAP Strategy Format with RSI/EMA
+                # log: VWAP Crossover Buy. Price: {price}, POC: {poc}, Vol: {vol}, Sector: Bullish, Dev: {dev}, Qty: {qty} (VIX: {vix}), RSI: {rsi}, EMA_Fast: {ema_fast}, EMA_Slow: {ema_slow}
+                log_line = f"{signal_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO VWAP Crossover Buy. Price: {signal_price:.2f}, POC: {sig['poc']:.2f}, Vol: {sig['vol']}, Sector: Bullish, Dev: {sig['dev']:.4f}, Qty: {sig['qty']} (VIX: {sig['vix']:.1f}), RSI: {sig['rsi']:.2f}, EMA_Fast: {sig['ema_fast']:.2f}, EMA_Slow: {sig['ema_slow']:.2f}\n"
                 f.write(log_line)
                 # Execute log
                 f.write(f"{signal_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO Executing BUY {sig['qty']} {symbol} @ {signal_price:.2f}\n")
@@ -110,8 +117,8 @@ def analyze_logs(filepath):
 
     # Regex patterns
     signal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Signal Generated: BUY (\w+) @ ([\d\.]+)")
-    # VWAP pattern with capturing groups for verification
-    vwap_signal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO VWAP Crossover Buy. Price: ([\d\.]+), POC: ([\d\.]+), Vol: (\d+), Sector: (\w+), Dev: ([\d\.]+), Qty: (\d+) \(VIX: ([\d\.]+)\)")
+    # VWAP pattern with capturing groups for verification (updated for RSI/EMA)
+    vwap_signal_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO VWAP Crossover Buy. Price: ([\d\.]+), POC: ([\d\.]+), Vol: (\d+), Sector: (\w+), Dev: ([\d\.]+), Qty: (\d+) \(VIX: ([\d\.]+)\), RSI: ([\d\.]+), EMA_Fast: ([\d\.]+), EMA_Slow: ([\d\.]+)")
     order_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Order Placed: BUY (\w+)")
     fill_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) INFO Order Filled: BUY (\w+) @ ([\d\.]+)")
 
@@ -127,7 +134,7 @@ def analyze_logs(filepath):
         # Check Signal (VWAP Strategy)
         m_vwap = vwap_signal_pattern.search(line)
         if m_vwap:
-            ts_str, price, poc, vol, sector, dev, qty, vix = m_vwap.groups()
+            ts_str, price, poc, vol, sector, dev, qty, vix, rsi, ema_fast, ema_slow = m_vwap.groups()
             ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S,%f")
             symbol = "NIFTY"
             signal_data = {
@@ -137,7 +144,10 @@ def analyze_logs(filepath):
                 'vol': int(vol),
                 'sector': sector,
                 'dev': float(dev),
-                'vix': float(vix)
+                'vix': float(vix),
+                'rsi': float(rsi),
+                'ema_fast': float(ema_fast),
+                'ema_slow': float(ema_slow)
             }
             signal_map[symbol] = signal_data # Update map for latency check
             vwap_signals.append(signal_data) # Store for logic verification
@@ -218,7 +228,17 @@ def analyze_logs(filepath):
         print(f"  Sector: {sig['sector']} (Bullish: {sector_bullish})")
         print(f"  Dev: {dev_val:.4f} (Within {dev_threshold}: {is_not_overextended})")
 
-        if is_above_poc and sector_bullish and is_not_overextended:
+        # RSI/EMA Verification
+        rsi_val = sig['rsi']
+        ema_fast = sig['ema_fast']
+        ema_slow = sig['ema_slow']
+        ema_trend = ema_fast > ema_slow
+        rsi_bullish = rsi_val > 50
+
+        print(f"  RSI: {rsi_val:.2f} (Bullish > 50: {rsi_bullish})")
+        print(f"  EMA Trend: {ema_trend} (Fast {ema_fast:.2f} > Slow {ema_slow:.2f})")
+
+        if is_above_poc and sector_bullish and is_not_overextended and rsi_bullish and ema_trend:
              print("  Result: Signal Validated: YES (Mathematically Accurate)")
         else:
              print("  Result: Signal Validated: NO (Logic Mismatch)")
