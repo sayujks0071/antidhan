@@ -419,8 +419,8 @@ def place_smart_order(
             order_data, AUTH_TOKEN, broker_name, original_data, smart_order_delay
         )
 
-    # Case 2: Direct internal call with auth_token and broker
-    elif auth_token and broker:
+    # Case 2: Direct internal call with broker (auth_token can be checked inside)
+    elif broker:
         return place_smart_order_with_auth(
             order_data, auth_token, broker, original_data, smart_order_delay
         )
@@ -429,6 +429,6 @@ def place_smart_order(
     else:
         error_response = {
             "status": "error",
-            "message": "Either api_key or both auth_token and broker must be provided",
+            "message": "Either api_key or broker must be provided",
         }
         return False, error_response, 400
