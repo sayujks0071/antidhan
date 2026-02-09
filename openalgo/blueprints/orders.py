@@ -525,48 +525,14 @@ def close_position():
         auth_token = get_auth_token(login_username)
         broker_name = session.get("broker")
 
-        # Check if in analyze mode
-        if get_analyze_mode():
-            # In analyze mode, use placesmartorder service with quantity=0 and position_size=0
-            api_key = get_api_key_for_tradingview(login_username)
-
-            if not api_key:
-                return jsonify(
-                    {"status": "error", "message": "API key not found for analyze mode"}
-                ), 401
-
-            # Prepare order data for placesmartorder service (without apikey in data)
-            order_data = {
-                "strategy": "UI Exit Position",
-                "exchange": exchange,
-                "symbol": symbol,
-                "action": "BUY",  # Will be determined by smart order logic
-                "product_type": product,
-                "pricetype": "MARKET",
-                "quantity": "0",
-                "price": "0",
-                "trigger_price": "0",
-                "disclosed_quantity": "0",
-                "position_size": "0",  # Setting to 0 to close the position
-            }
-
-            # Use placesmartorder service for analyze mode
-            from services.place_smart_order_service import place_smart_order
-
-            # Pass api_key as a separate parameter for analyze mode
-            success, response_data, status_code = place_smart_order(
-                order_data=order_data, api_key=api_key
-            )
-            return jsonify(response_data), status_code
-
-        # Live mode - continue with existing logic
-        if not auth_token or not broker_name:
-            return jsonify({"status": "error", "message": "Authentication error"}), 401
-
-        # Get API key for validation purposes
+        # Get API key (needed for analyze mode and for validation)
+        # Note: Local import is redundant if imported at top, but keeping logic clean
         from database.auth_db import get_api_key_for_tradingview
-
         api_key = get_api_key_for_tradingview(login_username)
+
+        # Check for broker name, required for live trading (unless analyzing)
+        if not get_analyze_mode() and not broker_name:
+            return jsonify({"status": "error", "message": "Broker not set in session"}), 400
 
         # Prepare order data for smart order service
         order_data = {
@@ -585,13 +551,10 @@ def close_position():
             "position_size": "0",  # Setting to 0 to close the position
         }
 
-        # Use placesmartorder service for live mode as well
-        from services.place_smart_order_service import place_smart_order
-
         # Delegate to service which handles:
         # 1. Validation (SecurityId Required)
-        # 2. Auth checks (Invalid Token)
-        # 3. Automatic retry mechanism for 500-level errors
+        # 2. Auth checks (Invalid Token) - returns 401 if auth_token is missing/invalid
+        # 3. Automatic retry mechanism for 500-level errors (including 502, 503, 504)
         success, response_data, status_code = place_smart_order(
             order_data=order_data,
             api_key=api_key,
