@@ -942,3 +942,44 @@ def calculate_relative_strength(df, index_df, window=10):
     except Exception as e:
         logger.error(f"Relative Strength calculation failed: {e}")
         return 0.0
+
+
+def run_backtest_simulation(strategy_class, df, params=None):
+    """
+    Standard helper to run a backtest simulation on a strategy.
+
+    Args:
+        strategy_class: The strategy class to instantiate.
+        df: DataFrame with historical data.
+        params: Dictionary of parameters to pass to the strategy.
+
+    Returns:
+        tuple: (action, score, details)
+    """
+    strat_params = params or {}
+
+    # Extract symbol or default to TEST
+    symbol = strat_params.get('symbol', 'TEST')
+
+    # Initialize strategy with mock parameters
+    # We use **strat_params to pass everything, but we ensure essential args are present
+    strat_params.setdefault('quantity', 1)
+    strat_params.setdefault('api_key', 'test')
+    strat_params.setdefault('host', 'test')
+
+    strat = strategy_class(symbol=symbol, **strat_params)
+
+    # Silence logger
+    if hasattr(strat, 'logger'):
+        strat.logger.handlers = []
+        strat.logger.addHandler(logging.NullHandler())
+
+    # Check if strategy has generate_signal or calculate_signal
+    if hasattr(strat, 'generate_signal'):
+        return strat.generate_signal(df)
+    elif hasattr(strat, 'calculate_signal'):
+        return strat.calculate_signal(df)
+    else:
+        # Fallback or error
+        logging.getLogger(__name__).warning(f"Strategy {strategy_class.__name__} has no signal generation method.")
+        return 'HOLD', 0.0, {}
