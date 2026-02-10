@@ -25,25 +25,29 @@ utils_dir = os.path.join(strategies_dir, "utils")
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import is_market_open, APIClient
     from optionchain_utils import (
         OptionChainClient,
         OptionPositionTracker,
+        calculate_straddle_premium,
+        check_time_window,
         choose_nearest_expiry,
+        get_atm_strike,
+        get_leg_details,
         is_chain_valid,
         normalize_expiry,
         safe_float,
         safe_int,
     )
     from strategy_common import (
+        DataFreshnessGuard,
+        RiskConfig,
+        RiskManager,
         SignalDebouncer,
         TradeLedger,
         TradeLimiter,
         format_kv,
-        DataFreshnessGuard,
-        RiskConfig,
-        RiskManager,
     )
+    from trading_utils import APIClient, is_market_open
 except ImportError:
     print("ERROR: Could not import strategy utilities.", flush=True)
     # Don't exit here immediately if running in an env without utils, just warn
@@ -177,14 +181,7 @@ class SensexIronCondorStrategy:
 
     def is_time_window_open(self):
         """Checks if current time is within entry window."""
-        now = datetime.now().time()
-        try:
-            start = datetime.strptime(ENTRY_START_TIME, "%H:%M").time()
-            end = datetime.strptime(ENTRY_END_TIME, "%H:%M").time()
-            return start <= now <= end
-        except ValueError:
-            self.logger.error("Invalid time format in configuration")
-            return False
+        return check_time_window(ENTRY_START_TIME, ENTRY_END_TIME)
 
     def is_expiry_day(self):
         """Checks if today matches the expiry date."""
@@ -217,39 +214,6 @@ class SensexIronCondorStrategy:
             return False, ""
         except ValueError:
             return False, ""
-
-    def get_atm_strike(self, chain):
-        """Finds ATM strike from chain data."""
-        for item in chain:
-            if item.get("ce", {}).get("label") == "ATM":
-                return item["strike"]
-        return None
-
-    def calculate_straddle_premium(self, chain, atm_strike):
-        """Calculates combined premium of ATM CE and PE."""
-        ce_ltp = 0.0
-        pe_ltp = 0.0
-
-        for item in chain:
-            if item["strike"] == atm_strike:
-                ce_ltp = safe_float(item.get("ce", {}).get("ltp", 0))
-                pe_ltp = safe_float(item.get("pe", {}).get("ltp", 0))
-                break
-
-        return ce_ltp + pe_ltp
-
-    def get_leg_details(self, chain, offset, option_type):
-        """Helper to resolve symbol and LTP from chain based on offset."""
-        for item in chain:
-            opt = item.get(option_type.lower(), {})
-            if opt.get("label") == offset:
-                return {
-                    "symbol": opt.get("symbol"),
-                    "ltp": safe_float(opt.get("ltp", 0)),
-                    "quantity": QUANTITY,
-                    "product": PRODUCT
-                }
-        return None
 
     def _close_position(self, chain, reason):
         """Closes all open positions."""
@@ -309,7 +273,7 @@ class SensexIronCondorStrategy:
         valid_setup = True
 
         for offset, otype, action in definitions:
-            details = self.get_leg_details(chain, offset, otype)
+            details = get_leg_details(chain, offset, otype, quantity=QUANTITY, product=PRODUCT)
             if details:
                 details["action"] = action
                 tracking_legs.append(details)
@@ -420,10 +384,10 @@ class SensexIronCondorStrategy:
                         continue
 
                 # 2. CALCULATE INDICATORS
-                atm_strike = self.get_atm_strike(chain)
+                atm_strike = get_atm_strike(chain)
                 straddle_premium = 0
                 if atm_strike:
-                    straddle_premium = self.calculate_straddle_premium(chain, atm_strike)
+                    straddle_premium = calculate_straddle_premium(chain, atm_strike)
 
                 # 3. LOG STATUS
                 self.logger.info(format_kv(
