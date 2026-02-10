@@ -328,6 +328,10 @@ class BaseStrategy:
         """Calculate Relative Strength Index."""
         return calculate_rsi(series, period)
 
+    def calculate_rsi_series(self, series, period=14):
+        """Calculate Relative Strength Index Series."""
+        return calculate_rsi(series, period)
+
     def calculate_sma(self, series, period=20):
         """Calculate Simple Moving Average."""
         return calculate_sma(series, period)
@@ -343,6 +347,10 @@ class BaseStrategy:
     def calculate_atr(self, df, period=14):
         """Calculate Average True Range."""
         return calculate_atr(df, period).iloc[-1]
+
+    def calculate_atr_series(self, df, period=14):
+        """Calculate Average True Range Series."""
+        return calculate_atr(df, period)
 
     def get_monthly_atr(self, symbol=None):
         """
@@ -385,6 +393,10 @@ class BaseStrategy:
         """Calculate ADX."""
         result = calculate_adx(df, period)
         return result.iloc[-1] if not result.empty else 0
+
+    def calculate_adx_series(self, df, period=14):
+        """Calculate ADX Series."""
+        return calculate_adx(df, period)
 
     def calculate_intraday_vwap(self, df):
         """Calculate VWAP."""

@@ -1,24 +1,28 @@
-# DAILY STATUS REPORT
+# Daily Status Report (2026-02-08)
 
-## Performance Summary
-- **Net PnL in Sandbox**: -1250.00
-  - AdvancedMLMomentum: 0.00
-  - SuperTrendVWAP: -342.00
-  - GapFadeStrategy: -908.00 (Retired)
+## 1. Sandbox Performance (Past Week)
 
-## System Health
-- **Total Master Contracts Synced**: 213 (Equity/Derivatives)
-- **Infrastructure Updates**:
-  - Added shared `calculate_sma`, `calculate_ema`, `calculate_relative_strength` to `trading_utils.py`.
-  - Refactored `BaseStrategy` to expose these utilities.
-  - Refactored `AdvancedMLMomentumStrategy` to use shared utilities.
+Based on Sandbox Leaderboard:
+*   **Rank 1 (Alpha):** `AdvancedMLMomentum` - Profit Factor 9.08. Max Drawdown -52.00.
+*   **Rank 2:** `SuperTrendVWAP` - Profit Factor 3.57.
+*   **Rank 3 (Laggard):** `GapFadeStrategy` - Profit Factor 0.37.
 
-## Strategy Updates
-- **Alpha Strategy**: `AdvancedMLMomentum` (Best Performer).
-- **Innovation**: Released `AdvancedMLMomentumV2` with **Multi-Timeframe Confirmation** (Daily Trend Filter) to prevent counter-trend entries.
-- **Deprecation**: Retired `GapFadeStrategy` (Profit Factor 0.34 < 0.8) to `strategies/retired/`.
+**Net PnL:** Not explicitly tracked, but Alpha strategy shows strong profitability.
 
-## Recommendations for Next Week
-- **Target Symbols**: High Momentum stocks in outperforming sectors (e.g., NIFTY AUTO, NIFTY ENERGY).
-  - Specific Watchlist: ADANIENT, TATAMOTORS, DLF.
-- **Action**: Deploy `AdvancedMLMomentumV2` on these symbols to leverage the new trend filter.
+## 2. Code Health & Innovation
+
+*   **Alpha Upgrade:** Created `AdvancedMLMomentumV2` (`openalgo/strategies/scripts/advanced_ml_momentum_strategy_v2.py`) with a **Dynamic Trailing Stop** to address drawdown risks.
+*   **Refactoring:**
+    *   Updated `BaseStrategy` to expose indicator Series methods (`calculate_atr_series`, etc.).
+    *   Refactored `MCXMomentumStrategy` to use these shared methods, removing local imports.
+*   **Deprecation:** Confirmed `GapFadeStrategy` is in `strategies/retired/`.
+
+## 3. Infrastructure
+
+*   **Total Master Contracts Synced:** 0 (File `openalgo/data/instruments.csv` is missing).
+    *   Action Required: Run instrument sync script to populate master data.
+
+## 4. Recommendations for Next Week
+
+*   **Target Symbols:** Focus on high-momentum stocks identified by `AdvancedMLMomentum` (e.g., Nifty 50 constituents with ROC > 0.01 and RSI > 55).
+*   **Strategy Focus:** Deploy `AdvancedMLMomentumV2` to Sandbox to validate the Trailing Stop logic.
