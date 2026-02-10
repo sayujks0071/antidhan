@@ -107,12 +107,37 @@ class MCXStrategy:
 
         self.data = df
 
+    def get_monthly_atr(self):
+        """Fetch daily data and calculate ATR for adaptive sizing."""
+        if not self.client: return 0.0
+        try:
+            start_date = (datetime.now() - timedelta(days=40)).strftime("%Y-%m-%d")
+            end_date = datetime.now().strftime("%Y-%m-%d")
+            df = self.client.history(
+                symbol=self.symbol,
+                interval="1d", # Daily
+                exchange="MCX",
+                start_date=start_date,
+                end_date=end_date
+            )
+            if df.empty or len(df) < 15:
+                return 0.0
+
+            # Calculate ATR using utility function
+            atr_series = calculate_atr(df, period=14)
+            if atr_series.empty: return 0.0
+            return atr_series.iloc[-1]
+        except Exception as e:
+            logger.error(f"Error calculating Monthly ATR: {e}")
+            return 0.0
+
     def check_signals(self):
         """Check entry and exit conditions"""
         if self.data.empty or len(self.data) < 50:
             return
 
         current = self.data.iloc[-1]
+        close = current['close']
 
         has_position = False
         if self.pm:
@@ -124,7 +149,17 @@ class MCXStrategy:
         usd_vol_high = usd_vol > 0.8
 
         # Position sizing adjustment for volatility
-        base_qty = 1 # Futures usually 1 lot
+        base_qty = 1 # Default Futures Lot
+
+        # Adaptive Sizing (Monthly ATR)
+        monthly_atr = self.get_monthly_atr()
+        if monthly_atr > 0 and self.pm:
+             # Assuming 500k capital, 1% risk
+             qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, close)
+             if qty > 0:
+                 base_qty = qty
+                 logger.info(f"Adaptive Base Qty: {base_qty} (Monthly ATR: {monthly_atr:.2f})")
+
         if usd_vol_high:
             logger.warning("⚠️ High USD/INR Volatility: Trading effectively halted or reduced.")
             if usd_vol > 1.5:

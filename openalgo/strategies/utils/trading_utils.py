@@ -3,7 +3,7 @@ import logging
 import os
 import time
 import time as time_module
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import time as dt_time
 from functools import lru_cache
 from pathlib import Path
@@ -544,7 +544,6 @@ class APIClient:
         self.host = host.rstrip("/")
         self.cache = FileCache()
 
-    @lru_cache(maxsize=128)
     def history(
         self,
         symbol,
@@ -554,23 +553,93 @@ class APIClient:
         end_date=None,
         max_retries=3,
     ):
-        """Fetch historical data with retry logic, exponential backoff, and in-memory caching."""
-        # Check Cache first
+        """
+        Fetch historical data with optimized caching (Split Request Strategy).
+        1. Past Data (Start -> Yesterday): Cached via Memory & FileCache.
+        2. Today Data (Today -> Now): Live fetch (No Cache).
+        """
+        try:
+            today = datetime.now().date()
+            today_str = today.strftime("%Y-%m-%d")
+
+            # Parse dates
+            def parse_date(d):
+                if not d: return today
+                if isinstance(d, datetime): return d.date()
+                if isinstance(d, pd.Timestamp): return d.date()
+                try:
+                    return datetime.strptime(d.split('T')[0], "%Y-%m-%d").date()
+                except:
+                    return today
+
+            start_dt = parse_date(start_date)
+            end_dt = parse_date(end_date)
+
+            # Determine split
+            # If the range includes both Past and Today
+            if start_dt < today and end_dt >= today:
+                yesterday = today - timedelta(days=1)
+                yesterday_str = yesterday.strftime("%Y-%m-%d")
+
+                # 1. Fetch Past (Cached)
+                past_df = self._fetch_segment(
+                    symbol, exchange, interval, start_date, yesterday_str, max_retries, use_cache=True
+                )
+
+                # 2. Fetch Today (Live)
+                today_df = self._fetch_segment(
+                    symbol, exchange, interval, today_str, end_date, max_retries, use_cache=False
+                )
+
+                if past_df.empty: return today_df
+                if today_df.empty: return past_df
+
+                # Combine
+                full_df = pd.concat([past_df, today_df])
+                # Drop duplicates by datetime
+                if 'datetime' in full_df.columns:
+                    full_df = full_df.drop_duplicates(subset=['datetime']).sort_values('datetime')
+
+                return full_df
+
+            else:
+                # Fully Past or Fully Today
+                use_cache = (end_dt < today)
+                return self._fetch_segment(symbol, exchange, interval, start_date, end_date, max_retries, use_cache=use_cache)
+
+        except Exception as e:
+            logger.error(f"History wrapper error: {e}")
+            return pd.DataFrame()
+
+    @lru_cache(maxsize=128)
+    def _fetch_segment_cached(self, symbol, exchange, interval, start_date, end_date, max_retries):
+        """Wrapper for _fetch_segment to enable lru_cache only for cacheable segments."""
+        # Note: calling self._fetch_segment_core directly to avoid recursion issues if structure changes
+        return self._fetch_segment_core(symbol, exchange, interval, start_date, end_date, max_retries, use_cache=True)
+
+    def _fetch_segment(self, symbol, exchange, interval, start_date, end_date, max_retries, use_cache):
+        """Dispatch to cached or non-cached core."""
+        if use_cache:
+            return self._fetch_segment_cached(symbol, exchange, interval, start_date, end_date, max_retries)
+        else:
+            return self._fetch_segment_core(symbol, exchange, interval, start_date, end_date, max_retries, use_cache=False)
+
+    def _fetch_segment_core(self, symbol, exchange, interval, start_date, end_date, max_retries, use_cache):
+        """Core fetch logic with FileCache support."""
         cache_key = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
-        cached_df = self.cache.get(cache_key)
-        if cached_df is not None and not cached_df.empty:
-            # Only use cache if end_date is in the past (not today)
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            if end_date and end_date < today_str:
+
+        if use_cache:
+            cached_df = self.cache.get(cache_key)
+            if cached_df is not None and not cached_df.empty:
                 return cached_df
 
         url = f"{self.host}/api/v1/history"
         payload = {
             "symbol": symbol,
             "exchange": exchange,
-            "interval": interval,  # Fixed: was "resolution"
-            "start_date": start_date,  # Fixed: was "from"
-            "end_date": end_date,  # Fixed: was "to"
+            "interval": interval,
+            "start_date": start_date,
+            "end_date": end_date,
             "apikey": self.api_key,
         }
         try:
@@ -592,13 +661,8 @@ class APIClient:
                     for col in required_cols:
                         if col not in df.columns:
                             df[col] = 0
-                    logger.debug(
-                        f"Successfully fetched {len(df)} rows for {symbol} on {exchange}"
-                    )
 
-                    # Save to Cache if valid and historical
-                    today_str = datetime.now().strftime("%Y-%m-%d")
-                    if end_date and end_date < today_str and not df.empty:
+                    if use_cache and not df.empty:
                         self.cache.set(cache_key, df)
 
                     return df
