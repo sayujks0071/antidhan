@@ -16,9 +16,13 @@ if hasattr(sys.stderr, "reconfigure"):
 
 # Path setup for utility imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, "utils")
+# utils_dir points to openalgo/strategies/utils where trading_utils.py resides
+utils_dir = os.path.join(script_dir, "utils")
 sys.path.insert(0, utils_dir)
+
+# root_dir points to openalgo folder, to allow imports like 'from utils import ...'
+root_dir = os.path.dirname(script_dir)
+sys.path.insert(0, root_dir)
 
 try:
     from trading_utils import is_market_open, APIClient
@@ -32,8 +36,8 @@ try:
         safe_int,
     )
     from strategy_common import SignalDebouncer, TradeLedger, TradeLimiter, format_kv
-except ImportError:
-    print("ERROR: Could not import strategy utilities.", flush=True)
+except ImportError as e:
+    print(f"ERROR: Could not import strategy utilities: {e}", flush=True)
     sys.exit(1)
 
 
@@ -60,7 +64,7 @@ MAX_HOLD_MIN = safe_int(os.getenv("MAX_HOLD_MIN", "45"))
 COOLDOWN_SECONDS = safe_int(os.getenv("COOLDOWN_SECONDS", "300"))
 SLEEP_SECONDS = safe_int(os.getenv("SLEEP_SECONDS", "20"))
 EXPIRY_REFRESH_SEC = safe_int(os.getenv("EXPIRY_REFRESH_SEC", "3600"))
-MAX_ORDERS_PER_DAY = safe_int(os.getenv("MAX_ORDERS_PER_DAY", "1"))
+MAX_ORDERS_PER_DAY = safe_int(os.getenv("MAX_ORDERS_PER_DAY", "3"))
 MAX_ORDERS_PER_HOUR = safe_int(os.getenv("MAX_ORDERS_PER_HOUR", "1"))
 
 # Time Filters
@@ -73,8 +77,7 @@ MIN_PREMIUM = safe_float(os.getenv("MIN_PREMIUM", "100.0")) # Minimum straddle p
 API_KEY = os.getenv("OPENALGO_APIKEY")
 HOST = os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000")
 
-root_dir = os.path.dirname(strategies_dir)
-sys.path.insert(0, root_dir)
+# Note: root_dir is already added above
 
 if not API_KEY:
     try:
@@ -110,6 +113,9 @@ class NiftyIronCondorStrategy:
 
         self.expiry = None
         self.last_expiry_check = 0
+
+        # Track if we have entered today to prevent re-entry if strategy is one-shot
+        # But here we use TradeLimiter which is better
 
         self.logger.info(f"Strategy Initialized: {STRATEGY_NAME}")
         self.logger.info(format_kv(
@@ -165,7 +171,6 @@ class NiftyIronCondorStrategy:
         for item in chain:
             if item.get("ce", {}).get("label") == "ATM":
                 return item["strike"]
-        # Fallback using spot price if available in metadata (not passed here usually)
         return None
 
     def calculate_straddle_premium(self, chain, atm_strike):
@@ -219,6 +224,7 @@ class NiftyIronCondorStrategy:
 
         for leg in exit_legs:
             try:
+                # Use placesmartorder via api_client
                 res = self.api_client.placesmartorder(
                     strategy=STRATEGY_NAME,
                     symbol=leg["symbol"],
@@ -280,6 +286,11 @@ class NiftyIronCondorStrategy:
 
                 # 5. ENTRY LOGIC
                 if not self.tracker.open_legs and self.is_time_window_open():
+
+                    if self.should_terminate():
+                         # Don't enter if near close
+                        time.sleep(SLEEP_SECONDS)
+                        continue
 
                     if not self.limiter.allow():
                         self.logger.debug("Trade limiter active. Skipping entry.")
