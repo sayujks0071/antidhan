@@ -124,7 +124,13 @@
     "created_at": "2026-02-02T12:00:00",
     "symbol": "NIFTY",
     "schedule_enabled": true,
-    "schedule_days": ["mon", "tue", "wed", "thu", "fri"],
+    "schedule_days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri"
+    ],
     "params": {
       "rsi_period": 14,
       "bb_period": 20,
@@ -193,6 +199,35 @@
       "seasonality_score": 60,
       "global_alignment_score": 55,
       "usd_inr_volatility": 0.5
+    },
+    "is_running": false,
+    "is_scheduled": true,
+    "schedule_start": "09:00",
+    "schedule_stop": "23:30"
+  },
+  "MCX_GOLD_BOLLINGER": {
+    "id": "MCX_GOLD_BOLLINGER",
+    "name": "MCX Gold Bollinger Reversal",
+    "description": "MCX Gold mean reversion strategy using Bollinger Bands and RSI",
+    "file_path": "strategies/scripts/mcx_gold_bollinger_reversal.py",
+    "user_id": "system",
+    "created_at": "2026-02-10T22:45:38.363747",
+    "underlying": "GOLD",
+    "schedule_enabled": true,
+    "schedule_days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri"
+    ],
+    "params": {
+      "seasonality_score": 60,
+      "global_alignment_score": 55,
+      "usd_inr_volatility": 0.5,
+      "period_rsi": 14,
+      "period_bb": 20,
+      "std_dev": 2.0
     },
     "is_running": false,
     "is_scheduled": true,
