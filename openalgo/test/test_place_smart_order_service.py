@@ -31,7 +31,7 @@ sys.modules['services.order_router_service'] = mock_order_router
 sys.modules['database.settings_db'].get_analyze_mode.return_value = False
 
 # Mock get_token to return a valid token
-sys.modules['database.token_db'].get_token.return_value = "12345"
+sys.modules['database.token_db'].get_token.return_value = "MOCK_SECURITY_TOKEN"
 
 from services.place_smart_order_service import place_smart_order
 
@@ -41,7 +41,7 @@ class TestPlaceSmartOrderService(unittest.TestCase):
     @patch('services.place_smart_order_service.get_auth_token_broker')
     def test_invalid_token_from_broker(self, mock_get_auth, mock_import):
         # Setup
-        mock_get_auth.return_value = ("valid_token_string", "dhan_sandbox")
+        mock_get_auth.return_value = ("MOCK_AUTH_TOKEN", "dhan_sandbox")
 
         mock_broker = MagicMock()
         mock_import.return_value = mock_broker
@@ -62,7 +62,7 @@ class TestPlaceSmartOrderService(unittest.TestCase):
         }
 
         # Execute
-        success, response, status_code = place_smart_order(order_data, api_key="test_key")
+        success, response, status_code = place_smart_order(order_data, api_key="MOCK_API_KEY")
 
         # Verify
         print(f"Status Code: {status_code}")
@@ -76,7 +76,7 @@ class TestPlaceSmartOrderService(unittest.TestCase):
     @patch('services.place_smart_order_service.get_auth_token_broker')
     def test_security_id_required_from_broker(self, mock_get_auth, mock_import):
         # Setup
-        mock_get_auth.return_value = ("valid_token_string", "dhan_sandbox")
+        mock_get_auth.return_value = ("MOCK_AUTH_TOKEN", "dhan_sandbox")
 
         mock_broker = MagicMock()
         mock_import.return_value = mock_broker
@@ -96,7 +96,7 @@ class TestPlaceSmartOrderService(unittest.TestCase):
         }
 
         # Execute
-        success, response, status_code = place_smart_order(order_data, api_key="test_key")
+        success, response, status_code = place_smart_order(order_data, api_key="MOCK_API_KEY")
 
         # Verify
         print(f"Status Code: {status_code}")
@@ -111,7 +111,7 @@ class TestPlaceSmartOrderService(unittest.TestCase):
     @patch('services.place_smart_order_service.get_auth_token_broker')
     def test_retry_on_connection_error(self, mock_get_auth, mock_import, mock_sleep):
         # Setup
-        mock_get_auth.return_value = ("valid_token_string", "dhan_sandbox")
+        mock_get_auth.return_value = ("MOCK_AUTH_TOKEN", "dhan_sandbox")
         mock_broker = MagicMock()
         mock_import.return_value = mock_broker
 
@@ -120,7 +120,7 @@ class TestPlaceSmartOrderService(unittest.TestCase):
         # Second call: Success
         mock_broker.place_smartorder_api.side_effect = [
             (None, {"errorType": "ConnectionError", "errorMessage": "Timeout"}, None),
-            (MagicMock(status=200), {"status": "success", "message": "Order placed"}, "12345")
+            (MagicMock(status=200), {"status": "success", "message": "Order placed"}, "MOCK_ORDER_ID_12345")
         ]
 
         order_data = {
@@ -135,7 +135,7 @@ class TestPlaceSmartOrderService(unittest.TestCase):
         }
 
         # Execute
-        success, response, status_code = place_smart_order(order_data, api_key="test_key")
+        success, response, status_code = place_smart_order(order_data, api_key="MOCK_API_KEY")
 
         # Verify
         print(f"Status Code: {status_code}")
