@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SENSEX Iron Condor - SENSEX Weekly Options (OpenAlgo Web UI Compatible)
+[SensexIronCondor] - SENSEX Weekly Options (OpenAlgo Web UI Compatible)
 Sells OTM2 CE + PE and buys OTM4 CE + PE wings for defined-risk theta decay on BFO.
 
 Exchange: BFO (BSE F&O)
@@ -10,7 +10,8 @@ Expiry: Weekly Friday
 import os
 import sys
 import time
-from datetime import datetime
+import requests
+from datetime import datetime, time as dt_time
 
 # Line-buffered output (required for real-time log capture)
 if hasattr(sys.stdout, "reconfigure"):
@@ -26,8 +27,20 @@ sys.path.insert(0, utils_dir)
 # Also add local strategies/utils if present (where we put our files)
 sys.path.insert(0, os.path.join(script_dir, "utils"))
 
+class PrintLogger:
+    def info(self, msg): print(msg, flush=True)
+    def warning(self, msg): print(msg, flush=True)
+    def error(self, msg, exc_info=False): print(msg, flush=True)
+    def debug(self, msg): print(msg, flush=True)
+
+logger = PrintLogger()
+
+# -----------------------------------------------------------------------------
+# UTILITIES IMPORT & FALLBACKS
+# -----------------------------------------------------------------------------
+
+# Try to import strategy utilities. If trading_utils fails (due to httpx), use local fallbacks.
 try:
-    from trading_utils import is_market_open, APIClient
     from optionchain_utils import (
         OptionChainClient,
         OptionPositionTracker,
@@ -46,23 +59,91 @@ try:
         RiskConfig,
         RiskManager,
     )
-except ImportError:
-    print("ERROR: Could not import strategy utilities.", flush=True)
-    # Print path for debugging
-    print(f"sys.path: {sys.path}", flush=True)
+except ImportError as e:
+    logger.error(f"CRITICAL: Could not import core utilities: {e}")
     sys.exit(1)
 
+# Local Fallback for APIClient and is_market_open to handle broken trading_utils
+class LocalAPIClient:
+    """Minimal API Client using requests to replace broken trading_utils.APIClient"""
+    def __init__(self, api_key, host="http://127.0.0.1:5000"):
+        self.api_key = api_key
+        self.host = host.rstrip('/')
+        self.session = requests.Session()
 
-class PrintLogger:
-    def info(self, msg): print(msg, flush=True)
-    def warning(self, msg): print(msg, flush=True)
-    def error(self, msg, exc_info=False): print(msg, flush=True)
-    def debug(self, msg): print(msg, flush=True)
+    def _post(self, endpoint, payload):
+        url = f"{self.host}/api/v1/{endpoint}"
+        payload["apikey"] = self.api_key
+        try:
+            response = self.session.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error(f"API Error ({endpoint}): HTTP {response.status_code} {response.text[:100]}")
+                return {"status": "error", "message": f"HTTP {response.status_code}"}
+        except Exception as e:
+            logger.error(f"API Exception ({endpoint}): {e}")
+            return {"status": "error", "message": str(e)}
+
+    def placesmartorder(self, strategy, symbol, action, exchange, price_type, product, quantity, position_size):
+        payload = {
+            "strategy": strategy,
+            "symbol": symbol,
+            "action": action,
+            "exchange": exchange,
+            "pricetype": price_type,
+            "product": product,
+            "quantity": str(quantity),
+            "position_size": str(position_size),
+            "price": "0",
+            "trigger_price": "0",
+            "disclosed_quantity": "0"
+        }
+        return self._post("placesmartorder", payload)
+
+    def history(self, symbol, exchange, interval, start_date, end_date):
+        # Not strictly needed for this strategy but good for completeness
+        payload = {
+            "symbol": symbol,
+            "exchange": exchange,
+            "interval": interval,
+            "start_date": start_date,
+            "end_date": end_date
+        }
+        res = self._post("history", payload)
+        if res.get("status") == "success":
+            import pandas as pd
+            return pd.DataFrame(res.get("data", []))
+        return None
+
+def local_is_market_open():
+    """Checks if market is open (09:15 - 15:30 IST) on weekdays."""
+    now = datetime.now()
+    # Check weekend (5=Sat, 6=Sun)
+    if now.weekday() >= 5:
+        return False
+
+    current_time = now.time()
+    market_start = dt_time(9, 15)
+    market_end = dt_time(15, 30)
+
+    return market_start <= current_time <= market_end
+
+# Attempt import, fall back if needed
+try:
+    from trading_utils import APIClient as ImportedAPIClient
+    from trading_utils import is_market_open as imported_is_market_open
+    APIClient = ImportedAPIClient
+    is_market_open = imported_is_market_open
+except ImportError:
+    logger.warning("trading_utils import failed (likely missing httpx). Using local fallbacks.")
+    APIClient = LocalAPIClient
+    is_market_open = local_is_market_open
 
 
-# ===========================
+# -----------------------------------------------------------------------------
 # CONFIGURATION - SENSEX WEEKLY OPTIONS
-# ===========================
+# -----------------------------------------------------------------------------
 STRATEGY_NAME = os.getenv("STRATEGY_NAME", "sensex_iron_condor")
 UNDERLYING = os.getenv("UNDERLYING", "SENSEX")
 UNDERLYING_EXCHANGE = os.getenv("UNDERLYING_EXCHANGE", "BSE_INDEX")
@@ -99,7 +180,9 @@ if UNDERLYING.upper().startswith(("SENSEX", "BANKEX")) and UNDERLYING_EXCHANGE.u
 if UNDERLYING.upper().startswith(("SENSEX", "BANKEX")) and OPTIONS_EXCHANGE.upper() == "NFO":
     OPTIONS_EXCHANGE = "BFO"
 
-
+# -----------------------------------------------------------------------------
+# API KEY RETRIEVAL
+# -----------------------------------------------------------------------------
 API_KEY = os.getenv("OPENALGO_APIKEY")
 HOST = os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000")
 
@@ -108,12 +191,15 @@ sys.path.insert(0, root_dir)
 
 if not API_KEY:
     try:
+        # Attempt to retrieve from database if env var missing
+        # This path depends on where database/auth_db is relative to root
+        sys.path.append(root_dir)
         from database.auth_db import get_first_available_api_key
         API_KEY = get_first_available_api_key()
         if API_KEY:
-            print("Successfully retrieved API Key from database.", flush=True)
+            logger.info("Successfully retrieved API Key from database.")
     except Exception as e:
-        print(f"Warning: Could not retrieve API key from database: {e}", flush=True)
+        logger.warning(f"Warning: Could not retrieve API key from database: {e}")
 
 if not API_KEY:
     raise ValueError("API Key must be set in OPENALGO_APIKEY environment variable")
@@ -121,7 +207,7 @@ if not API_KEY:
 
 class SensexIronCondorStrategy:
     def __init__(self):
-        self.logger = PrintLogger()
+        self.logger = logger
         self.client = OptionChainClient(api_key=API_KEY, host=HOST)
         self.api_client = APIClient(api_key=API_KEY, host=HOST)
 
@@ -140,6 +226,9 @@ class SensexIronCondorStrategy:
         self.expiry = EXPIRY_DATE if EXPIRY_DATE else None
         self.last_expiry_check = 0
         self.entered_today = False
+
+        # Reset tracking date to handle midnight crossover if script runs long-term
+        self.current_date = datetime.now().date()
 
         self.logger.info(f"Strategy Initialized: {STRATEGY_NAME}")
         self.logger.info(format_kv(
@@ -160,7 +249,6 @@ class SensexIronCondorStrategy:
         now = time.time()
         if not self.expiry or (now - self.last_expiry_check > EXPIRY_REFRESH_SEC):
             try:
-                # Note: normalize_expiry might be needed if format differs, but usually client handles it
                 res = self.client.expiry(UNDERLYING, OPTIONS_EXCHANGE, "options")
                 if res.get("status") == "success":
                     dates = res.get("data", [])
@@ -278,7 +366,7 @@ class SensexIronCondorStrategy:
                     symbol=leg["symbol"],
                     action=leg["action"],
                     exchange=OPTIONS_EXCHANGE,
-                    pricetype="MARKET",
+                    price_type="MARKET",
                     product=leg["product"],
                     quantity=leg["quantity"],
                     position_size=leg["quantity"]
@@ -329,6 +417,7 @@ class SensexIronCondorStrategy:
 
         if valid_setup:
             try:
+                self.logger.info(f"Placing Multi-Leg Order: {format_kv(reason=entry_reason)}")
                 response = self.client.optionsmultiorder(
                     strategy=STRATEGY_NAME,
                     underlying=UNDERLYING,
@@ -347,7 +436,7 @@ class SensexIronCondorStrategy:
                         entry_prices=entry_prices,
                         side="SELL" # Net credit
                     )
-                    self.logger.info(f"Iron Condor positions tracked. Reason: {entry_reason}")
+                    self.logger.info(f"Iron Condor positions tracked.")
                 else:
                     self.logger.error(f"Order Failed: {response.get('message')}")
 
@@ -361,19 +450,16 @@ class SensexIronCondorStrategy:
 
         while True:
             try:
-                # 0. Daily Reset
-                # If market is closed, ensure entered_today is reset?
-                # Better to reset it at start of day logic, but loop runs continuously.
-                # Assuming script restarts or handles it. Simple way:
-                if not is_market_open():
-                    # If market is closed, we can reset entered_today if it's past midnight
-                    # but for simplicity, just sleep.
-                    # Or check if time < 9:00 AM
-                    if datetime.now().hour < 9:
-                        self.entered_today = False
+                # 0. Daily Reset Check
+                today = datetime.now().date()
+                if today != self.current_date:
+                    self.entered_today = False
+                    self.current_date = today
+                    self.logger.info("New day detected. Resetting daily counters.")
 
+                if not is_market_open():
                     self.logger.debug("Market is closed.")
-                    time.sleep(SLEEP_SECONDS)
+                    time.sleep(SLEEP_SECONDS * 2) # Sleep longer when market closed
                     continue
 
                 self.ensure_expiry()
@@ -414,7 +500,6 @@ class SensexIronCondorStrategy:
                         self.logger.info(f"Exit signal: {exit_reason}")
                         self._close_position(chain, exit_reason)
                         if should_term:
-                             # If terminated for day, sleep longer or wait for market close
                              self.logger.info("Terminated for the day. Sleeping.")
                              time.sleep(SLEEP_SECONDS * 2)
                         continue
@@ -435,7 +520,7 @@ class SensexIronCondorStrategy:
                 ))
 
                 # 4. ENTRY LOGIC
-                # Skip if already in position, or entered today (if max orders reached), or time window closed, or terminated
+                # Skip if already in position, or entered today, or time window closed, or terminated
                 if self.tracker.open_legs:
                     time.sleep(SLEEP_SECONDS)
                     continue
@@ -444,21 +529,32 @@ class SensexIronCondorStrategy:
                     time.sleep(SLEEP_SECONDS)
                     continue
 
-                if self.limiter.allow() and self.is_time_window_open() and not self.entered_today:
+                # Check TradeLimiter
+                if not self.limiter.allow():
+                    self.logger.debug("TradeLimiter: Trade limit reached or cooldown active.")
+                    time.sleep(SLEEP_SECONDS)
+                    continue
+
+                if self.is_time_window_open() and not self.entered_today:
 
                     # Entry Conditions:
                     # 1. Straddle Premium > MIN_STRADDLE_PREMIUM
-                    # 2. Debounced signal (e.g., just existence of condition for now)
-
                     condition = straddle_premium >= MIN_STRADDLE_PREMIUM
 
                     if condition:
-                        # Use debouncer to confirm signal stability if needed,
-                        # or just edge detection to avoid spamming if order fails
-                        if self.debouncer.edge("entry_signal", True):
+                        # Use debouncer to prevent rapid firing on same condition if loop cycles fast
+                        # Using edge("entry_signal", condition) will trigger only on False->True
+                        # But here condition might stay True for a long time.
+                        # We want to enter ONCE if condition is met and we are FLAT.
+                        # Since we check self.entered_today and self.tracker.open_legs, we are safe from re-entry.
+                        # But debouncer is good practice to ensure signal stability.
+
+                        if self.debouncer.edge("entry_signal", condition):
                             self.logger.info(f"Entry Signal: Straddle {straddle_premium} >= {MIN_STRADDLE_PREMIUM}")
                             self._open_position(chain, "premium_selling_opportunity")
                     else:
+                        # Reset debouncer if condition fails
+                        self.debouncer.edge("entry_signal", False)
                         self.logger.debug(f"Waiting for premium. Current: {straddle_premium}, Target: {MIN_STRADDLE_PREMIUM}")
 
             except Exception as e:
