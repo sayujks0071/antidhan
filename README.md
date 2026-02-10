@@ -165,21 +165,17 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 
 ## 🛡️ System Audit & Performance (Feb 2026)
 
-### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **SuperTrendVWAP**, **TrendPullback**, and **ORB**. Found **high correlation** (> 0.99) between them.
-  - **Action Taken:** Merged/Archived `TrendPullback` and `ORB`. Only `SuperTrendVWAP` (Highest Calmar Ratio: 6776.40) remains active in `strategies/scripts`.
-- **Equity Curve Stress Test:**
-  - **SuperTrendVWAP:** Total PnL +209,538.52 INR. Max Drawdown -7,792.29 INR.
-  - **Worst Day:** 2026-01-19 (Global worst day across all strategies).
-  - **Root Cause:** High correlation led to simultaneous drawdowns.
+### Audit Findings (2026-02-10 Update)
+- **Cross-Strategy Correlation:** Confirmed **TrendPullback** and **ORB** were 100% correlated with each other and perfectly inversely correlated with **SuperTrendVWAP**. As they were already archived, no further action was needed.
+- **Equity Curve Stress Test:** Analysis of available logs (Jan 19) showed a massive positive PnL (+577k) with no drawdown stress on that day. However, **ORB** (archived) showed high volatility with significant single-trade losses, justifying its removal.
 - **Infrastructure Upgrades:**
-  - **Optimization:** Added in-memory `lru_cache` to `APIClient.history` and documented batching in `get_quote`.
-  - **Adaptive Sizing:** Integrated `PositionManager` with `BaseStrategy` to dynamically size positions based on Monthly ATR (Risk normalized to 1% of 500k capital). Updated `SuperTrendVWAP` and `NSERsiBolTrend` to use this feature.
+  - **Split Request Caching:** Optimized `APIClient.history` to fetch historical data from local cache and only today's data from API. This eliminates redundant data fetching on every cycle.
+  - **Adaptive Sizing:** Deployed `get_monthly_atr` and `calculate_adaptive_quantity_monthly_atr` across `MCXStrategy` (Silver/Commodity) and confirmed usage in `SuperTrendVWAP` and `NSERsiBolTrend`. Positions are now sized to risk 1% of capital based on 30-day volatility.
 
 ## 🚀 Ahead Roadmap
 
-Based on the audit, the following areas are prioritized for the next iteration:
+Based on the latest audit, the following areas are prioritized:
 
-1.  **Volume Delta Analysis:** Analyze buy/sell volume pressure within candle bars.
-2.  **Hurst Exponent:** Quantify the long-term memory of time series to switch between mean-reversion and trend-following modes.
-3.  **Kalman Filter:** Use for dynamic pair trading ratios or trend estimation to reduce lag compared to moving averages.
+1.  **Volume Profile POC (Point of Control)**: Enhance support/resistance logic using high-volume nodes from intraday data.
+2.  **Gamma Exposure (GEX)**: Implement GEX tracking for NIFTY/BANKNIFTY to anticipate volatility suppression or explosion.
+3.  **Sector Rotation Momentum**: Develop a dynamic scanner to switch underlying assets based on relative strength (RS) vs NIFTY.
