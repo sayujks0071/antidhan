@@ -6,6 +6,7 @@ Includes Retry-with-Backoff logic for robust error handling.
 
 import os
 import time
+import email.utils
 from functools import wraps
 from typing import Optional
 
@@ -111,8 +112,29 @@ def request(
             ):
                 if attempt < max_retries:
                     wait_time = backoff_factor * (2**attempt)
+
+                    # Check for Retry-After header
+                    retry_after = response.headers.get("Retry-After")
+                    if retry_after:
+                        try:
+                            # Try parsing as integer seconds
+                            wait_time = float(retry_after)
+                        except ValueError:
+                            # Try parsing as HTTP date
+                            try:
+                                parsed_date = email.utils.parsedate_to_datetime(retry_after)
+                                if parsed_date:
+                                    wait_time = parsed_date.timestamp() - time.time()
+                            except Exception:
+                                pass  # Fallback to exponential backoff
+
+                    # Ensure wait_time is non-negative and cap it reasonably (e.g., 60s)
+                    wait_time = max(0, wait_time)
+                    if wait_time > 60:
+                        wait_time = 60
+
                     logger.warning(
-                        f"Request to {url} failed (HTTP {response.status_code}). Retrying in {wait_time}s..."
+                        f"Request to {url} failed (HTTP {response.status_code}). Retrying in {wait_time:.2f}s..."
                     )
                     time.sleep(wait_time)
                     continue
