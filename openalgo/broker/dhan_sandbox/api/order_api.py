@@ -92,52 +92,56 @@ def get_api_response(endpoint, auth, method="GET", payload=""):
 
 def get_order_book(auth):
     """
-    Fetch the order book.
+    Fetch the complete order book from the broker.
 
     Args:
-        auth (str): Authentication token.
+        auth (str): The authentication token (Access Token).
 
     Returns:
-        dict or list: The order book data or error response.
+        list: A list of order dictionaries if the request is successful.
+        dict: An error dictionary if the request fails.
     """
     return get_api_response("/v2/orders", auth)
 
 
 def get_trade_book(auth):
     """
-    Fetch the trade book.
+    Fetch the complete trade book (executed orders) from the broker.
 
     Args:
-        auth (str): Authentication token.
+        auth (str): The authentication token (Access Token).
 
     Returns:
-        dict or list: The trade book data or error response.
+        list: A list of trade dictionaries if the request is successful.
+        dict: An error dictionary if the request fails.
     """
     return get_api_response("/v2/trades", auth)
 
 
 def get_positions(auth):
     """
-    Fetch current positions.
+    Fetch all current open and closed positions from the broker.
 
     Args:
-        auth (str): Authentication token.
+        auth (str): The authentication token (Access Token).
 
     Returns:
-        dict or list: The positions data or error response.
+        list: A list of position dictionaries if the request is successful.
+        dict: An error dictionary if the request fails.
     """
     return get_api_response("/v2/positions", auth)
 
 
 def get_holdings(auth):
     """
-    Fetch holdings.
+    Fetch all current holdings (Demat) from the broker.
 
     Args:
-        auth (str): Authentication token.
+        auth (str): The authentication token (Access Token).
 
     Returns:
-        dict or list: The holdings data or error response.
+        list: A list of holding dictionaries if the request is successful.
+        dict: An error dictionary if the request fails.
     """
     return get_api_response("/v2/holdings", auth)
 
@@ -532,7 +536,7 @@ def modify_order(data, auth):
     orderid = data["orderid"]
     transformed_order_data = transform_modify_order_data(
         data
-    )  # You need to implement this function
+    )
 
     # Set up the request headers
     headers = {
@@ -575,14 +579,16 @@ def modify_order(data, auth):
 
 def cancel_all_orders_api(data, auth):
     """
-    Cancel all pending orders.
+    Cancel all pending orders currently in the order book.
 
     Args:
-        data (dict): Request data (unused).
-        auth (str): Authentication token.
+        data (dict): Request data (unused, kept for signature compatibility).
+        auth (str): The authentication token (Access Token).
 
     Returns:
-        tuple: (canceled_orders_list, failed_cancellations_list)
+        tuple: A tuple containing two lists:
+               - canceled_orders_list (list): List of Order IDs that were successfully canceled.
+               - failed_cancellations_list (list): List of Order IDs that failed to cancel.
     """
     # Get the order book
     AUTH_TOKEN = auth

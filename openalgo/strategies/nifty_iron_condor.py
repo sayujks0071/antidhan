@@ -21,17 +21,21 @@ utils_dir = os.path.join(strategies_dir, "utils")
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import is_market_open, APIClient
     from optionchain_utils import (
         OptionChainClient,
         OptionPositionTracker,
+        calculate_straddle_premium,
+        check_time_window,
         choose_nearest_expiry,
+        get_atm_strike,
+        get_leg_details,
         is_chain_valid,
         normalize_expiry,
         safe_float,
         safe_int,
     )
     from strategy_common import SignalDebouncer, TradeLedger, TradeLimiter, format_kv
+    from trading_utils import APIClient, is_market_open
 except ImportError:
     print("ERROR: Could not import strategy utilities.", flush=True)
     sys.exit(1)
@@ -141,14 +145,7 @@ class NiftyIronCondorStrategy:
 
     def is_time_window_open(self):
         """Checks if current time is within entry window."""
-        now = datetime.now().time()
-        try:
-            start = datetime.strptime(ENTRY_START_TIME, "%H:%M").time()
-            end = datetime.strptime(ENTRY_END_TIME, "%H:%M").time()
-            return start <= now <= end
-        except ValueError:
-            self.logger.error("Invalid time format in configuration")
-            return False
+        return check_time_window(ENTRY_START_TIME, ENTRY_END_TIME)
 
     def should_terminate(self):
         """Checks if strategy should terminate for the day (after 3:15 PM)."""
@@ -158,43 +155,6 @@ class NiftyIronCondorStrategy:
             return now >= exit_time
         except ValueError:
             return False
-
-    def get_atm_strike(self, chain):
-        """Finds ATM strike from chain data."""
-        # Assuming chain is sorted or we search for label="ATM"
-        for item in chain:
-            if item.get("ce", {}).get("label") == "ATM":
-                return item["strike"]
-        # Fallback using spot price if available in metadata (not passed here usually)
-        return None
-
-    def calculate_straddle_premium(self, chain, atm_strike):
-        """Calculates combined premium of ATM CE and PE."""
-        ce_ltp = 0.0
-        pe_ltp = 0.0
-
-        for item in chain:
-            if item["strike"] == atm_strike:
-                ce_ltp = safe_float(item.get("ce", {}).get("ltp", 0))
-                pe_ltp = safe_float(item.get("pe", {}).get("ltp", 0))
-                break
-
-        return ce_ltp + pe_ltp
-
-    def get_leg_details(self, chain, offset, option_type):
-        """Helper to resolve symbol and LTP from chain based on offset."""
-        # OTM2 CE means finding label="OTM2" in CE dict
-        for item in chain:
-            opt = item.get(option_type.lower(), {})
-            if opt.get("label") == offset:
-                return {
-                    "symbol": opt.get("symbol"),
-                    "ltp": safe_float(opt.get("ltp", 0)),
-                    "quantity": QUANTITY,
-                    "product": PRODUCT
-                    # Action is determined by strategy logic
-                }
-        return None
 
     def _close_position(self, chain, reason):
         """Closes all open positions."""
@@ -286,13 +246,13 @@ class NiftyIronCondorStrategy:
                         time.sleep(SLEEP_SECONDS)
                         continue
 
-                    atm_strike = self.get_atm_strike(chain)
+                    atm_strike = get_atm_strike(chain)
                     if not atm_strike:
                         self.logger.warning("ATM strike not found.")
                         time.sleep(SLEEP_SECONDS)
                         continue
 
-                    premium = self.calculate_straddle_premium(chain, atm_strike)
+                    premium = calculate_straddle_premium(chain, atm_strike)
                     self.logger.info(format_kv(spot="ATM", strike=atm_strike, premium=premium))
 
                     if premium >= MIN_PREMIUM:
@@ -319,7 +279,7 @@ class NiftyIronCondorStrategy:
 
                             # Resolve symbols first
                             for offset, otype, action in definitions:
-                                details = self.get_leg_details(chain, offset, otype)
+                                details = get_leg_details(chain, offset, otype, quantity=QUANTITY, product=PRODUCT)
                                 if details:
                                     details["action"] = action
                                     tracking_legs.append(details)
