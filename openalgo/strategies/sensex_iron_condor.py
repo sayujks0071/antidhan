@@ -10,7 +10,18 @@ Expiry: Weekly Friday
 import os
 import sys
 import time
-from datetime import datetime
+import requests
+from datetime import datetime, time as dt_time
+# Use standard library zoneinfo if available (Python 3.9+)
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    # Fallback to pytz if zoneinfo not available (though Python 3.9+ is expected)
+    try:
+        import pytz
+        ZoneInfo = pytz.timezone
+    except ImportError:
+        ZoneInfo = None
 
 # Line-buffered output (required for real-time log capture)
 if hasattr(sys.stdout, "reconfigure"):
@@ -23,11 +34,11 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 strategies_dir = os.path.dirname(script_dir)
 utils_dir = os.path.join(strategies_dir, "utils")
 sys.path.insert(0, utils_dir)
-# Also add local strategies/utils if present (where we put our files)
+# Also ensure script_dir/utils is in path as per some environments
 sys.path.insert(0, os.path.join(script_dir, "utils"))
 
+# Import essential utilities
 try:
-    from trading_utils import is_market_open, APIClient
     from optionchain_utils import (
         OptionChainClient,
         OptionPositionTracker,
@@ -47,10 +58,21 @@ try:
         RiskManager,
     )
 except ImportError:
-    print("ERROR: Could not import strategy utilities.", flush=True)
-    # Print path for debugging
+    print("ERROR: Could not import essential strategy utilities (optionchain_utils/strategy_common).", flush=True)
     print(f"sys.path: {sys.path}", flush=True)
     sys.exit(1)
+
+# Import trading_utils with fallback
+APIClient = None
+is_market_open_util = None
+
+try:
+    from trading_utils import is_market_open as _is_market_open, APIClient as _APIClient
+    APIClient = _APIClient
+    is_market_open_util = _is_market_open
+except ImportError:
+    # Fallback implementation if trading_utils fails (e.g. missing httpx)
+    pass
 
 
 class PrintLogger:
@@ -61,6 +83,84 @@ class PrintLogger:
 
 
 # ===========================
+# LOCAL UTILITIES (Fallback for broken/missing trading_utils)
+# ===========================
+def is_market_open_fallback(exchange="BSE"):
+    """
+    Check if market is open based on exchange.
+    BSE/NSE: 09:15 - 15:30 IST
+    """
+    try:
+        tz = ZoneInfo("Asia/Kolkata") if ZoneInfo else None
+        now = datetime.now(tz) if tz else datetime.now() # Fallback to system time if no TZ info
+
+        # Check weekend
+        if now.weekday() >= 5:  # 5=Sat, 6=Sun
+            return False
+
+        market_start = dt_time(9, 15)
+        market_end = dt_time(15, 30)
+        current_time = now.time()
+
+        return market_start <= current_time <= market_end
+    except Exception:
+        return True
+
+class APIClientFallback:
+    """
+    Minimal API Client using requests (no httpx).
+    """
+    def __init__(self, api_key, host="http://127.0.0.1:5000"):
+        self.api_key = api_key
+        self.host = host.rstrip("/")
+        self.session = requests.Session()
+
+    def placesmartorder(
+        self,
+        strategy,
+        symbol,
+        action,
+        exchange,
+        pricetype,
+        product,
+        quantity,
+        position_size,
+    ):
+        url = f"{self.host}/api/v1/placesmartorder"
+        payload = {
+            "apikey": self.api_key,
+            "strategy": strategy,
+            "symbol": symbol,
+            "action": action,
+            "exchange": exchange,
+            "pricetype": pricetype,
+            "product": product,
+            "quantity": str(quantity),
+            "position_size": str(position_size),
+            "price": "0",
+            "trigger_price": "0",
+            "disclosed_quantity": "0",
+        }
+        try:
+            response = self.session.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {"status": "error", "message": f"HTTP {response.status_code}: {response.text}"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+# Select final implementation
+if not APIClient:
+    APIClient = APIClientFallback
+
+if not is_market_open_util:
+    is_market_open = is_market_open_fallback
+else:
+    is_market_open = is_market_open_util
+
+
+# ===========================
 # CONFIGURATION - SENSEX WEEKLY OPTIONS
 # ===========================
 STRATEGY_NAME = os.getenv("STRATEGY_NAME", "sensex_iron_condor")
@@ -68,27 +168,27 @@ UNDERLYING = os.getenv("UNDERLYING", "SENSEX")
 UNDERLYING_EXCHANGE = os.getenv("UNDERLYING_EXCHANGE", "BSE_INDEX")
 OPTIONS_EXCHANGE = os.getenv("OPTIONS_EXCHANGE", "BFO")
 PRODUCT = os.getenv("PRODUCT", "MIS")           # MIS=Intraday, NRML=Positional
-QUANTITY = int(os.getenv("QUANTITY", "1"))        # 1 lot = 10 units for SENSEX
-STRIKE_COUNT = int(os.getenv("STRIKE_COUNT", "12"))
+QUANTITY = safe_int(os.getenv("QUANTITY", "1"))        # 1 lot = 10 units for SENSEX
+STRIKE_COUNT = safe_int(os.getenv("STRIKE_COUNT", "12"))
 
 # Strategy-specific parameters
-MIN_STRADDLE_PREMIUM = float(os.getenv("MIN_STRADDLE_PREMIUM", "400.0"))
+MIN_STRADDLE_PREMIUM = safe_float(os.getenv("MIN_STRADDLE_PREMIUM", "400.0"))
 ENTRY_START_TIME = os.getenv("ENTRY_START_TIME", "10:00")
 ENTRY_END_TIME = os.getenv("ENTRY_END_TIME", "14:30")
 EXIT_TIME = os.getenv("EXIT_TIME", "15:15")
 FRIDAY_EXIT_TIME = os.getenv("FRIDAY_EXIT_TIME", "14:00") # Early exit on expiry day
 
 # Risk parameters
-SL_PCT = float(os.getenv("SL_PCT", "35"))        # % of entry premium
-TP_PCT = float(os.getenv("TP_PCT", "45"))         # % of entry premium
-MAX_HOLD_MIN = int(os.getenv("MAX_HOLD_MIN", "45"))
+SL_PCT = safe_float(os.getenv("SL_PCT", "35"))        # % of entry premium
+TP_PCT = safe_float(os.getenv("TP_PCT", "45"))         # % of entry premium
+MAX_HOLD_MIN = safe_int(os.getenv("MAX_HOLD_MIN", "45"))
 
 # Rate limiting
-COOLDOWN_SECONDS = int(os.getenv("COOLDOWN_SECONDS", "300"))
-SLEEP_SECONDS = int(os.getenv("SLEEP_SECONDS", "30"))
-EXPIRY_REFRESH_SEC = int(os.getenv("EXPIRY_REFRESH_SEC", "3600"))
-MAX_ORDERS_PER_DAY = int(os.getenv("MAX_ORDERS_PER_DAY", "1"))
-MAX_ORDERS_PER_HOUR = int(os.getenv("MAX_ORDERS_PER_HOUR", "1"))
+COOLDOWN_SECONDS = safe_int(os.getenv("COOLDOWN_SECONDS", "300"))
+SLEEP_SECONDS = safe_int(os.getenv("SLEEP_SECONDS", "30"))
+EXPIRY_REFRESH_SEC = safe_int(os.getenv("EXPIRY_REFRESH_SEC", "3600"))
+MAX_ORDERS_PER_DAY = safe_int(os.getenv("MAX_ORDERS_PER_DAY", "1"))
+MAX_ORDERS_PER_HOUR = safe_int(os.getenv("MAX_ORDERS_PER_HOUR", "1"))
 
 # Manual expiry override (format: 14FEB26)
 EXPIRY_DATE = os.getenv("EXPIRY_DATE", "").strip()
@@ -123,6 +223,7 @@ class SensexIronCondorStrategy:
     def __init__(self):
         self.logger = PrintLogger()
         self.client = OptionChainClient(api_key=API_KEY, host=HOST)
+        # Use resolved APIClient (util or fallback)
         self.api_client = APIClient(api_key=API_KEY, host=HOST)
 
         self.tracker = OptionPositionTracker(
@@ -196,7 +297,7 @@ class SensexIronCondorStrategy:
             today = datetime.now().date()
             return today == expiry_dt
         except ValueError:
-            self.logger.warning(f"Could not parse expiry date: {self.expiry}")
+            # Attempt normalize if needed, but assuming standard format
             return False
 
     def should_terminate(self):
@@ -361,14 +462,9 @@ class SensexIronCondorStrategy:
 
         while True:
             try:
-                # 0. Daily Reset
-                # If market is closed, ensure entered_today is reset?
-                # Better to reset it at start of day logic, but loop runs continuously.
-                # Assuming script restarts or handles it. Simple way:
+                # 0. Daily Reset Check
                 if not is_market_open():
-                    # If market is closed, we can reset entered_today if it's past midnight
-                    # but for simplicity, just sleep.
-                    # Or check if time < 9:00 AM
+                    # Simple check: if early morning, reset flag
                     if datetime.now().hour < 9:
                         self.entered_today = False
 
@@ -400,7 +496,6 @@ class SensexIronCondorStrategy:
                 underlying_ltp = safe_float(chain_resp.get("underlying_ltp", 0))
 
                 # 1. EXIT MANAGEMENT (always check exits BEFORE entries)
-                # Check forced time exit first
                 should_term, term_reason = self.should_terminate()
 
                 if self.tracker.open_legs:
@@ -414,7 +509,6 @@ class SensexIronCondorStrategy:
                         self.logger.info(f"Exit signal: {exit_reason}")
                         self._close_position(chain, exit_reason)
                         if should_term:
-                             # If terminated for day, sleep longer or wait for market close
                              self.logger.info("Terminated for the day. Sleeping.")
                              time.sleep(SLEEP_SECONDS * 2)
                         continue
@@ -435,7 +529,7 @@ class SensexIronCondorStrategy:
                 ))
 
                 # 4. ENTRY LOGIC
-                # Skip if already in position, or entered today (if max orders reached), or time window closed, or terminated
+                # Skip if already in position, or entered today, or time window closed, or terminated
                 if self.tracker.open_legs:
                     time.sleep(SLEEP_SECONDS)
                     continue
@@ -448,13 +542,10 @@ class SensexIronCondorStrategy:
 
                     # Entry Conditions:
                     # 1. Straddle Premium > MIN_STRADDLE_PREMIUM
-                    # 2. Debounced signal (e.g., just existence of condition for now)
 
                     condition = straddle_premium >= MIN_STRADDLE_PREMIUM
 
                     if condition:
-                        # Use debouncer to confirm signal stability if needed,
-                        # or just edge detection to avoid spamming if order fails
                         if self.debouncer.edge("entry_signal", True):
                             self.logger.info(f"Entry Signal: Straddle {straddle_premium} >= {MIN_STRADDLE_PREMIUM}")
                             self._open_position(chain, "premium_selling_opportunity")
