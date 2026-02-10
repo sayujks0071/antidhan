@@ -6,6 +6,7 @@ from pathlib import Path
 # Add repo root to path to allow imports (if running as script)
 try:
     from base_strategy import BaseStrategy
+    from trading_utils import calculate_bollinger_bands
 except ImportError:
     # Try setting path to find utils
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,6 +15,7 @@ except ImportError:
     if utils_dir not in sys.path:
         sys.path.insert(0, utils_dir)
     from base_strategy import BaseStrategy
+    from trading_utils import calculate_bollinger_bands
 
 class GapFadeStrategy(BaseStrategy):
     def __init__(self, symbol, quantity, gap_threshold=0.5, api_key=None, host=None, log_file=None, client=None, **kwargs):
@@ -62,16 +64,26 @@ class GapFadeStrategy(BaseStrategy):
             return
 
         # Calculate ADX to check trend strength
-        # IMPROVEMENT: Avoid fading if trend is too strong (ADX > 25)
-        # This addresses low win rate in trending markets.
         try:
             adx = self.calculate_adx(df)
             self.logger.info(f"ADX: {adx:.2f}")
-            if adx > 25:
-                self.logger.info(f"ADX {adx:.2f} > 25 indicates strong trend. Skipping Gap Fade trade.")
+            # Relaxed ADX filter: Only avoid extremely strong trends (> 40)
+            if adx > 40:
+                self.logger.info(f"ADX {adx:.2f} > 40 indicates extremely strong trend. Skipping Gap Fade trade.")
                 return
         except Exception as e:
             self.logger.warning(f"Could not calculate ADX: {e}")
+
+        # Calculate Bollinger Bands (20, 2)
+        try:
+            sma, upper, lower = calculate_bollinger_bands(df['close'], window=20, num_std=2)
+            upper_band = upper.iloc[-1]
+            lower_band = lower.iloc[-1]
+            self.logger.info(f"Bollinger Bands: Upper={upper_band:.2f}, Lower={lower_band:.2f}")
+        except Exception as e:
+            self.logger.warning(f"Could not calculate Bollinger Bands: {e}")
+            upper_band = float('inf')
+            lower_band = 0
 
         # Calculate RSI for Mean Reversion Confirmation
         try:
@@ -108,32 +120,42 @@ class GapFadeStrategy(BaseStrategy):
         action = None
         option_type = None
 
+        atr = self.calculate_atr(df)
+        stop_loss_dist = atr * 2
+        take_profit_dist = atr * 4
+        self.logger.info(f"ATR: {atr:.2f}. SL Dist: {stop_loss_dist:.2f}, TP Dist: {take_profit_dist:.2f}")
+
         if gap_pct > self.gap_threshold:
-            # Gap UP -> Fade (Sell/Short or Buy Put)
-            # Filter: RSI must be Overbought (> 60) to justify shorting
-            if rsi > 60:
-                self.logger.info(f"Gap UP detected & RSI {rsi:.2f} > 60. FADE (Short) confirm.")
-                action = "SELL"
+            # Gap UP -> Fade (Buy/Long PE)
+            # Filter: Price > Upper Band (Mean Reversion) AND RSI > 60 (Overbought)
+            if current_price > upper_band and rsi > 60:
+                self.logger.info(f"Gap UP detected. Price > Upper Band ({upper_band:.2f}) & RSI {rsi:.2f} > 60. FADE (Short) confirm.")
+                action = "BUY"
                 option_type = "PE"
+                sl_price = current_price + stop_loss_dist
+                tp_price = current_price - take_profit_dist
             else:
-                self.logger.info(f"Gap UP but RSI {rsi:.2f} < 60. Skipping FADE (Momentum Risk).")
+                self.logger.info(f"Gap UP but conditions not met (Price > Upper Band? {current_price > upper_band}, RSI > 60? {rsi > 60}). Skipping.")
                 return
 
         elif gap_pct < -self.gap_threshold:
-            # Gap DOWN -> Fade (Buy/Long or Buy Call)
-            # Filter: RSI must be Oversold (< 40) to justify buying
-            if rsi < 40:
-                self.logger.info(f"Gap DOWN detected & RSI {rsi:.2f} < 40. FADE (Long) confirm.")
+            # Gap DOWN -> Fade (Buy/Long)
+            # Filter: Price < Lower Band (Mean Reversion) AND RSI < 40 (Oversold)
+            if current_price < lower_band and rsi < 40:
+                self.logger.info(f"Gap DOWN detected. Price < Lower Band ({lower_band:.2f}) & RSI {rsi:.2f} < 40. FADE (Long) confirm.")
                 action = "BUY"
                 option_type = "CE"
+                sl_price = current_price - stop_loss_dist
+                tp_price = current_price + take_profit_dist
             else:
-                self.logger.info(f"Gap DOWN but RSI {rsi:.2f} > 40. Skipping FADE (Momentum Risk).")
+                self.logger.info(f"Gap DOWN but conditions not met (Price < Lower Band? {current_price < lower_band}, RSI < 40? {rsi < 40}). Skipping.")
                 return
 
         # 3. Select Option Strike (ATM)
         atm = round(current_price / 50) * 50
 
         self.logger.info(f"Signal: Buy {option_type} at {atm} (Gap Fade)")
+        self.logger.info(f"Risk Management: SL @ {sl_price:.2f}, TP @ {tp_price:.2f}")
 
         # 4. Check VIX
         vix = self.get_vix()
@@ -142,10 +164,10 @@ class GapFadeStrategy(BaseStrategy):
             qty = int(qty * 0.5)
             self.logger.info(f"High VIX {vix}. Reduced Qty to {qty}")
 
-        # 5. Place Order (Simulation)
-        self.logger.info(f"Executing {option_type} Buy for {qty} qty.")
+        # 5. Place Order (Simulation/Execution)
+        self.logger.info(f"Executing {action} (via {option_type} Buy) for {qty} qty.")
         if self.pm:
-            self.pm.update_position(qty, 100, "BUY")
+            self.pm.update_position(qty, current_price, action)
 
 if __name__ == "__main__":
     GapFadeStrategy.cli()
