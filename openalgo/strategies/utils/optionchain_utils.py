@@ -59,6 +59,49 @@ def choose_nearest_expiry(expiry_dates):
     valid_dates.sort(key=lambda x: x[0])
     return valid_dates[0][1]
 
+
+def choose_monthly_expiry(expiry_dates):
+    """
+    Selects the nearest monthly expiry date (last expiry of the month).
+    """
+    if not expiry_dates:
+        return None
+
+    today = datetime.now().date()
+    future_dates = []
+
+    for d_str in expiry_dates:
+        try:
+            d_date = datetime.strptime(d_str, "%d%b%y").date()
+            if d_date >= today:
+                future_dates.append((d_date, d_str))
+        except ValueError:
+            continue
+
+    if not future_dates:
+        return None
+
+    # Group by (Year, Month) and find the max date in each group
+    monthly_expiries = {}
+    for d_date, d_str in future_dates:
+        key = (d_date.year, d_date.month)
+        if key not in monthly_expiries:
+            monthly_expiries[key] = (d_date, d_str)
+        else:
+            # Update if current date is greater than stored date for this month
+            if d_date > monthly_expiries[key][0]:
+                monthly_expiries[key] = (d_date, d_str)
+
+    # Collect all monthly expiries
+    final_candidates = list(monthly_expiries.values())
+
+    if not final_candidates:
+        return None
+
+    # Sort by date and return the earliest one
+    final_candidates.sort(key=lambda x: x[0])
+    return final_candidates[0][1]
+
 def is_chain_valid(chain_response, min_strikes=10, require_oi=True, require_volume=False):
     """
     Validates option chain response.
