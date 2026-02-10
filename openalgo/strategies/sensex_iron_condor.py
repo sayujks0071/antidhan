@@ -23,6 +23,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 strategies_dir = os.path.dirname(script_dir)
 utils_dir = os.path.join(strategies_dir, "utils")
 sys.path.insert(0, utils_dir)
+# Also add local strategies/utils if present (where we put our files)
+sys.path.insert(0, os.path.join(script_dir, "utils"))
 
 try:
     from trading_utils import is_market_open, APIClient
@@ -46,10 +48,8 @@ try:
     )
 except ImportError:
     print("ERROR: Could not import strategy utilities.", flush=True)
-    # Don't exit here immediately if running in an env without utils, just warn
-    # But for production, sys.exit(1) is safer.
-    # Given the missing utils issue, I'll print warning but let it crash later if needed.
-    # Actually, following the prompt boilerplate exactly:
+    # Print path for debugging
+    print(f"sys.path: {sys.path}", flush=True)
     sys.exit(1)
 
 
