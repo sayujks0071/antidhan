@@ -231,12 +231,31 @@ def place_smart_order_with_auth(
                 order_data, auth_token
             )
 
+            # Determine if we should retry based on status or error message
+            should_retry = False
+            current_status = None
+
+            if res and hasattr(res, "status"):
+                current_status = res.status
+
+            # Check for specific error conditions that might warrant a retry (e.g., transient connection errors)
+            if current_status and current_status >= 500:
+                should_retry = True
+            elif not res and isinstance(response_data, dict):
+                # Handle cases where res is None but response_data might indicate a transient error
+                # e.g., "ConnectionError" or "timeout" in the error response from broker module wrapper
+                error_type = response_data.get("errorType", "")
+                error_msg = response_data.get("errorMessage", "")
+                if "ConnectionError" in error_type or "timeout" in str(error_msg).lower():
+                    should_retry = True
+                    current_status = 503  # Treat as Service Unavailable
+
             # Check for 500-level errors to retry
-            if res and hasattr(res, "status") and res.status >= 500:
+            if should_retry:
                 if attempt < max_retries:
                     wait_time = retry_delay * (2**attempt)
                     logger.warning(
-                        f"API call failed with status {res.status}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                        f"API call failed with status {current_status}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
                     )
                     time.sleep(wait_time)
                     continue
@@ -361,7 +380,17 @@ def place_smart_order_with_auth(
         )
         error_response = {"status": "error", "message": message}
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
-        status_code = res.status if res and hasattr(res, "status") else 500
+
+        # Determine appropriate status code based on error message or response status
+        if res and hasattr(res, "status"):
+            status_code = res.status
+        elif "Invalid Token" in message:
+            status_code = 401
+        elif "SecurityId Required" in message:
+            status_code = 400
+        else:
+            status_code = 500
+
         return False, error_response, status_code
 
 
