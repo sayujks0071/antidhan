@@ -198,5 +198,35 @@
     "is_scheduled": true,
     "schedule_start": "09:00",
     "schedule_stop": "23:30"
+  },
+  "NSE_RSI_MACD_TREND": {
+    "id": "NSE_RSI_MACD_TREND",
+    "name": "NSE RSI MACD Trend",
+    "description": "NSE Equity Trend Strategy using RSI, MACD and Bollinger Bands",
+    "file_path": "strategies/scripts/nse_rsi_macd_trend.py",
+    "user_id": "testuser",
+    "created_at": "2026-02-02T10:00:00",
+    "symbol": "RELIANCE",
+    "schedule_enabled": true,
+    "schedule_days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri"
+    ],
+    "params": {
+      "rsi_period": 14,
+      "macd_fast": 12,
+      "macd_slow": 26,
+      "macd_signal": 9,
+      "bb_period": 20,
+      "bb_std": 2.0,
+      "quantity": 1
+    },
+    "is_running": false,
+    "is_scheduled": true,
+    "schedule_start": "09:15",
+    "schedule_stop": "15:30"
   }
 }
