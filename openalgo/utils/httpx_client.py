@@ -44,6 +44,8 @@ def get_httpx_client() -> httpx.Client:
 def retry_with_backoff(max_retries: int = 3, backoff_factor: float = 0.5):
     """
     Decorator to add retry with backoff logic to a function.
+    Handles general exceptions and transient failures.
+    For HTTP-specific retries (429/500), use the `request` function.
 
     Args:
         max_retries: Number of retries on failure (default 3)
