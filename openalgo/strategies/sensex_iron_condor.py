@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-SENSEX Iron Condor - SENSEX Weekly Options Strategy
-Sells OTM2 CE + PE and buys OTM4 CE + PE wings for defined-risk theta decay on BFO.
+SENSEX Iron Condor - SENSEX Weekly Options (OpenAlgo Web UI Compatible)
+Sells OTM2 CE+PE and buys OTM4 CE+PE wings for defined-risk theta decay on BFO.
 
 Exchange: BFO (BSE F&O)
 Underlying: SENSEX on BSE_INDEX
@@ -23,13 +23,10 @@ if hasattr(sys.stderr, "reconfigure"):
 script_dir = os.path.dirname(os.path.abspath(__file__))
 strategies_dir = os.path.dirname(script_dir)
 utils_dir = os.path.join(strategies_dir, "utils")
-sys.path.insert(0, utils_dir)
+# sys.path.insert(0, utils_dir) # Avoid adding openalgo/utils as it shadows standard logging
 # Also add local strategies/utils if present (where we put our files)
 sys.path.insert(0, os.path.join(script_dir, "utils"))
 
-# -----------------------------------------------------------------------------
-# UTILITY IMPORTS
-# -----------------------------------------------------------------------------
 try:
     from optionchain_utils import (
         OptionChainClient,
@@ -37,6 +34,7 @@ try:
         choose_nearest_expiry,
         is_chain_valid,
         safe_float,
+        safe_int,
     )
     from strategy_common import (
         SignalDebouncer,
@@ -47,31 +45,12 @@ except ImportError:
     print("ERROR: Could not import strategy utilities.", flush=True)
     sys.exit(1)
 
-# Local fallback for is_market_open to avoid dependencies
-def is_market_open_local():
-    """Checks if market is open (9:15 - 15:30 IST)."""
-    try:
-        # IST = UTC + 5:30
-        utc_now = datetime.now(timezone.utc)
-        ist_now = utc_now + timedelta(hours=5, minutes=30)
-
-        if ist_now.weekday() >= 5: # Sat/Sun
-            return False
-
-        now_time = ist_now.time()
-        start = time_obj(9, 15)
-        end = time_obj(15, 30)
-        return start <= now_time <= end
-    except Exception:
-        # If time check fails, assume open to allow script to run (fail open)
-        return True
 
 class PrintLogger:
     def info(self, msg): print(msg, flush=True)
     def warning(self, msg): print(msg, flush=True)
     def error(self, msg, exc_info=False): print(msg, flush=True)
     def debug(self, msg): print(msg, flush=True)
-
 
 # ===========================
 # CONFIGURATION - SENSEX WEEKLY OPTIONS
@@ -138,8 +117,6 @@ class SensexIronCondorStrategy:
     def __init__(self):
         self.logger = PrintLogger()
         self.client = OptionChainClient(api_key=API_KEY, host=HOST)
-        # Note: We rely on OptionChainClient for execution (optionsmultiorder).
-        # We do not use APIClient here to avoid httpx dependency issues.
 
         self.tracker = OptionPositionTracker(
             sl_pct=SL_PCT,
@@ -188,6 +165,24 @@ class SensexIronCondorStrategy:
                     self.logger.warning(f"Expiry fetch failed: {res.get('message')}")
             except Exception as e:
                 self.logger.error(f"Error fetching expiry: {e}")
+
+    def is_market_open_local(self):
+        """Checks if market is open (9:15 - 15:30 IST) using local time fallback."""
+        try:
+            # IST = UTC + 5:30
+            utc_now = datetime.now(timezone.utc)
+            ist_now = utc_now + timedelta(hours=5, minutes=30)
+
+            if ist_now.weekday() >= 5: # Sat=5, Sun=6
+                return False
+
+            now_time = ist_now.time()
+            start = time_obj(9, 15)
+            end = time_obj(15, 30)
+            return start <= now_time <= end
+        except Exception:
+            # If time check fails, assume open to allow script to run (fail open)
+            return True
 
     def is_time_window_open(self):
         """Checks if current time is within entry window."""
@@ -285,44 +280,32 @@ class SensexIronCondorStrategy:
             return
 
         exit_legs = []
-        # Sort legs: BUY first (cover shorts), then SELL (close longs)
-        # to optimize margin and safety.
-        # Original actions were: Sell Wings, Buy Body (Wait, IC is sell body buy wings)
-        # IC: Short OTM2 (Credit), Long OTM4 (Debit).
-        # To Close: Buy OTM2 (Debit), Sell OTM4 (Credit).
-        # We want to BUY first.
 
-        # We construct exit legs based on open legs
+        # We construct exit legs based on open legs tracked by tracker
         for leg in self.tracker.open_legs:
-            # Reverse action
-            original_action = leg.get("action")
+            # Reverse action: BUY -> SELL, SELL -> BUY
+            original_action = leg.get("action", "BUY")
             exit_action = "BUY" if original_action == "SELL" else "SELL"
 
             exit_legs.append({
-                "symbol": leg["symbol"], # Use symbol if supported by optionsmultiorder?
-                # optionsmultiorder usually takes 'offset' and 'option_type'.
-                # But for closing specific symbols, we might need 'symbol' if API supports it.
-                # If API strictly requires offset, we are in trouble if offsets shifted.
-                # However, usually we can pass 'symbol' in place of offset/type if the backend is smart,
-                # OR we just use placesmartorder loop if unsure.
-                # The prompt implies using `optionsmultiorder`.
-                # Assuming `optionsmultiorder` can handle symbol-based legs or we can fallback.
-                # Let's try to reconstruct offset/type from leg data if available.
-                "offset": leg.get("offset", "ATM"), # Best effort if stored
-                "option_type": leg.get("option_type", "CE"),
+                "symbol": leg["symbol"],
+                "option_type": leg.get("option_type", "CE"), # fallback if not stored
                 "action": exit_action,
                 "quantity": leg["quantity"],
-                "product": PRODUCT
+                "product": PRODUCT,
+                "offset": leg.get("offset", "ATM") # fallback
             })
 
-        # Sort: BUY first
+        # Sort legs: BUY legs first (to cover shorts or close longs safely)
+        # Margin benefit comes from closing Shorts (Buy action) first usually?
+        # Actually, if we are Short Options, we Buy to Close. If we are Long Options, we Sell to Close.
+        # Buying reduces margin usage immediately. Selling might increase it momentarily if done wrong?
+        # No, closing a Long position releases margin? No, long options cost cash.
+        # Closing a Short position releases margin.
+        # So prioritizing BUY actions (Covering Shorts) is best practice.
         exit_legs.sort(key=lambda x: 0 if x["action"] == "BUY" else 1)
 
         try:
-            # We use optionsmultiorder. If it fails due to symbol vs offset, we might need a different approach.
-            # But based on the prompt's "Production-Ready" requirement, we assume standard usage.
-            # Re-using optionsmultiorder for closing is cleaner.
-
             response = self.client.optionsmultiorder(
                 strategy=STRATEGY_NAME,
                 underlying=UNDERLYING,
@@ -377,6 +360,9 @@ class SensexIronCondorStrategy:
                 valid_setup = False
                 break
 
+        # BUY legs first for margin benefit on entry
+        api_legs.sort(key=lambda x: 0 if x["action"] == "BUY" else 1)
+
         if valid_setup:
             try:
                 response = self.client.optionsmultiorder(
@@ -411,15 +397,13 @@ class SensexIronCondorStrategy:
 
         while True:
             try:
-                # Check Market Open (using local fallback)
-                if not is_market_open_local():
-                    # Reset daily flag if new day (simplistic check)
-                    # Ideally we check date change.
-                    # But if market is closed, just sleep.
-                    if datetime.now(timezone.utc).hour < 3: # Early morning UTC (~8:30 IST)
+                # Check Market Open
+                if not self.is_market_open_local():
+                    # Reset daily flag if new day (simplistic check: early morning UTC)
+                    if datetime.now(timezone.utc).hour < 3:
                         self.entered_today = False
 
-                    self.logger.debug("Market is closed.")
+                    # self.logger.debug("Market is closed.") # Reduce log spam
                     time.sleep(SLEEP_SECONDS)
                     continue
 
@@ -437,7 +421,7 @@ class SensexIronCondorStrategy:
                     strike_count=STRIKE_COUNT,
                 )
 
-                valid, reason = is_chain_valid(chain_resp, min_strikes=8)
+                valid, reason = is_chain_valid(chain_resp, min_strikes=STRIKE_COUNT)
                 if not valid:
                     self.logger.warning(f"Chain invalid: {reason}")
                     time.sleep(SLEEP_SECONDS)
@@ -457,7 +441,6 @@ class SensexIronCondorStrategy:
                         exit_reason = term_reason
 
                     if exit_now:
-                        self.logger.info(f"Exit signal: {exit_reason}")
                         self._close_position(chain, exit_reason)
                         if should_term:
                              self.logger.info("Terminated for the day. Sleeping.")
@@ -492,16 +475,17 @@ class SensexIronCondorStrategy:
 
                     # Entry Conditions:
                     # 1. Straddle Premium > MIN_STRADDLE_PREMIUM (Volatility Check)
-                    # 2. Debounced signal
+                    # 2. Debouncer edge detection
 
                     condition = straddle_premium >= MIN_STRADDLE_PREMIUM
 
-                    if condition:
-                        if self.debouncer.edge("entry_signal", True):
+                    if self.debouncer.edge("entry_signal", condition):
+                        if condition: # Double check (implied by edge(True))
                             self.logger.info(f"Entry Signal: Straddle {straddle_premium} >= {MIN_STRADDLE_PREMIUM}")
                             self._open_position(chain, "premium_selling_opportunity")
                     else:
-                        self.logger.debug(f"Waiting for premium. Current: {straddle_premium}, Target: {MIN_STRADDLE_PREMIUM}")
+                        if not condition:
+                            self.logger.debug(f"Waiting for premium. Current: {straddle_premium}, Target: {MIN_STRADDLE_PREMIUM}")
 
             except KeyboardInterrupt:
                 self.logger.info("Strategy stopped by user.")
