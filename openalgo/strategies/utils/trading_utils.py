@@ -543,6 +543,8 @@ class APIClient:
         self.api_key = api_key
         self.host = host.rstrip("/")
         self.cache = FileCache()
+        self.quote_cache = {}  # Key: symbol, Value: (timestamp, data)
+        self.quote_ttl = 1.0   # 1 second TTL
 
     @lru_cache(maxsize=128)
     def history(
@@ -621,6 +623,7 @@ class APIClient:
         """
         Fetch real-time quote from Kite API via OpenAlgo.
         Supports single symbol or list of symbols (batch request).
+        Includes short-lived cache (TTL=1s) to optimize loop performance.
 
         Args:
             symbol (str or list): Trading symbol(s) e.g., 'INFY' or ['INFY', 'TCS']
@@ -630,6 +633,15 @@ class APIClient:
         Returns:
             dict: Quote data (single dict if str input, dict of dicts if list input) or None
         """
+        # Check Cache for single symbol request
+        now = time.time()
+        if not isinstance(symbol, list):
+            cache_key = f"{symbol}_{exchange}"
+            if cache_key in self.quote_cache:
+                ts, data = self.quote_cache[cache_key]
+                if now - ts < self.quote_ttl:
+                    return data
+
         url = f"{self.host}/api/v1/quotes"
         payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
 
@@ -667,6 +679,9 @@ class APIClient:
                     quote_data = data["data"]
                     # Ensure ltp is available
                     if "ltp" in quote_data:
+                        # Update Cache
+                        if not isinstance(symbol, list):
+                            self.quote_cache[cache_key] = (now, quote_data)
                         return quote_data
                     else:
                         logger.warning(

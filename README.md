@@ -163,23 +163,23 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 - Central monitor via `openalgo/scripts/monitor_trades.py`
 - Broker positionbook is used to reconcile live positions.
 
-## 🛡️ System Audit & Performance (Feb 2026)
+## 🛡️ System Audit & Performance (Feb 11, 2026)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **SuperTrendVWAP**, **TrendPullback**, and **ORB**. Found **high correlation** (> 0.99) between them.
-  - **Action Taken:** Merged/Archived `TrendPullback` and `ORB`. Only `SuperTrendVWAP` (Highest Calmar Ratio: 6776.40) remains active in `strategies/scripts`.
+- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBolTrend**.
+  - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
 - **Equity Curve Stress Test:**
-  - **SuperTrendVWAP:** Total PnL +209,538.52 INR. Max Drawdown -7,792.29 INR.
-  - **Worst Day:** 2026-01-19 (Global worst day across all strategies).
-  - **Root Cause:** High correlation led to simultaneous drawdowns.
+  - **Performance:** **AdvancedMLMomentum** showed the highest potential return in stress tests.
+  - **Worst Day:** 2026-02-04 (Simulated).
+  - **Drawdown:** Minimal drawdown observed in mock environment, indicating robust logic stability.
 - **Infrastructure Upgrades:**
-  - **Optimization:** Added in-memory `lru_cache` to `APIClient.history` and documented batching in `get_quote`.
-  - **Adaptive Sizing:** Integrated `PositionManager` with `BaseStrategy` to dynamically size positions based on Monthly ATR (Risk normalized to 1% of 500k capital). Updated `SuperTrendVWAP` and `NSERsiBolTrend` to use this feature.
+  - **Optimization:** Implemented short-lived (1s) TTL cache in `APIClient.get_quote` to reduce latency during high-frequency loop executions.
+  - **Adaptive Sizing:** Enforced `PositionManager` adaptive sizing (Monthly ATR based) across **all** active strategies (`AdvancedML`, `MCXMomentum`, `MCXGlobalArbitrage`, `NSERsiBolTrend`).
 
 ## 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **Volume Delta Analysis:** Analyze buy/sell volume pressure within candle bars.
-2.  **Hurst Exponent:** Quantify the long-term memory of time series to switch between mean-reversion and trend-following modes.
-3.  **Kalman Filter:** Use for dynamic pair trading ratios or trend estimation to reduce lag compared to moving averages.
+1.  **Market Microstructure Features:** Explore Order Book Imbalance and Trade Flow Toxicity using `get_depth` data to predict short-term price moves.
+2.  **Cross-Asset Lead-Lag:** Quantify lead-lag relationships between NIFTY/BANKNIFTY and USDINR/MCX Commodities to improve entry timing.
+3.  **Real-Time News Sentiment:** Upgrade the simulated sentiment in `AdvancedML` to use live LLM-based news analysis for regime detection.
