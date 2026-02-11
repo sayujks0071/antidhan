@@ -116,16 +116,7 @@ class MCXMomentumStrategy(BaseStrategy):
         usd_vol_high = self.params.get('usd_inr_volatility', 0) > 1.0
 
         # Adjust Position Size
-        base_qty = self.quantity
-
-        # Adaptive Sizing (Monthly ATR)
-        monthly_atr = self.get_monthly_atr()
-        if monthly_atr > 0 and self.pm:
-            # 1% Risk on 500,000 Capital
-            adaptive_qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, current['close'])
-            if adaptive_qty > 0:
-                base_qty = adaptive_qty
-                self.logger.info(f"Adaptive Base Qty: {base_qty} (Monthly ATR: {monthly_atr:.2f})")
+        base_qty = self.get_adaptive_quantity(current['close'])
 
         if usd_vol_high:
             self.logger.warning("⚠️ High USD/INR Volatility (>1.0%): Reducing position size by 30%.")

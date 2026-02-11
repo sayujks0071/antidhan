@@ -21,14 +21,16 @@ if str(utils_path) not in sys.path:
     sys.path.insert(0, str(utils_path))
 
 try:
-    from trading_utils import APIClient
+    from trading_utils import APIClient, PositionManager, calculate_atr
     from symbol_resolver import SymbolResolver
 except ImportError:
     try:
-        from openalgo.strategies.utils.trading_utils import APIClient
+        from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, calculate_atr
         from openalgo.strategies.utils.symbol_resolver import SymbolResolver
     except ImportError:
         APIClient = None
+        PositionManager = None
+        calculate_atr = None
         SymbolResolver = None
 
 # Configuration
@@ -58,10 +60,38 @@ class MCXGlobalArbitrageStrategy:
         self.api_client = api_client
         self.last_trade_time = 0
         self.cooldown_seconds = 300
+        self.pm = PositionManager(self.symbol) if PositionManager else None
 
         # Session Reference Points (Opening Price of the session/day)
         self.session_ref_mcx = None
         self.session_ref_global = None
+
+    def get_monthly_atr(self):
+        """Fetch daily data and calculate ATR for adaptive sizing."""
+        try:
+            if not self.api_client or not calculate_atr:
+                return 0.0
+
+            start_date = (datetime.now() - timedelta(days=45)).strftime("%Y-%m-%d")
+            end_date = datetime.now().strftime("%Y-%m-%d")
+
+            df = self.api_client.history(
+                symbol=self.symbol,
+                interval="D",
+                exchange="MCX",
+                start_date=start_date,
+                end_date=end_date
+            )
+
+            if df.empty or len(df) < 15:
+                return 0.0
+
+            # calculate_atr returns a Series
+            atr_series = calculate_atr(df, period=14)
+            return atr_series.iloc[-1]
+        except Exception as e:
+            logger.error(f"Error calculating Monthly ATR: {e}")
+            return 0.0
 
     def fetch_data(self):
         """Fetch live MCX and Global prices. Returns True on success."""
@@ -173,7 +203,16 @@ class MCXGlobalArbitrageStrategy:
 
     def entry(self, side, price, reason):
         logger.info(f"SIGNAL: {side} {self.symbol} at {price:.2f} | Reason: {reason}")
-        
+
+        # Calculate Quantity
+        qty = 1
+        if self.pm:
+            monthly_atr = self.get_monthly_atr()
+            if monthly_atr > 0:
+                # 1% Risk on 500k Capital
+                qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, price)
+                logger.info(f"Adaptive Quantity: {qty} (Monthly ATR: {monthly_atr:.2f})")
+
         order_placed = False
         if self.api_client:
             try:
@@ -184,18 +223,18 @@ class MCXGlobalArbitrageStrategy:
                     exchange="MCX",
                     price_type="MARKET",
                     product="MIS",
-                    quantity=1,
-                    position_size=1
+                    quantity=qty,
+                    position_size=qty
                 )
-                logger.info(f"[ENTRY] Order placed: {side} {self.symbol} @ {price:.2f}")
+                logger.info(f"[ENTRY] Order placed: {side} {self.symbol} @ {price:.2f} Qty: {qty}")
                 order_placed = True
             except Exception as e:
                 logger.error(f"[ENTRY] Order placement failed: {e}")
         else:
             logger.warning(f"[ENTRY] No API client available - signal logged but order not placed")
-        
+
         if order_placed or not self.api_client: # Assume success if no client (testing)
-            self.position = 1 if side == "BUY" else -1
+            self.position = qty if side == "BUY" else -qty
             self.last_trade_time = time.time()
 
     def exit(self, side, price, reason):
