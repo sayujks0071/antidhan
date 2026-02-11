@@ -3,23 +3,48 @@ Generating mock logs at logs/mock_openalgo.log...
 Analyzing logs from logs/mock_openalgo.log...
 
 --- Latency Audit ---
-Symbol: NIFTY, Latency: 409.00 ms
-Symbol: BANKNIFTY, Latency: 190.00 ms
-Symbol: RELIANCE, Latency: 256.00 ms
-Average Latency: 285.00 ms
+[10:00:00] Symbol: NIFTY, Latency: 283.00 ms
+[10:10:00] Symbol: BANKNIFTY, Latency: 422.00 ms
+[10:30:00] Symbol: NIFTY, Latency: 201.00 ms
+[10:45:00] Symbol: RELIANCE, Latency: 554.00 ms
+  [WARNING] Latency > 500ms! Bottleneck investigation required.
+[11:00:00] Symbol: NIFTY, Latency: 443.00 ms
+Average Latency: 380.60 ms
 
 --- Slippage Check ---
-Symbol: NIFTY, Slippage: 1.66 pts
-Symbol: BANKNIFTY, Slippage: 1.99 pts
-Symbol: RELIANCE, Slippage: 0.30 pts
-Average Slippage: 1.32 pts
+Symbol: NIFTY, Slippage: 2.86 pts
+Symbol: BANKNIFTY, Slippage: 1.90 pts
+Symbol: NIFTY, Slippage: 1.64 pts
+Symbol: RELIANCE, Slippage: -0.78 pts
+Symbol: NIFTY, Slippage: -0.82 pts
+Average Slippage: 0.96 pts
 
 --- Logic Verification ---
-Strategy: SuperTrendVWAPStrategy (NIFTY)
-Market Data:
-  Close: 24500, VWAP: 24450 (Above: True)
-  Volume: 200000, Threshold: 175000.0 (Spike: True)
-  POC: 24480 (Above: True)
-  Dev: 0.00204 (Within limit 0.03: True)
-  Sector RSI: 55.0 (Bullish: True)
-Signal Validated: YES (Mathematically Accurate - VWAP Strategy)
+Strategy: SuperTrendVWAPStrategy (NIFTY) - Verifying 3 signals
+
+Signal #1 at 10:00:00
+  Close: 24500.00, Inferred VWAP: 24451.10
+  POC: 24480.00 (Above: True)
+  Sector: Bullish (Bullish: True)
+  Dev: 0.0020 (Within 0.03: True)
+  RSI: 55.00 (Bullish > 50: True)
+  EMA Trend: True (Fast 24490.00 > Slow 24460.00)
+  Result: Signal Validated: YES (Mathematically Accurate)
+
+Signal #2 at 10:30:00
+  Close: 24600.00, Inferred VWAP: 24501.99
+  POC: 24580.00 (Above: True)
+  Sector: Bullish (Bullish: True)
+  Dev: 0.0040 (Within 0.03: True)
+  RSI: 57.00 (Bullish > 50: True)
+  EMA Trend: True (Fast 24590.00 > Slow 24560.00)
+  Result: Signal Validated: YES (Mathematically Accurate)
+
+Signal #3 at 11:00:00
+  Close: 24700.00, Inferred VWAP: 24552.68
+  POC: 24680.00 (Above: True)
+  Sector: Bullish (Bullish: True)
+  Dev: 0.0060 (Within 0.03: True)
+  RSI: 59.00 (Bullish > 50: True)
+  EMA Trend: True (Fast 24690.00 > Slow 24660.00)
+  Result: Signal Validated: YES (Mathematically Accurate)
