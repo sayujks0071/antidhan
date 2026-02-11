@@ -201,13 +201,6 @@ def place_smart_order_with_auth(
         )
         return success, response_data, status_code
 
-    # Live Mode - Proceed with actual order placement
-    broker_module = import_broker_module(broker)
-    if broker_module is None:
-        error_response = {"status": "error", "message": "Broker-specific module not found"}
-        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
-        return False, error_response, 404
-
     # Check if auth_token is valid
     if not auth_token:
         error_response = {
@@ -216,6 +209,13 @@ def place_smart_order_with_auth(
         }
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 401
+
+    # Live Mode - Proceed with actual order placement
+    broker_module = import_broker_module(broker)
+    if broker_module is None:
+        error_response = {"status": "error", "message": "Broker-specific module not found"}
+        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+        return False, error_response, 404
 
     # Retry mechanism for 500-level errors
     max_retries = 3
@@ -232,11 +232,17 @@ def place_smart_order_with_auth(
             )
 
             # Check for 500-level errors to retry
-            if res and hasattr(res, "status") and res.status >= 500:
+            status = (
+                res.status
+                if res and hasattr(res, "status")
+                else (res.status_code if res and hasattr(res, "status_code") else None)
+            )
+
+            if status and status >= 500:
                 if attempt < max_retries:
                     wait_time = retry_delay * (2**attempt)
                     logger.warning(
-                        f"API call failed with status {res.status}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                        f"API call failed with status {status}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
                     )
                     time.sleep(wait_time)
                     continue
