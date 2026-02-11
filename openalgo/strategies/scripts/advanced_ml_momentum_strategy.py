@@ -120,8 +120,10 @@ class MLMomentumStrategy(BaseStrategy):
 
             avg_vol = df['volume'].rolling(20).mean().iloc[-1]
             if last['volume'] > avg_vol * self.vol_multiplier:
-                self.logger.info(f"Strong Momentum Signal (ROC: {last['roc']:.3f}, RS: {rs_excess:.3f}). BUY.")
-                self.execute_trade('BUY', self.quantity, current_price)
+                # Use Adaptive Sizing
+                qty = self.get_adaptive_quantity(current_price)
+                self.logger.info(f"Strong Momentum Signal (ROC: {last['roc']:.3f}, RS: {rs_excess:.3f}). BUY {qty}.")
+                self.execute_trade('BUY', qty, current_price)
 
     def get_news_sentiment(self):
         # Simulated
