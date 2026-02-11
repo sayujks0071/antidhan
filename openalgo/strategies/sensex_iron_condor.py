@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-SENSEX Iron Condor - SENSEX Weekly Options Strategy
-Sells OTM2 CE + PE and buys OTM4 CE + PE wings for defined-risk theta decay on BFO.
+SENSEX Weekly Iron Condor (OpenAlgo Web UI Compatible)
+Sells OTM2 CE+PE and buys OTM4 CE+PE wings for defined-risk theta decay on BFO.
 
 Exchange: BFO (BSE F&O)
 Underlying: SENSEX on BSE_INDEX
 Expiry: Weekly Friday
-Edge: Theta decay + defined risk via wings, exploiting lower STT and 100-pt strikes on BSE.
 """
 import os
 import sys
 import time
-from datetime import datetime, timedelta, timezone, time as time_obj
+import requests
+from datetime import datetime, timedelta, timezone
 
 # Line-buffered output (required for real-time log capture)
 if hasattr(sys.stdout, "reconfigure"):
@@ -24,12 +24,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 strategies_dir = os.path.dirname(script_dir)
 utils_dir = os.path.join(strategies_dir, "utils")
 sys.path.insert(0, utils_dir)
-# Also add local strategies/utils if present (where we put our files)
-sys.path.insert(0, os.path.join(script_dir, "utils"))
 
-# -----------------------------------------------------------------------------
-# UTILITY IMPORTS
-# -----------------------------------------------------------------------------
 try:
     from optionchain_utils import (
         OptionChainClient,
@@ -47,24 +42,6 @@ except ImportError:
     print("ERROR: Could not import strategy utilities.", flush=True)
     sys.exit(1)
 
-# Local fallback for is_market_open to avoid dependencies
-def is_market_open_local():
-    """Checks if market is open (9:15 - 15:30 IST)."""
-    try:
-        # IST = UTC + 5:30
-        utc_now = datetime.now(timezone.utc)
-        ist_now = utc_now + timedelta(hours=5, minutes=30)
-
-        if ist_now.weekday() >= 5: # Sat/Sun
-            return False
-
-        now_time = ist_now.time()
-        start = time_obj(9, 15)
-        end = time_obj(15, 30)
-        return start <= now_time <= end
-    except Exception:
-        # If time check fails, assume open to allow script to run (fail open)
-        return True
 
 class PrintLogger:
     def info(self, msg): print(msg, flush=True)
@@ -89,7 +66,7 @@ MIN_STRADDLE_PREMIUM = float(os.getenv("MIN_STRADDLE_PREMIUM", "400.0"))
 ENTRY_START_TIME = os.getenv("ENTRY_START_TIME", "10:00")
 ENTRY_END_TIME = os.getenv("ENTRY_END_TIME", "14:30")
 EXIT_TIME = os.getenv("EXIT_TIME", "15:15")
-FRIDAY_EXIT_TIME = os.getenv("FRIDAY_EXIT_TIME", "14:00") # Early exit on expiry day
+FRIDAY_EXIT_TIME = os.getenv("FRIDAY_EXIT_TIME", "14:00") # Early exit on expiry day due to gamma risk
 
 # Risk parameters
 SL_PCT = float(os.getenv("SL_PCT", "35"))        # % of entry premium
@@ -134,12 +111,58 @@ if not API_KEY:
     raise ValueError("API Key must be set in OPENALGO_APIKEY environment variable")
 
 
+# Local fallback for is_market_open to avoid dependencies
+def is_market_open_local():
+    """Checks if market is open (9:15 - 15:30 IST)."""
+    try:
+        # IST = UTC + 5:30
+        utc_now = datetime.now(timezone.utc)
+        ist_now = utc_now + timedelta(hours=5, minutes=30)
+
+        if ist_now.weekday() >= 5: # Sat/Sun
+            return False
+
+        now_time = ist_now.time()
+        start = datetime.strptime("09:15", "%H:%M").time()
+        end = datetime.strptime("15:30", "%H:%M").time()
+        return start <= now_time <= end
+    except Exception:
+        return True # Fail open if unsure
+
+# Simple Client for Single Orders (avoiding httpx dependency)
+class SimpleOrderClient:
+    def __init__(self, api_key, host):
+        self.api_key = api_key
+        self.host = host.rstrip('/')
+        self.session = requests.Session()
+
+    def placesmartorder(self, symbol, action, exchange, product, quantity, pricetype="MARKET"):
+        url = f"{self.host}/api/v1/placesmartorder"
+        payload = {
+            "apikey": self.api_key,
+            "strategy": STRATEGY_NAME,
+            "symbol": symbol,
+            "action": action,
+            "exchange": exchange,
+            "pricetype": pricetype,
+            "product": product,
+            "quantity": quantity,
+            "position_size": quantity # simple 1:1 mapping
+        }
+        try:
+            response = self.session.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Order Error: {e}", flush=True)
+            return {"status": "error", "message": str(e)}
+
+
 class SensexIronCondorStrategy:
     def __init__(self):
         self.logger = PrintLogger()
         self.client = OptionChainClient(api_key=API_KEY, host=HOST)
-        # Note: We rely on OptionChainClient for execution (optionsmultiorder).
-        # We do not use APIClient here to avoid httpx dependency issues.
+        self.order_client = SimpleOrderClient(api_key=API_KEY, host=HOST)
 
         self.tracker = OptionPositionTracker(
             sl_pct=SL_PCT,
@@ -191,7 +214,6 @@ class SensexIronCondorStrategy:
 
     def is_time_window_open(self):
         """Checks if current time is within entry window."""
-        # Use IST time for check
         utc_now = datetime.now(timezone.utc)
         ist_now = utc_now + timedelta(hours=5, minutes=30)
         now_time = ist_now.time()
@@ -211,13 +233,10 @@ class SensexIronCondorStrategy:
         try:
             # Format: DDMMMYY e.g. 14FEB26
             expiry_dt = datetime.strptime(self.expiry, "%d%b%y").date()
-
             utc_now = datetime.now(timezone.utc)
             today = (utc_now + timedelta(hours=5, minutes=30)).date()
-
             return today == expiry_dt
         except ValueError:
-            self.logger.warning(f"Could not parse expiry date: {self.expiry}")
             return False
 
     def should_terminate(self):
@@ -273,76 +292,59 @@ class SensexIronCondorStrategy:
                     "quantity": QUANTITY,
                     "product": PRODUCT,
                     "option_type": option_type,
-                    "offset": offset # Store offset for closing/reference if needed
+                    "offset": offset
                 }
         return None
 
     def _close_position(self, chain, reason):
-        """Closes all open positions using multi-order."""
+        """Closes all open positions sequentially (BUY legs first)."""
         self.logger.info(f"Closing position. Reason: {reason}")
 
         if not self.tracker.open_legs:
             return
 
+        # Prepare exit legs
         exit_legs = []
-        # Sort legs: BUY first (cover shorts), then SELL (close longs)
-        # to optimize margin and safety.
-        # Original actions were: Sell Wings, Buy Body (Wait, IC is sell body buy wings)
-        # IC: Short OTM2 (Credit), Long OTM4 (Debit).
-        # To Close: Buy OTM2 (Debit), Sell OTM4 (Credit).
-        # We want to BUY first.
-
-        # We construct exit legs based on open legs
         for leg in self.tracker.open_legs:
-            # Reverse action
             original_action = leg.get("action")
+            # Reverse action for exit
             exit_action = "BUY" if original_action == "SELL" else "SELL"
 
             exit_legs.append({
-                "symbol": leg["symbol"], # Use symbol if supported by optionsmultiorder?
-                # optionsmultiorder usually takes 'offset' and 'option_type'.
-                # But for closing specific symbols, we might need 'symbol' if API supports it.
-                # If API strictly requires offset, we are in trouble if offsets shifted.
-                # However, usually we can pass 'symbol' in place of offset/type if the backend is smart,
-                # OR we just use placesmartorder loop if unsure.
-                # The prompt implies using `optionsmultiorder`.
-                # Assuming `optionsmultiorder` can handle symbol-based legs or we can fallback.
-                # Let's try to reconstruct offset/type from leg data if available.
-                "offset": leg.get("offset", "ATM"), # Best effort if stored
-                "option_type": leg.get("option_type", "CE"),
+                "symbol": leg["symbol"],
                 "action": exit_action,
                 "quantity": leg["quantity"],
                 "product": PRODUCT
             })
 
-        # Sort: BUY first
+        # Sort: BUY first to cover shorts and free up margin
         exit_legs.sort(key=lambda x: 0 if x["action"] == "BUY" else 1)
 
-        try:
-            # We use optionsmultiorder. If it fails due to symbol vs offset, we might need a different approach.
-            # But based on the prompt's "Production-Ready" requirement, we assume standard usage.
-            # Re-using optionsmultiorder for closing is cleaner.
-
-            response = self.client.optionsmultiorder(
-                strategy=STRATEGY_NAME,
-                underlying=UNDERLYING,
-                exchange=UNDERLYING_EXCHANGE,
-                expiry_date=self.expiry,
-                legs=exit_legs
-            )
-            self.logger.info(f"Exit Order Response: {response}")
-        except Exception as e:
-            self.logger.error(f"Exit failed: {e}")
+        # Execute sequentially using placesmartorder
+        for leg in exit_legs:
+            self.logger.info(f"Executing Exit: {leg['action']} {leg['symbol']}")
+            try:
+                resp = self.order_client.placesmartorder(
+                    symbol=leg["symbol"],
+                    action=leg["action"],
+                    exchange=OPTIONS_EXCHANGE,
+                    product=leg["product"],
+                    quantity=leg["quantity"]
+                )
+                self.logger.info(f"Order Resp: {resp}")
+                # Small delay between orders to ensure processing
+                time.sleep(0.5)
+            except Exception as e:
+                self.logger.error(f"Failed to close leg {leg['symbol']}: {e}")
 
         self.tracker.clear()
         self.logger.info("Tracker cleared.")
 
     def _open_position(self, chain, entry_reason):
-        """Places Iron Condor orders."""
+        """Places Iron Condor orders atomically."""
         # Iron Condor Definition:
         # Sell OTM2 Call, Sell OTM2 Put (Short Strangle)
         # Buy OTM4 Call, Buy OTM4 Put (Long Wings)
-        # Net Credit.
 
         definitions = [
             ("OTM4", "CE", "BUY"),
@@ -379,6 +381,7 @@ class SensexIronCondorStrategy:
 
         if valid_setup:
             try:
+                # Use optionsmultiorder for atomic entry
                 response = self.client.optionsmultiorder(
                     strategy=STRATEGY_NAME,
                     underlying=UNDERLYING,
@@ -411,12 +414,10 @@ class SensexIronCondorStrategy:
 
         while True:
             try:
-                # Check Market Open (using local fallback)
+                # Check Market Open
                 if not is_market_open_local():
-                    # Reset daily flag if new day (simplistic check)
-                    # Ideally we check date change.
-                    # But if market is closed, just sleep.
-                    if datetime.now(timezone.utc).hour < 3: # Early morning UTC (~8:30 IST)
+                    # Reset daily flag if new day (simplistic check using UTC hour < 3 i.e. < 8:30 IST)
+                    if datetime.now(timezone.utc).hour < 3:
                         self.entered_today = False
 
                     self.logger.debug("Market is closed.")
@@ -489,11 +490,6 @@ class SensexIronCondorStrategy:
                     continue
 
                 if self.limiter.allow() and self.is_time_window_open() and not self.entered_today:
-
-                    # Entry Conditions:
-                    # 1. Straddle Premium > MIN_STRADDLE_PREMIUM (Volatility Check)
-                    # 2. Debounced signal
-
                     condition = straddle_premium >= MIN_STRADDLE_PREMIUM
 
                     if condition:
