@@ -16,9 +16,11 @@ if hasattr(sys.stderr, "reconfigure"):
 
 # Path setup for utility imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, "utils")
+openalgo_dir = os.path.dirname(script_dir) # openalgo/
+utils_dir = os.path.join(script_dir, "utils") # openalgo/strategies/utils/
+
 sys.path.insert(0, utils_dir)
+sys.path.insert(0, openalgo_dir)
 
 try:
     from trading_utils import is_market_open, APIClient
@@ -30,10 +32,12 @@ try:
         normalize_expiry,
         safe_float,
         safe_int,
+        get_atm_strike,
+        calculate_straddle_premium,
     )
     from strategy_common import SignalDebouncer, TradeLedger, TradeLimiter, format_kv
-except ImportError:
-    print("ERROR: Could not import strategy utilities.", flush=True)
+except ImportError as e:
+    print(f"ERROR: Could not import strategy utilities: {e}", flush=True)
     sys.exit(1)
 
 
@@ -73,7 +77,8 @@ MIN_PREMIUM = safe_float(os.getenv("MIN_PREMIUM", "120.0")) # Minimum straddle p
 API_KEY = os.getenv("OPENALGO_APIKEY")
 HOST = os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000")
 
-root_dir = os.path.dirname(strategies_dir)
+# root_dir points to repo root (grandparent of script_dir)
+root_dir = os.path.dirname(os.path.dirname(script_dir))
 sys.path.insert(0, root_dir)
 
 if not API_KEY:
@@ -224,26 +229,6 @@ class NiftyIronCondorStrategy:
         except ValueError:
             return False
 
-    def get_atm_strike(self, chain):
-        """Finds ATM strike from chain data."""
-        for item in chain:
-            if item.get("ce", {}).get("label") == "ATM":
-                return item["strike"]
-        return None
-
-    def calculate_straddle_premium(self, chain, atm_strike):
-        """Calculates combined premium of ATM CE and PE."""
-        ce_ltp = 0.0
-        pe_ltp = 0.0
-
-        for item in chain:
-            if item["strike"] == atm_strike:
-                ce_ltp = safe_float(item.get("ce", {}).get("ltp", 0))
-                pe_ltp = safe_float(item.get("pe", {}).get("ltp", 0))
-                break
-
-        return ce_ltp + pe_ltp
-
     def get_leg_details(self, chain, offset, option_type):
         """Helper to resolve symbol and LTP from chain based on offset."""
         for item in chain:
@@ -354,16 +339,14 @@ class NiftyIronCondorStrategy:
                         time.sleep(SLEEP_SECONDS)
                         continue
 
-                    atm_strike = self.get_atm_strike(chain)
+                    atm_strike = get_atm_strike(chain)
                     if not atm_strike:
                         self.logger.warning("ATM strike not found.")
                         time.sleep(SLEEP_SECONDS)
                         continue
 
-                    premium = self.calculate_straddle_premium(chain, atm_strike)
-                    # Use debug for frequent checks, info for significant events
-                    if int(time.time()) % 60 == 0:
-                        self.logger.debug(format_kv(spot="ATM", strike=atm_strike, premium=premium))
+                    premium = calculate_straddle_premium(chain, atm_strike)
+                    self.logger.info(format_kv(spot="ATM", strike=atm_strike, premium=premium))
 
                     if premium > MIN_PREMIUM:
                         if self.debouncer.edge("ENTRY_SIGNAL", True):
