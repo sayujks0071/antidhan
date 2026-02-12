@@ -87,65 +87,67 @@ def run_diagnostic():
         with patch('openalgo.services.place_smart_order_service.get_auth_token_broker', return_value=("mock_auth_token", "dhan_sandbox")):
             # Mock get_analyze_mode to False (Live/Paper Trading)
             with patch('openalgo.services.place_smart_order_service.get_analyze_mode', return_value=False):
-                # Mock httpx request (patching local import in order_api)
-                with patch('broker.dhan_sandbox.api.order_api.request', side_effect=mock_request):
+                # Mock executor to prevent DB writes
+                with patch('openalgo.services.place_smart_order_service.executor.submit'):
+                    # Mock httpx request (patching local import in order_api)
+                    with patch('broker.dhan_sandbox.api.order_api.request', side_effect=mock_request):
 
-                    failed_count = 0
-                    success_handled_count = 0
+                        failed_count = 0
+                        success_handled_count = 0
 
-                    for order_conf in order_types:
-                        logger.info(f"\n--- Testing Order Type: {order_conf['name']} ---")
+                        for order_conf in order_types:
+                            logger.info(f"\n--- Testing Order Type: {order_conf['name']} ---")
 
-                        order_data = {
-                            "symbol": symbol,
-                            "exchange": exchange,
-                            "action": "BUY",
-                            "quantity": "1",
-                            "pricetype": order_conf['type'],
-                            "product": product,
-                            "price": order_conf['price'],
-                            "trigger_price": order_conf.get('trigger_price', '0'),
-                            "disclosed_quantity": "0",
-                            "apikey": api_key,
-                            "strategy": "Diagnostic",
-                            "position_size": "1"
-                        }
+                            order_data = {
+                                "symbol": symbol,
+                                "exchange": exchange,
+                                "action": "BUY",
+                                "quantity": "1",
+                                "pricetype": order_conf['type'],
+                                "product": product,
+                                "price": order_conf['price'],
+                                "trigger_price": order_conf.get('trigger_price', '0'),
+                                "disclosed_quantity": "0",
+                                "apikey": api_key,
+                                "strategy": "Diagnostic",
+                                "position_size": "1"
+                            }
 
-                        # Call the service
-                        # Note: place_smart_order returns (success, response, status_code)
-                        success, response, status_code = place_smart_order(
-                            order_data=order_data,
-                            api_key=api_key
-                        )
+                            # Call the service
+                            # Note: place_smart_order returns (success, response, status_code)
+                            success, response, status_code = place_smart_order(
+                                order_data=order_data,
+                                api_key=api_key
+                            )
 
-                        logger.info(f"Service Result: Success={success}, Status={status_code}")
-                        logger.info(f"Response: {response}")
+                            logger.info(f"Service Result: Success={success}, Status={status_code}")
+                            logger.info(f"Response: {response}")
 
-                        # Verification Logic
-                        # We EXPECT the service to return success=False because the order was REJECTED by broker
-                        # even though HTTP status was 200.
-                        # However, place_smart_order_service implementation says:
-                        # if res and res.status == 200:
-                        #    if order_id is None: return False, ...
-                        #    else: return True, ...
+                            # Verification Logic
+                            # We EXPECT the service to return success=False because the order was REJECTED by broker
+                            # even though HTTP status was 200.
+                            # However, place_smart_order_service implementation says:
+                            # if res and res.status == 200:
+                            #    if order_id is None: return False, ...
+                            #    else: return True, ...
 
-                        # In our mock, we return "orderId": "1000001".
-                        # But we also set "orderStatus": "REJECTED".
+                            # In our mock, we return "orderId": "1000001".
+                            # But we also set "orderStatus": "REJECTED".
 
-                        # Let's see how `broker.dhan_sandbox.api.order_api.place_order_api` handles it.
-                        # It checks: if order_status in ["REJECTED", "FAILED"]: orderid = None
+                            # Let's see how `broker.dhan_sandbox.api.order_api.place_order_api` handles it.
+                            # It checks: if order_status in ["REJECTED", "FAILED"]: orderid = None
 
-                        # So place_order_api should return orderid=None.
-                        # Then place_smart_order_service should see order_id is None and return False.
+                            # So place_order_api should return orderid=None.
+                            # Then place_smart_order_service should see order_id is None and return False.
 
-                        if not success:
-                            logger.info("PASS: Service correctly identified failure.")
-                            success_handled_count += 1
-                        else:
-                            logger.error("FAIL: Service reported success for a REJECTED order!")
-                            failed_count += 1
+                            if not success:
+                                logger.info("PASS: Service correctly identified failure.")
+                                success_handled_count += 1
+                            else:
+                                logger.error("FAIL: Service reported success for a REJECTED order!")
+                                failed_count += 1
 
-                    logger.info("\n--- Diagnostic Summary ---")
+                        logger.info("\n--- Diagnostic Summary ---")
                     logger.info(f"Total Tests: {len(order_types)}")
                     logger.info(f"Correctly Handled (Rejected): {success_handled_count}")
                     logger.info(f"Incorrectly Handled (Success): {failed_count}")
