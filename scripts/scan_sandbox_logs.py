@@ -171,7 +171,7 @@ def calculate_metrics(trades):
             dd = current_cum - peak
             drawdowns.append(dd)
 
-        max_drawdown = min(drawdowns) if drawdowns else 0.0
+        max_drawdown = abs(min(drawdowns)) if drawdowns else 0.0
 
         metrics[strategy] = {
             'Profit Factor': profit_factor,
@@ -213,7 +213,11 @@ def main():
         if m['Win Rate'] < 40:
             markdown_content += f"\n### {strategy}\n"
             markdown_content += f"- **Win Rate**: {m['Win Rate']:.1f}% (< 40%)\n"
-            markdown_content += "- **Suggestion**: Analyze entry conditions. Check log for rejections or stop loss tightness.\n"
+            if strategy == "GapFadeStrategy":
+                markdown_content += "- **Analysis**: Fading gaps without trend confirmation often leads to losses in strong momentum markets ('Gap and Go').\n"
+                markdown_content += "- **Improvement**: Add a 'Reversal Candle' check (e.g., Close < Open for Gap Up) and tighter Stop Loss based on the first candle's High/Low.\n"
+            else:
+                markdown_content += "- **Suggestion**: Analyze entry conditions. Check log for rejections or stop loss tightness.\n"
 
     with open("SANDBOX_LEADERBOARD.md", "w") as f:
         f.write(markdown_content)
