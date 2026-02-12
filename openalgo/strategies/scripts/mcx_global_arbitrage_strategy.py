@@ -21,16 +21,17 @@ if str(utils_path) not in sys.path:
     sys.path.insert(0, str(utils_path))
 
 try:
-    from trading_utils import APIClient, PositionManager, calculate_atr
+    from trading_utils import APIClient, PositionManager, calculate_atr, get_monthly_atr
     from symbol_resolver import SymbolResolver
 except ImportError:
     try:
-        from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, calculate_atr
+        from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, calculate_atr, get_monthly_atr
         from openalgo.strategies.utils.symbol_resolver import SymbolResolver
     except ImportError:
         APIClient = None
         PositionManager = None
         calculate_atr = None
+        get_monthly_atr = lambda client, symbol, exchange: 0.0
         SymbolResolver = None
 
 # Configuration
@@ -66,32 +67,6 @@ class MCXGlobalArbitrageStrategy:
         self.session_ref_mcx = None
         self.session_ref_global = None
 
-    def get_monthly_atr(self):
-        """Fetch daily data and calculate ATR for adaptive sizing."""
-        try:
-            if not self.api_client or not calculate_atr:
-                return 0.0
-
-            start_date = (datetime.now() - timedelta(days=45)).strftime("%Y-%m-%d")
-            end_date = datetime.now().strftime("%Y-%m-%d")
-
-            df = self.api_client.history(
-                symbol=self.symbol,
-                interval="D",
-                exchange="MCX",
-                start_date=start_date,
-                end_date=end_date
-            )
-
-            if df.empty or len(df) < 15:
-                return 0.0
-
-            # calculate_atr returns a Series
-            atr_series = calculate_atr(df, period=14)
-            return atr_series.iloc[-1]
-        except Exception as e:
-            logger.error(f"Error calculating Monthly ATR: {e}")
-            return 0.0
 
     def fetch_data(self):
         """Fetch live MCX and Global prices. Returns True on success."""
@@ -207,7 +182,7 @@ class MCXGlobalArbitrageStrategy:
         # Calculate Quantity
         qty = 1
         if self.pm:
-            monthly_atr = self.get_monthly_atr()
+            monthly_atr = get_monthly_atr(self.api_client, self.symbol, "MCX")
             if monthly_atr > 0:
                 # 1% Risk on 500k Capital
                 qty = self.pm.calculate_risk_adjusted_quantity(500000, 1.0, monthly_atr, price)

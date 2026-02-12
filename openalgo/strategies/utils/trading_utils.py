@@ -3,7 +3,7 @@ import logging
 import os
 import time
 import time as time_module
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import time as dt_time
 from functools import lru_cache
 from pathlib import Path
@@ -950,4 +950,36 @@ def calculate_relative_strength(df, index_df, window=10):
         return stock_roc - index_roc
     except Exception as e:
         logger.error(f"Relative Strength calculation failed: {e}")
+        return 0.0
+
+
+def get_monthly_atr(client, symbol, exchange="NSE"):
+    """
+    Fetch daily data and calculate ATR for adaptive sizing.
+    Uses 45 days of history.
+    """
+    try:
+        # Avoid circular import if APIClient is needed for type hinting, but client is passed
+        if not client:
+            return 0.0
+
+        start_date = (datetime.now() - timedelta(days=45)).strftime("%Y-%m-%d")
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
+        df = client.history(
+            symbol=symbol,
+            interval="1d",
+            exchange=exchange,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        if df.empty or len(df) < 15:
+            return 0.0
+
+        # calculate_atr returns a Series
+        atr_series = calculate_atr(df, period=14)
+        return atr_series.iloc[-1]
+    except Exception as e:
+        logger.error(f"Error calculating Monthly ATR for {symbol}: {e}")
         return 0.0
