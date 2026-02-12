@@ -31,7 +31,7 @@ sys.path.insert(0, utils_dir)
 sys.path.insert(0, openalgo_dir)
 
 try:
-    from trading_utils import is_market_open, APIClient
+    from datetime import timezone, timedelta
     from optionchain_utils import (
         OptionChainClient,
         OptionPositionTracker,
@@ -46,6 +46,27 @@ try:
 except ImportError:
     print("ERROR: Could not import strategy utilities.", flush=True)
     sys.exit(1)
+
+def is_market_open():
+    """
+    Checks if NSE market is open (09:15 - 15:30 IST).
+    Uses UTC time + 5.5 hours to avoid pytz dependency.
+    """
+    # Current UTC time
+    now_utc = datetime.now(timezone.utc)
+    # Convert to IST (UTC + 5:30)
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_ist = now_utc + ist_offset
+
+    # Check weekend (0=Mon, 6=Sun)
+    if now_ist.weekday() >= 5:
+        return False
+
+    current_time = now_ist.time()
+    market_start = datetime.strptime("09:15", "%H:%M").time()
+    market_end = datetime.strptime("15:30", "%H:%M").time()
+
+    return market_start <= current_time <= market_end
 
 
 class PrintLogger:
@@ -66,6 +87,9 @@ QUANTITY = safe_int(os.getenv("QUANTITY", "15"))
 STRIKE_COUNT = safe_int(os.getenv("STRIKE_COUNT", "20")) # Enough to reach OTM7 (700 pts with 100 step)
 
 # Strategy specific parameters
+STRIKE_GAP = safe_int(os.getenv("STRIKE_GAP", "500"))
+WING_WIDTH = safe_int(os.getenv("WING_WIDTH", "200"))
+
 # SL/TP based on Net Credit Premium
 SL_PCT = safe_float(os.getenv("SL_PCT", "30.0"))
 TP_PCT = safe_float(os.getenv("TP_PCT", "50.0"))
@@ -109,8 +133,7 @@ class BankNiftyMonthlyICStrategy:
     def __init__(self):
         self.logger = PrintLogger()
         self.client = OptionChainClient(api_key=API_KEY, host=HOST)
-        # Use APIClient for exits as recommended
-        self.api_client = APIClient(api_key=API_KEY, host=HOST)
+        # Replaced APIClient with OptionChainClient (which now has placesmartorder)
 
         self.tracker = OptionPositionTracker(
             sl_pct=SL_PCT,
@@ -177,18 +200,18 @@ class BankNiftyMonthlyICStrategy:
         except ValueError:
             return False
 
-    def get_leg_details(self, chain, offset, option_type):
-        """Helper to resolve symbol and LTP from chain based on offset."""
-        # Finds label=offset (e.g., OTM5)
+    def get_leg_details_by_strike(self, chain, strike, option_type):
+        """Helper to resolve symbol and LTP from chain based on strike price."""
         for item in chain:
-            opt = item.get(option_type.lower(), {})
-            if opt.get("label") == offset:
-                return {
-                    "symbol": opt.get("symbol"),
-                    "ltp": safe_float(opt.get("ltp", 0)),
-                    "quantity": QUANTITY,
-                    "product": PRODUCT
-                }
+            if item.get("strike") == strike:
+                opt = item.get(option_type.lower(), {})
+                if opt.get("symbol"):
+                    return {
+                        "symbol": opt.get("symbol"),
+                        "ltp": safe_float(opt.get("ltp", 0)),
+                        "quantity": QUANTITY,
+                        "product": PRODUCT
+                    }
         return None
 
     def _close_position(self, chain, reason):
@@ -220,7 +243,8 @@ class BankNiftyMonthlyICStrategy:
 
         for leg in exit_legs:
             try:
-                res = self.api_client.placesmartorder(
+                # Use self.client (OptionChainClient) which now has placesmartorder
+                res = self.client.placesmartorder(
                     strategy=STRATEGY_NAME,
                     symbol=leg["symbol"],
                     action=leg["action"],
@@ -360,85 +384,90 @@ class BankNiftyMonthlyICStrategy:
                     premium = calculate_straddle_premium(chain, atm_strike)
                     self.logger.info(format_kv(spot="ATM", strike=atm_strike, premium=premium))
 
-                    if premium >= MIN_PREMIUM:
-                        if self.debouncer.edge("ENTRY_SIGNAL", True):
-                            self.logger.info("Entry signal detected. Placing Monthly Iron Condor orders...")
+                    is_entry_signal = (premium >= MIN_PREMIUM)
 
-                            # Iron Condor Definition (Monthly):
-                            # Strike Gap: 500 (OTM5)
-                            # Wing Width: 200 (OTM7 = 500+200)
+                    if self.debouncer.edge("ENTRY_SIGNAL", is_entry_signal):
+                        self.logger.info("Entry signal detected. Placing Monthly Iron Condor orders...")
 
-                            # 1. Sell OTM5 Call
-                            # 2. Sell OTM5 Put
-                            # 3. Buy OTM7 Call (Protection)
-                            # 4. Buy OTM7 Put (Protection)
+                        # Iron Condor Definition (Monthly):
+                        # Strike Gap: 500 (OTM5)
+                        # Wing Width: 200 (OTM7 = 500+200)
 
-                            # Define legs: (offset, type, action)
-                            definitions = [
-                                ("OTM7", "CE", "BUY"),
-                                ("OTM7", "PE", "BUY"),
-                                ("OTM5", "CE", "SELL"),
-                                ("OTM5", "PE", "SELL")
-                            ]
+                        sell_ce_strike = atm_strike + STRIKE_GAP
+                        buy_ce_strike = atm_strike + STRIKE_GAP + WING_WIDTH
+                        sell_pe_strike = atm_strike - STRIKE_GAP
+                        buy_pe_strike = atm_strike - STRIKE_GAP - WING_WIDTH
 
-                            tracking_legs = []
-                            entry_prices = []
-                            valid_setup = True
+                        # Define legs: (strike, type, action)
+                        # Order matters: Buy wings first for margin benefit (though optionsmultiorder usually handles this,
+                        # we define intended structure here)
+                        definitions = [
+                            (buy_ce_strike, "CE", "BUY"),
+                            (buy_pe_strike, "PE", "BUY"),
+                            (sell_ce_strike, "CE", "SELL"),
+                            (sell_pe_strike, "PE", "SELL")
+                        ]
 
-                            # Resolve symbols first
-                            for offset, otype, action in definitions:
-                                details = self.get_leg_details(chain, offset, otype)
-                                if details:
-                                    details["action"] = action
-                                    tracking_legs.append(details)
-                                    entry_prices.append(details["ltp"])
-                                else:
-                                    self.logger.warning(f"Could not resolve leg: {offset} {otype}")
-                                    valid_setup = False
-                                    break
+                        tracking_legs = []
+                        entry_prices = []
+                        valid_setup = True
 
-                            if valid_setup:
-                                # Construct API payload
-                                api_legs = []
-                                for offset, otype, action in definitions:
-                                    api_legs.append({
-                                        "offset": offset,
-                                        "option_type": otype,
-                                        "action": action,
-                                        "quantity": QUANTITY,
-                                        "product": PRODUCT
-                                    })
-
-                                try:
-                                    response = self.client.optionsmultiorder(
-                                        strategy=STRATEGY_NAME,
-                                        underlying=UNDERLYING,
-                                        exchange=UNDERLYING_EXCHANGE,
-                                        expiry_date=self.expiry,
-                                        legs=api_legs
-                                    )
-
-                                    if response.get("status") == "success":
-                                        self.logger.info(f"Order Success: {response}")
-                                        self.limiter.record()
-
-                                        # Add to tracker with correct signature: legs, entry_prices, side
-                                        self.tracker.add_legs(
-                                            legs=tracking_legs,
-                                            entry_prices=entry_prices,
-                                            side="SELL" # Net credit strategy
-                                        )
-                                        self.logger.info("Iron Condor positions tracked.")
-                                    else:
-                                        self.logger.error(f"Order Failed: {response.get('message')}")
-
-                                except Exception as e:
-                                    self.logger.error(f"Order Execution Error: {e}")
+                        # Resolve symbols first
+                        for strike, otype, action in definitions:
+                            details = self.get_leg_details_by_strike(chain, strike, otype)
+                            if details:
+                                details["action"] = action
+                                details["option_type"] = otype
+                                tracking_legs.append(details)
+                                entry_prices.append(details["ltp"])
                             else:
-                                self.logger.warning("Setup invalid (missing strikes). Skipping.")
+                                self.logger.warning(f"Could not resolve leg: Strike {strike} {otype}")
+                                valid_setup = False
+                                break
+
+                        if valid_setup:
+                            # Construct API payload
+                            api_legs = []
+                            for leg in tracking_legs:
+                                api_legs.append({
+                                    "symbol": leg["symbol"],
+                                    "option_type": leg["option_type"],
+                                    "action": leg["action"],
+                                    "quantity": QUANTITY,
+                                    "product": PRODUCT
+                                })
+
+                            try:
+                                response = self.client.optionsmultiorder(
+                                    strategy=STRATEGY_NAME,
+                                    underlying=UNDERLYING,
+                                    exchange=UNDERLYING_EXCHANGE,
+                                    expiry_date=self.expiry,
+                                    legs=api_legs
+                                )
+
+                                if response.get("status") == "success":
+                                    self.logger.info(f"Order Success: {response}")
+                                    self.limiter.record()
+
+                                    # Add to tracker with correct signature: legs, entry_prices, side
+                                    self.tracker.add_legs(
+                                        legs=tracking_legs,
+                                        entry_prices=entry_prices,
+                                        side="SELL" # Net credit strategy
+                                    )
+                                    self.logger.info("Iron Condor positions tracked.")
+                                else:
+                                    self.logger.error(f"Order Failed: {response.get('message')}")
+
+                            except Exception as e:
+                                self.logger.error(f"Order Execution Error: {e}")
+                        else:
+                            self.logger.warning("Setup invalid (missing strikes). Skipping.")
 
                     else:
-                        self.logger.debug(f"Premium {premium} < {MIN_PREMIUM}. Waiting.")
+                        if not is_entry_signal:
+                            self.logger.debug(f"Premium {premium} < {MIN_PREMIUM}. Waiting.")
 
             except Exception as e:
                 self.logger.error(f"Error in main loop: {e}", exc_info=True)
