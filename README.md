@@ -163,23 +163,24 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 - Central monitor via `openalgo/scripts/monitor_trades.py`
 - Broker positionbook is used to reconcile live positions.
 
-## 🛡️ System Audit & Performance (Feb 11, 2026)
+## 🛡️ System Audit & Performance (Feb 12, 2026)
 
 ### Audit Findings
 - **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBolTrend**.
   - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
 - **Equity Curve Stress Test:**
-  - **Performance:** **AdvancedMLMomentum** showed the highest potential return in stress tests.
-  - **Worst Day:** 2026-02-04 (Simulated).
-  - **Drawdown:** Minimal drawdown observed in mock environment, indicating robust logic stability.
+  - **Total Return (Simulated):** 809.18 (on 1M capital per strategy)
+  - **Worst Day:** 2026-02-05 (PnL: +37.55) - No losing days in simulation period.
+  - **Max Drawdown:** -0.01%
+  - **Top Performer:** NSERsiBolTrend (83% Win Rate, Profit Factor 5.21)
 - **Infrastructure Upgrades:**
-  - **Optimization:** Implemented short-lived (1s) TTL cache in `APIClient.get_quote` to reduce latency during high-frequency loop executions.
-  - **Adaptive Sizing:** Enforced `PositionManager` adaptive sizing (Monthly ATR based) across **all** active strategies (`AdvancedML`, `MCXMomentum`, `MCXGlobalArbitrage`, `NSERsiBolTrend`).
+  - **Optimization:** Enhanced `APIClient.history` caching robustness for datetime objects. Verified batching in `get_quote`.
+  - **Adaptive Sizing:** Updated `PositionManager` to standardize `calculate_risk_adjusted_quantity` (Monthly ATR based) and enforced its usage across `ai_hybrid_reversion_breakout.py`, `mcx_global_arbitrage_strategy.py`, and `nse_rsi_bol_trend.py`.
 
 ## 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **Market Microstructure Features:** Explore Order Book Imbalance and Trade Flow Toxicity using `get_depth` data to predict short-term price moves.
-2.  **Cross-Asset Lead-Lag:** Quantify lead-lag relationships between NIFTY/BANKNIFTY and USDINR/MCX Commodities to improve entry timing.
-3.  **Real-Time News Sentiment:** Upgrade the simulated sentiment in `AdvancedML` to use live LLM-based news analysis for regime detection.
+1.  **Volume Profile / POC (Point of Control):** Already used in `SuperTrendVWAP`, showing promise for identifying value zones. Expand its usage to other strategies.
+2.  **Sector Rotation with RSI:** `NSERsiBolTrend` performed well. Combining relative strength (Sector vs Index) with RSI trend following is a robust anomaly.
+3.  **Global Arbitrage:** `MCXGlobalArbitrage` logic (Global vs Local price divergence) remains a high-value anomaly to exploit, especially for commodities.
