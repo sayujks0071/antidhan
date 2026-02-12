@@ -21,7 +21,7 @@ utils_dir = os.path.join(strategies_dir, "utils")
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import is_market_open, APIClient
+    from datetime import timezone, timedelta
     from optionchain_utils import (
         OptionChainClient,
         OptionPositionTracker,
@@ -34,6 +34,24 @@ try:
 except ImportError:
     print("ERROR: Could not import strategy utilities.", flush=True)
     sys.exit(1)
+
+def is_market_open():
+    """
+    Checks if NSE market is open (09:15 - 15:30 IST).
+    Uses UTC time + 5.5 hours to avoid pytz dependency.
+    """
+    now_utc = datetime.now(timezone.utc)
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_ist = now_utc + ist_offset
+
+    if now_ist.weekday() >= 5:
+        return False
+
+    current_time = now_ist.time()
+    market_start = datetime.strptime("09:15", "%H:%M").time()
+    market_end = datetime.strptime("15:30", "%H:%M").time()
+
+    return market_start <= current_time <= market_end
 
 
 class PrintLogger:
@@ -86,7 +104,7 @@ class BankNiftyHDFCCorrelation:
     def __init__(self):
         self.logger = PrintLogger()
         self.client = OptionChainClient(api_key=API_KEY, host=HOST)
-        self.api_client = APIClient(api_key=API_KEY, host=HOST)
+        # Using OptionChainClient for everything (it now supports get_quote and placesmartorder)
 
         self.tracker = OptionPositionTracker(
             sl_pct=SL_PCT,
@@ -146,7 +164,8 @@ class BankNiftyHDFCCorrelation:
         """Fetches quote and calculates change percent."""
         try:
             # Assuming NSE for component stocks
-            quote = self.api_client.get_quote(symbol, "NSE")
+            # Use self.client which is OptionChainClient with get_quote support
+            quote = self.client.get_quote(symbol, "NSE")
             if not quote:
                 return None
 
@@ -182,7 +201,8 @@ class BankNiftyHDFCCorrelation:
         for leg in self.tracker.open_legs:
             try:
                 # We are Long Calls, so we SELL to close
-                res = self.api_client.placesmartorder(
+                # Use self.client.placesmartorder
+                res = self.client.placesmartorder(
                     strategy=STRATEGY_NAME,
                     symbol=leg["symbol"],
                     action="SELL",
@@ -259,7 +279,8 @@ class BankNiftyHDFCCorrelation:
 
                             if atm_leg:
                                 try:
-                                    res = self.api_client.placesmartorder(
+                                    # Use self.client.placesmartorder
+                                    res = self.client.placesmartorder(
                                         strategy=STRATEGY_NAME,
                                         symbol=atm_leg["symbol"],
                                         action="BUY",
