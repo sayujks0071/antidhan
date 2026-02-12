@@ -35,6 +35,7 @@ try:
         calculate_ema,
         calculate_intraday_vwap,
         calculate_relative_strength,
+        calculate_roc,
         calculate_rsi,
         calculate_sma,
         calculate_supertrend,
@@ -56,6 +57,7 @@ except ImportError:
             calculate_ema,
             calculate_intraday_vwap,
             calculate_relative_strength,
+            calculate_roc,
             calculate_rsi,
             calculate_sma,
             calculate_supertrend,
@@ -77,6 +79,7 @@ except ImportError:
             calculate_ema,
             calculate_intraday_vwap,
             calculate_relative_strength,
+            calculate_roc,
             calculate_rsi,
             calculate_sma,
             calculate_supertrend,
@@ -341,8 +344,23 @@ class BaseStrategy:
         return calculate_relative_strength(df, index_df, period)
 
     def calculate_atr(self, df, period=14):
-        """Calculate Average True Range."""
+        """Calculate Average True Range (Scalar)."""
         return calculate_atr(df, period).iloc[-1]
+
+    def calculate_atr_series(self, df, period=14):
+        """Calculate Average True Range (Series)."""
+        return calculate_atr(df, period)
+
+    def calculate_roc(self, series, period=10):
+        """Calculate Rate of Change (ROC)."""
+        return calculate_roc(series, period)
+
+    def is_lunch_break(self):
+        """Avoid trading during low volume lunch hours (12:00 - 13:00)."""
+        now = datetime.now()
+        if 12 <= now.hour < 13:
+            return True
+        return False
 
     def get_monthly_atr(self, symbol=None):
         """
@@ -382,9 +400,13 @@ class BaseStrategy:
         return self.quantity
 
     def calculate_adx(self, df, period=14):
-        """Calculate ADX."""
+        """Calculate ADX (Scalar)."""
         result = calculate_adx(df, period)
         return result.iloc[-1] if not result.empty else 0
+
+    def calculate_adx_series(self, df, period=14):
+        """Calculate ADX (Series)."""
+        return calculate_adx(df, period)
 
     def calculate_intraday_vwap(self, df):
         """Calculate VWAP."""
