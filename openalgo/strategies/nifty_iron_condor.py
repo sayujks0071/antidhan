@@ -6,7 +6,7 @@ Sell OTM2 Strangle + Buy OTM4 Wings. Entry > 10 AM, Straddle Premium > 120. Risk
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta, time as dt_time
 
 # Line-buffered output (required for real-time log capture)
 if hasattr(sys.stdout, "reconfigure"):
@@ -16,12 +16,14 @@ if hasattr(sys.stderr, "reconfigure"):
 
 # Path setup for utility imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, "utils")
+# Correctly point to strategies/utils to find optionchain_utils.py
+utils_dir = os.path.join(script_dir, "utils")
 sys.path.insert(0, utils_dir)
 
+# Define directories for potential root imports
+strategies_dir = os.path.dirname(script_dir)
+
 try:
-    from trading_utils import is_market_open, APIClient
     from optionchain_utils import (
         OptionChainClient,
         OptionPositionTracker,
@@ -34,9 +36,59 @@ try:
         calculate_straddle_premium,
     )
     from strategy_common import SignalDebouncer, TradeLedger, TradeLimiter, format_kv
-except ImportError:
-    print("ERROR: Could not import strategy utilities.", flush=True)
+except ImportError as e:
+    print(f"ERROR: Could not import strategy utilities: {e}", flush=True)
     sys.exit(1)
+
+# Robust import for trading_utils (handles missing httpx dependency)
+try:
+    from trading_utils import is_market_open, APIClient
+except ImportError:
+    print("Warning: trading_utils not found or httpx missing. Using local fallbacks.", flush=True)
+    import requests
+
+    def is_market_open(exchange="NSE"):
+        """Local implementation of market open check."""
+        ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+
+        # Weekend Check
+        if ist_now.weekday() >= 5:  # 5=Sat, 6=Sun
+            return False
+
+        market_start = dt_time(9, 15)
+        market_end = dt_time(15, 30)
+        current_time = ist_now.time()
+
+        return market_start <= current_time <= market_end
+
+    class APIClient:
+        """Local implementation of APIClient using requests."""
+        def __init__(self, api_key, host="http://127.0.0.1:5000"):
+            self.api_key = api_key
+            self.host = host.rstrip('/')
+            self.session = requests.Session()
+
+        def placesmartorder(self, strategy, symbol, action, exchange, price_type, product, quantity, position_size):
+            url = f"{self.host}/api/v1/placesmartorder"
+            payload = {
+                "apikey": self.api_key,
+                "strategy": strategy,
+                "symbol": symbol,
+                "action": action,
+                "exchange": exchange,
+                "pricetype": price_type, # Note: Payload key is 'pricetype'
+                "product": product,
+                "quantity": str(quantity),
+                "position_size": str(position_size),
+                "price": "0",
+                "trigger_price": "0",
+                "disclosed_quantity": "0"
+            }
+            try:
+                response = self.session.post(url, json=payload, timeout=10)
+                return response.json()
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
 
 
 class PrintLogger:
@@ -138,8 +190,6 @@ class IronCondorTracker(OptionPositionTracker):
                 current_cost_to_close -= (curr * qty)
 
         # Net Credit Strategy PnL: Credit Collected - Cost to Close
-        # Example: Collected 100. Cost to Close 80. PnL = +20.
-        # Example: Collected 100. Cost to Close 120. PnL = -20.
         pnl = total_credit_collected - current_cost_to_close
 
         if total_credit_collected == 0:
@@ -263,18 +313,18 @@ class NiftyIronCondorStrategy:
             return
 
         # Sort: BUYs first (to cover shorts), then SELLs
-        # Action 'BUY' comes before 'SELL' alphabetically? No, B < S.
-        # We want close_action='BUY' (covering short) first.
+        # Action 'BUY' comes before 'SELL' alphabetically.
         exit_orders.sort(key=lambda x: 0 if x['action'] == 'BUY' else 1)
 
         for order in exit_orders:
             try:
+                # Use price_type argument to match APIClient signature (standard or fallback)
                 res = self.api_client.placesmartorder(
                     strategy=STRATEGY_NAME,
                     symbol=order["symbol"],
                     action=order["action"],
                     exchange=OPTIONS_EXCHANGE,
-                    pricetype="MARKET",
+                    price_type="MARKET",
                     product=order["product"],
                     quantity=order["quantity"],
                     position_size=0
