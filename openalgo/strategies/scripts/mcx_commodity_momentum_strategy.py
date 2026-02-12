@@ -21,21 +21,12 @@ except ImportError:
     from base_strategy import BaseStrategy
 
 class MCXMomentumStrategy(BaseStrategy):
-    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
-                 log_file=None, client=None, **kwargs):
+    def __init__(self, **kwargs):
+        # Set defaults for this specific strategy
+        kwargs.setdefault('interval', '15m')
+        kwargs.setdefault('exchange', 'MCX')
 
-        super().__init__(
-            name="MCX_Momentum",
-            symbol=symbol,
-            quantity=quantity,
-            interval="15m",
-            exchange="MCX",
-            api_key=api_key,
-            host=host,
-            ignore_time=ignore_time,
-            log_file=log_file,
-            client=client
-        )
+        super().__init__(**kwargs)
 
         # Strategy Parameters
         self.params = {
@@ -49,26 +40,26 @@ class MCXMomentumStrategy(BaseStrategy):
         # Update with kwargs
         self.params.update(kwargs)
 
-        self.logger.info(f"Initialized Strategy for {symbol}")
+        self.logger.info(f"Initialized Strategy for {self.symbol}")
         self.logger.info(f"Filters: Seasonality={self.params.get('seasonality_score', 'N/A')}, "
                          f"USD_Vol={self.params.get('usd_inr_volatility', 'N/A')}")
 
     @classmethod
     def add_arguments(cls, parser):
-        parser.add_argument('--underlying', type=str, help='Commodity Name (e.g., GOLD, SILVER)')
-        parser.add_argument('--port', type=int, help='API Port (Override host)')
-        # Custom Factors
+        # Only add custom arguments not covered by BaseStrategy
         parser.add_argument('--usd_inr_trend', type=str, default='Neutral', help='USD/INR Trend')
         parser.add_argument('--usd_inr_volatility', type=float, default=0.0, help='USD/INR Volatility %%')
         parser.add_argument('--seasonality_score', type=int, default=50, help='Seasonality Score (0-100)')
         parser.add_argument('--global_alignment_score', type=int, default=50, help='Global Alignment Score')
+        parser.add_argument('--port', type=int, help='API Port (Override host)') # Kept for backward compat
 
     @classmethod
     def parse_arguments(cls, args):
+        # BaseStrategy extracts standard args
         kwargs = super().parse_arguments(args)
 
-        # Handle Port/Host override
-        if args.port:
+        # Handle Port/Host override if port is used
+        if hasattr(args, 'port') and args.port:
             kwargs['host'] = f"http://127.0.0.1:{args.port}"
 
         # Add custom params to kwargs
@@ -84,7 +75,7 @@ class MCXMomentumStrategy(BaseStrategy):
         Main Strategy Logic Execution Cycle
         """
         # Fetch Data
-        df = self.fetch_history(days=5, interval="15m")
+        df = self.fetch_history(days=5, interval=self.interval)
         if df.empty or len(df) < 50:
             self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows. Need >50.")
             return
@@ -128,7 +119,7 @@ class MCXMomentumStrategy(BaseStrategy):
                 current['close'] > prev['close']):
 
                 self.logger.info(f"BUY SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
-                self.execute_trade('BUY', base_qty, current['close'])
+                self.buy(base_qty, current['close'])
 
             # SELL Signal
             elif (current['adx'] > self.params['adx_threshold'] and
@@ -136,7 +127,7 @@ class MCXMomentumStrategy(BaseStrategy):
                   current['close'] < prev['close']):
 
                 self.logger.info(f"SELL SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
-                self.execute_trade('SELL', base_qty, current['close'])
+                self.sell(base_qty, current['close'])
 
         # Exit Logic
         elif has_position:
@@ -145,11 +136,11 @@ class MCXMomentumStrategy(BaseStrategy):
             if pos_qty > 0: # Long
                 if current['rsi'] < 45 or current['adx'] < 20:
                      self.logger.info(f"EXIT LONG: Trend Faded. RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
-                     self.execute_trade('SELL', abs(pos_qty), current['close'])
+                     self.sell(abs(pos_qty), current['close'])
             elif pos_qty < 0: # Short
                 if current['rsi'] > 55 or current['adx'] < 20:
                      self.logger.info(f"EXIT SHORT: Trend Faded. RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
-                     self.execute_trade('BUY', abs(pos_qty), current['close'])
+                     self.buy(abs(pos_qty), current['close'])
 
     def generate_signal(self, df):
         """
