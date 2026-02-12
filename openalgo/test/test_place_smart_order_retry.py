@@ -77,7 +77,7 @@ class TestPlaceSmartOrderService(unittest.TestCase):
 
             self.assertFalse(success)
             self.assertEqual(status_code, 401)
-            self.assertEqual(response['message'], "Invalid Token")
+            self.assertEqual(response['message'], "Invalid Token: Authentication token is missing or empty")
 
             # Broker module should NOT be imported/called
             mock_import.assert_not_called()

@@ -3,6 +3,13 @@
 Bank Nifty Monthly Iron Condor - BANKNIFTY Options (OpenAlgo Web UI Compatible)
 Sells OTM5 (~500 pts) strangles and buys OTM7 (~700 pts) wings for defined-risk theta decay.
 Designed for Monthly Expiry contracts.
+
+Strategy Profile: Conservative Monthly Income
+- Sell OTM5 (Strike Gap 500)
+- Buy OTM7 (Wing Width 200)
+- Lot Size: 15 (Bank Nifty Standard)
+- SL: 30% of Net Premium Collected
+- TP: 50% of Net Premium Collected
 """
 import os
 import sys
@@ -54,11 +61,12 @@ UNDERLYING = os.getenv("UNDERLYING", "BANKNIFTY")
 UNDERLYING_EXCHANGE = os.getenv("UNDERLYING_EXCHANGE", "NSE_INDEX")
 OPTIONS_EXCHANGE = os.getenv("OPTIONS_EXCHANGE", "NSE")
 PRODUCT = os.getenv("PRODUCT", "MIS")
-QUANTITY = safe_int(os.getenv("QUANTITY", "15")) # Default Bank Nifty Lot Size (check current)
-STRIKE_COUNT = safe_int(os.getenv("STRIKE_COUNT", "20")) # Increased to reach OTM7
+# Bank Nifty Lot Size is typically 15 (as of late 2024/2025)
+QUANTITY = safe_int(os.getenv("QUANTITY", "15"))
+STRIKE_COUNT = safe_int(os.getenv("STRIKE_COUNT", "20")) # Enough to reach OTM7 (700 pts with 100 step)
 
 # Strategy specific parameters
-# Guide: Stop Loss Premium %: 30, Target Premium %: 50
+# SL/TP based on Net Credit Premium
 SL_PCT = safe_float(os.getenv("SL_PCT", "30.0"))
 TP_PCT = safe_float(os.getenv("TP_PCT", "50.0"))
 MAX_HOLD_MIN = safe_int(os.getenv("MAX_HOLD_MIN", "45"))
@@ -73,6 +81,7 @@ ENTRY_START_TIME = os.getenv("ENTRY_START_TIME", "10:00")
 ENTRY_END_TIME = os.getenv("ENTRY_END_TIME", "14:30")
 EXIT_TIME = os.getenv("EXIT_TIME", "15:15")
 # Guide: "ATM Threshold: If (ATM_CE + ATM_PE) < 900, IV is low... > 1500 IV is high"
+# We want decent premium to sell.
 MIN_PREMIUM = safe_float(os.getenv("MIN_PREMIUM", "900.0"))
 
 
@@ -124,7 +133,8 @@ class BankNiftyMonthlyICStrategy:
             sl_pct=SL_PCT,
             tp_pct=TP_PCT,
             max_hold=MAX_HOLD_MIN,
-            max_orders=MAX_ORDERS_PER_DAY
+            max_orders=MAX_ORDERS_PER_DAY,
+            lot_size=QUANTITY
         ))
 
     def ensure_expiry(self):
@@ -136,7 +146,7 @@ class BankNiftyMonthlyICStrategy:
                 if res.get("status") == "success":
                     dates = res.get("data", [])
                     if dates:
-                        # Use Monthly Expiry Logic
+                        # Use Monthly Expiry Logic (Last Thursday usually)
                         self.expiry = choose_monthly_expiry(dates)
                         self.last_expiry_check = now
                         self.logger.info(f"Selected Monthly Expiry: {self.expiry}")
@@ -182,12 +192,12 @@ class BankNiftyMonthlyICStrategy:
         return None
 
     def _close_position(self, chain, reason):
-        """Closes all open positions."""
+        """Closes all open positions with prioritized ordering."""
         self.logger.info(f"Closing position. Reason: {reason}")
 
         exit_legs = []
         for leg in self.tracker.open_legs:
-            # Reverse action
+            # Reverse action: If we SOLD to open, we BUY to close.
             action = "BUY" if leg.get("action") == "SELL" else "SELL"
             exit_legs.append({
                 "symbol": leg["symbol"],
@@ -202,6 +212,12 @@ class BankNiftyMonthlyICStrategy:
             self.tracker.clear()
             return
 
+        # CRITICAL: Sort legs to prioritize BUY orders (Covering Shorts) first.
+        # This prevents margin spikes or rejection when closing complex positions.
+        # BUY (Close Short) = Priority 0
+        # SELL (Close Long) = Priority 1
+        exit_legs.sort(key=lambda x: 0 if x['action'] == 'BUY' else 1)
+
         for leg in exit_legs:
             try:
                 res = self.api_client.placesmartorder(
@@ -215,11 +231,74 @@ class BankNiftyMonthlyICStrategy:
                     position_size=leg["quantity"]
                 )
                 self.logger.info(f"Exit Order: {leg['symbol']} {leg['action']} -> {res}")
+                time.sleep(0.5) # Slight delay to ensure sequential execution
             except Exception as e:
                 self.logger.error(f"Exit failed for {leg['symbol']}: {e}")
 
         self.tracker.clear()
         self.logger.info("Position closed and tracker cleared.")
+
+    def check_exit_conditions_local(self, chain):
+        """
+        Calculates PnL based on Net Credit to strictly follow strategy intent.
+        Returns: (bool exit_now, string reason)
+        """
+        if not self.tracker.open_legs:
+            return False, ""
+
+        # 1. Time Stop
+        if self.tracker.entry_time:
+            minutes_held = (datetime.now() - self.tracker.entry_time).total_seconds() / 60
+            if minutes_held >= MAX_HOLD_MIN:
+                return True, "time_stop"
+
+        # 2. PnL Check (Net Credit Basis)
+        ltp_map = {}
+        for item in chain:
+            ce = item.get("ce", {})
+            pe = item.get("pe", {})
+            if ce.get("symbol"): ltp_map[ce["symbol"]] = safe_float(ce.get("ltp"))
+            if pe.get("symbol"): ltp_map[pe["symbol"]] = safe_float(pe.get("ltp"))
+
+        net_credit_collected = 0.0
+        current_cost_to_close = 0.0
+
+        for leg in self.tracker.open_legs:
+            sym = leg["symbol"]
+            entry = leg["entry_price"]
+            curr = ltp_map.get(sym, entry)
+            qty = leg.get("quantity", 1)
+
+            if leg["action"].upper() == "SELL":
+                # We collected premium
+                net_credit_collected += (entry * qty)
+                # To close, we buy back at current
+                current_cost_to_close += (curr * qty)
+            else: # BUY
+                # We paid premium
+                net_credit_collected -= (entry * qty)
+                # To close, we sell at current (credit)
+                current_cost_to_close -= (curr * qty)
+
+        # PnL = Net Credit Collected - Cost to Close
+        # Example: Collected 100. Cost to close 80. PnL = 20.
+        # Example: Collected 100. Cost to close 150. PnL = -50.
+        pnl = net_credit_collected - current_cost_to_close
+
+        # Percentage of MAX PROFIT (Net Credit)
+        if net_credit_collected == 0:
+            return False, ""
+
+        pnl_pct = (pnl / abs(net_credit_collected)) * 100
+
+        # Check Stops
+        if pnl_pct <= -SL_PCT:
+            return True, f"stop_loss_hit ({pnl_pct:.1f}%)"
+
+        if pnl_pct >= TP_PCT:
+            return True, f"take_profit_hit ({pnl_pct:.1f}%)"
+
+        return False, ""
 
     def run(self):
         self.logger.info("Starting BankNifty Monthly IC Strategy Loop...")
@@ -256,7 +335,8 @@ class BankNiftyMonthlyICStrategy:
 
                 # 4. EXIT MANAGEMENT
                 if self.tracker.open_legs:
-                    exit_now, legs, exit_reason = self.tracker.should_exit(chain)
+                    # Use Local Logic for precise Net Credit PnL
+                    exit_now, exit_reason = self.check_exit_conditions_local(chain)
                     if exit_now or self.should_terminate():
                         reason = exit_reason if exit_now else "EOD Auto-Squareoff"
                         self._close_position(chain, reason)

@@ -211,7 +211,7 @@ class NSERsiBolTrendStrategy:
                         monthly_atr = self.get_monthly_atr()
                         qty = self.quantity
                         if monthly_atr > 0 and self.pm:
-                            qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, current_price)
+                            qty = self.pm.calculate_risk_adjusted_quantity(500000, 1.0, monthly_atr, current_price)
                             self.logger.info(f"Adaptive Quantity: {qty} (Monthly ATR: {monthly_atr:.2f})")
 
                         self.logger.info(f"Entry signal detected (Oversold). Buying {qty} at {current_price}")
