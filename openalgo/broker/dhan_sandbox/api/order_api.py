@@ -206,7 +206,7 @@ def place_order_api(data, auth):
 
     Returns:
         tuple: (response_object, response_dict, order_id)
-            - response_object: The HTTP response object.
+            - response_object: The HTTP response object (httpx.Response).
             - response_dict (dict): The parsed JSON response.
             - order_id (str or None): The generated Order ID. None if the order is rejected or failed.
     """
@@ -304,7 +304,7 @@ def place_smartorder_api(data, auth):
 
     Returns:
         tuple: (response_object, response_dict, order_id)
-            - response_object: The HTTP response object.
+            - response_object: The HTTP response object (httpx.Response).
             - response_dict (dict): The parsed JSON response.
             - order_id (str or None): The generated Order ID. None if the order is rejected or logic determined no action needed.
     """
