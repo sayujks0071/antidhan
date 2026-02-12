@@ -90,7 +90,7 @@ except ImportError:
 class BaseStrategy:
     def __init__(self, name=None, symbol=None, quantity=1, interval="5m", exchange="NSE",
                  api_key=None, host=None, ignore_time=False, log_file=None, client=None,
-                 sector=None, underlying=None, type="EQUITY", **kwargs):
+                 sector=None, underlying=None, type="EQUITY", product="MIS", **kwargs):
         """
         Base Strategy Class for Dhan Sandbox Strategies.
         Accepts standard parameters and kwargs for flexibility.
@@ -104,6 +104,7 @@ class BaseStrategy:
         self.sector = sector
         self.underlying = underlying
         self.type = type
+        self.product = product
 
         # Set any additional kwargs as attributes (e.g. threshold, stop_pct)
         for k, v in kwargs.items():
@@ -151,7 +152,7 @@ class BaseStrategy:
                 sys.path.insert(0, openalgo_root)
         except Exception as e:
             # Don't fail if we can't figure out paths, just log it later if logger exists
-            print(f"Warning: Could not add project root to path: {e}")
+            pass
 
     def _resolve_api_key(self, api_key):
         """Resolve API Key from multiple sources."""
@@ -165,7 +166,9 @@ class BaseStrategy:
 
         # 2. Try database
         try:
-            # This requires 'database' to be importable (path fixed by _add_project_root_to_path)
+            # Ensure project root is in path
+            self._add_project_root_to_path()
+            # This requires 'database' to be importable
             from database.auth_db import get_first_available_api_key
             key = get_first_available_api_key()
             if key:
@@ -244,6 +247,7 @@ class BaseStrategy:
             exchange=self.exchange,
             quantity=quantity,
             limit_price=price,
+            product=self.product,
             urgency=urgency
         )
 
@@ -264,6 +268,21 @@ class BaseStrategy:
         else:
             self.logger.error("Trade execution failed (no response from API)")
             return None
+
+    def buy(self, quantity, price=None, urgency="MEDIUM"):
+        """Convenience wrapper for BUY trade."""
+        return self.execute_trade("BUY", quantity, price, urgency)
+
+    def sell(self, quantity, price=None, urgency="MEDIUM"):
+        """Convenience wrapper for SELL trade."""
+        return self.execute_trade("SELL", quantity, price, urgency)
+
+    def get_current_price(self):
+        """Fetch current LTP for the symbol."""
+        quote = self.client.get_quote(self.symbol, self.exchange)
+        if quote and 'ltp' in quote:
+            return float(quote['ltp'])
+        return None
 
     def cycle(self):
         """
@@ -448,16 +467,29 @@ class BaseStrategy:
     def get_standard_parser(description="Strategy"):
         """Get a standard ArgumentParser with common arguments."""
         parser = argparse.ArgumentParser(description=description)
+        # Core
         parser.add_argument("--symbol", type=str, help="Trading Symbol")
-        parser.add_argument("--quantity", type=int, default=10, help="Order Quantity")
-        parser.add_argument("--api_key", type=str, help="API Key")
-        parser.add_argument("--host", type=str, help="Host")
-        parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours")
-        parser.add_argument("--logfile", type=str, help="Log file path")
-        parser.add_argument("--sector", type=str, help="Sector Benchmark (e.g., NIFTY 50)")
+        parser.add_argument("--quantity", type=int, default=1, help="Order Quantity")
+        parser.add_argument("--interval", type=str, default="5m", help="Candle Interval")
         parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
+        parser.add_argument("--product", type=str, default="MIS", help="Product Type (MIS/CNC/NRML)")
+
+        # Connection
+        parser.add_argument("--api_key", type=str, help="API Key")
+        parser.add_argument("--host", type=str, help="Host URL")
+        parser.add_argument("--logfile", type=str, help="Log file path")
+
+        # Logic / Filters
+        parser.add_argument("--ignore_time", action="store_true", help="Ignore market hours")
+        parser.add_argument("--sector", type=str, help="Sector Benchmark (e.g., NIFTY 50)")
         parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
         parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
+
+        # Risk Management
+        parser.add_argument("--risk", type=float, default=1.0, help="Risk Percentage")
+        parser.add_argument("--sl", type=float, help="Stop Loss Percentage/Points")
+        parser.add_argument("--tp", type=float, help="Take Profit Percentage/Points")
+
         return parser
 
     @classmethod
@@ -474,7 +506,6 @@ class BaseStrategy:
         # Resolve symbol if underlying is provided (requires SymbolResolver logic if used)
         symbol = args.symbol
         if hasattr(args, 'underlying') and args.underlying and not symbol:
-             # This logic was previously in run_strategy of supertrend_vwap_strategy
              try:
                  resolver = SymbolResolver()
                  res = resolver.resolve({
