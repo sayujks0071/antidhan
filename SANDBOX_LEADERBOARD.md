@@ -1,13 +1,14 @@
-# SANDBOX LEADERBOARD (2026-02-08)
+# SANDBOX LEADERBOARD (2026-02-11)
 
 | Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |
 |------|----------|---------------|--------------|----------|--------------|
-| 1 | AdvancedMLMomentum | 9.08 | -52.00 | 80.0% | 5 |
-| 2 | SuperTrendVWAP | 3.57 | -282.00 | 80.0% | 10 |
-| 3 | GapFadeStrategy | 0.37 | -766.00 | 30.0% | 10 |
+| 1 | SuperTrendVWAP | 4.52 | 170.00 | 80.0% | 10 |
+| 2 | AdvancedMLMomentum | 1.19 | 145.00 | 60.0% | 5 |
+| 3 | GapFadeStrategy | 0.42 | 911.00 | 30.0% | 10 |
 
 ## Analysis & Improvements
 
 ### GapFadeStrategy
 - **Win Rate**: 30.0% (< 40%)
-- **Suggestion**: The strategy is likely fading "Breakaway Gaps" (strong trend initiations) which leads to losses. Adding an RSI filter to confirm Mean Reversion setup (Fade only if Overbought/Oversold) should improve the win rate.
+- **Analysis**: Fading gaps without trend confirmation often leads to losses in strong momentum markets ('Gap and Go').
+- **Improvement**: Add a 'Reversal Candle' check (e.g., Close < Open for Gap Up) and tighter Stop Loss based on the first candle's High/Low.

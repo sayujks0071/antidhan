@@ -350,58 +350,47 @@ class PositionManager:
         )
         self.save_state()
 
-    def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price):
+    def calculate_risk_adjusted_quantity(self, capital, risk_per_trade_pct, volatility, price):
         """
-        Calculate position size based on ATR-based stop loss.
-        Risk Amount = Capital * (risk_per_trade_pct/100)
-        Stop Distance = ATR * 2
-        Qty = Risk Amount / Stop Distance
+        Calculate position size based on Volatility (ATR).
+        Encourages using Monthly ATR for robustness.
+
+        Formula: Qty = (Capital * RiskPct) / (Volatility * 2.0)
         """
-        if atr <= 0 or price <= 0:
-            logger.warning(f"Invalid ATR ({atr}) or Price ({price}) for sizing.")
+        if volatility <= 0 or price <= 0:
+            logger.warning(f"Invalid Volatility ({volatility}) or Price ({price}) for sizing.")
             return 0
 
         risk_amount = capital * (risk_per_trade_pct / 100.0)
-        stop_loss_dist = atr * 2.0
+        stop_loss_dist = volatility * 2.0
 
-        # Avoid division by zero
         if stop_loss_dist == 0:
             qty = 0
         else:
             qty = risk_amount / stop_loss_dist
 
-        # Ensure quantity is at least 1 if risk allowed it, but respect capital limits
         # Max quantity based on capital = capital / price
         max_qty_capital = capital / price
-
         qty = min(qty, max_qty_capital)
 
         return int(qty)
+
+    def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price):
+        """
+        Calculate position size based on ATR (Legacy/Intraday).
+        Delegates to calculate_risk_adjusted_quantity.
+        """
+        qty = self.calculate_risk_adjusted_quantity(capital, risk_per_trade_pct, atr, price)
+        return qty
 
     def calculate_adaptive_quantity_monthly_atr(self, capital, risk_per_trade_pct, monthly_atr, price):
         """
-        Calculate position size based on Monthly ATR (Robust Volatility).
-        Risk Amount = Capital * (risk_per_trade_pct/100)
-        Stop Distance = Monthly ATR * 2.0 (Wider stop for robustness)
-        Qty = Risk Amount / Stop Distance
+        Calculate position size based on Monthly ATR.
+        Alias for calculate_risk_adjusted_quantity with specific logging.
         """
-        if monthly_atr <= 0 or price <= 0:
-            logger.warning(f"Invalid Monthly ATR ({monthly_atr}) or Price ({price}) for sizing.")
-            return 0
-
-        risk_amount = capital * (risk_per_trade_pct / 100.0)
-        stop_loss_dist = monthly_atr * 2.0
-
-        if stop_loss_dist == 0:
-            qty = 0
-        else:
-            qty = risk_amount / stop_loss_dist
-
-        max_qty_capital = capital / price
-        qty = min(qty, max_qty_capital)
-
-        logger.info(f"Adaptive Sizing (Monthly ATR): Price={price}, MATR={monthly_atr:.2f}, Risk={risk_amount:.2f}, Qty={int(qty)}")
-        return int(qty)
+        qty = self.calculate_risk_adjusted_quantity(capital, risk_per_trade_pct, monthly_atr, price)
+        logger.info(f"Adaptive Sizing (Monthly ATR): Price={price}, MATR={monthly_atr:.2f}, RiskAmt={capital*risk_per_trade_pct/100:.2f}, Qty={qty}")
+        return qty
 
     def has_position(self):
         return self.position != 0
@@ -563,16 +552,30 @@ class APIClient:
         if cached_df is not None and not cached_df.empty:
             # Only use cache if end_date is in the past (not today)
             today_str = datetime.now().strftime("%Y-%m-%d")
-            if end_date and end_date < today_str:
+            check_date = end_date
+            if isinstance(check_date, datetime):
+                check_date = check_date.strftime("%Y-%m-%d")
+
+            if check_date and check_date < today_str:
                 return cached_df
 
         url = f"{self.host}/api/v1/history"
+
+        # Ensure dates are serialized for JSON
+        json_start = start_date
+        if isinstance(json_start, datetime):
+            json_start = json_start.strftime("%Y-%m-%d")
+
+        json_end = end_date
+        if isinstance(json_end, datetime):
+            json_end = json_end.strftime("%Y-%m-%d")
+
         payload = {
             "symbol": symbol,
             "exchange": exchange,
             "interval": interval,  # Fixed: was "resolution"
-            "start_date": start_date,  # Fixed: was "from"
-            "end_date": end_date,  # Fixed: was "to"
+            "start_date": json_start,  # Fixed: was "from"
+            "end_date": json_end,  # Fixed: was "to"
             "apikey": self.api_key,
         }
         try:
@@ -600,7 +603,11 @@ class APIClient:
 
                     # Save to Cache if valid and historical
                     today_str = datetime.now().strftime("%Y-%m-%d")
-                    if end_date and end_date < today_str and not df.empty:
+                    check_date = end_date
+                    if isinstance(check_date, datetime):
+                        check_date = check_date.strftime("%Y-%m-%d")
+
+                    if check_date and check_date < today_str and not df.empty:
                         self.cache.set(cache_key, df)
 
                     return df

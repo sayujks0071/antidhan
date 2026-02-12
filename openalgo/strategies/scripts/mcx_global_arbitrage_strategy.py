@@ -210,7 +210,7 @@ class MCXGlobalArbitrageStrategy:
             monthly_atr = self.get_monthly_atr()
             if monthly_atr > 0:
                 # 1% Risk on 500k Capital
-                qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, price)
+                qty = self.pm.calculate_risk_adjusted_quantity(500000, 1.0, monthly_atr, price)
                 logger.info(f"Adaptive Quantity: {qty} (Monthly ATR: {monthly_atr:.2f})")
 
         order_placed = False
