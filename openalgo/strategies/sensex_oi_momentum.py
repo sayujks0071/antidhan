@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-SENSEX Weekly Iron Condor (OpenAlgo Web UI Compatible)
-Sells OTM2 CE+PE and buys OTM4 CE+PE wings for defined-risk theta decay on BFO.
+SENSEX OI Momentum (OpenAlgo Web UI Compatible)
+Directional options strategy based on OI Walls and PCR analysis.
+Buys ATM CE on Put Wall support (PCR > 1.2) or ATM PE on Call Wall resistance (PCR < 0.8).
 
 Exchange: BFO (BSE F&O)
 Underlying: SENSEX on BSE_INDEX
 Expiry: Weekly Friday
+Edge: OI Walls act as strong S/R in BSE markets; uses PCR for confirmation.
 """
 import os
 import sys
@@ -32,6 +34,7 @@ try:
         choose_nearest_expiry,
         is_chain_valid,
         safe_float,
+        safe_int,
     )
     from strategy_common import (
         SignalDebouncer,
@@ -51,34 +54,38 @@ class PrintLogger:
 
 
 # ===========================
-# CONFIGURATION - SENSEX WEEKLY OPTIONS
+# CONFIGURATION - SENSEX OI MOMENTUM
 # ===========================
-STRATEGY_NAME = os.getenv("STRATEGY_NAME", "sensex_iron_condor")
+STRATEGY_NAME = os.getenv("STRATEGY_NAME", "sensex_oi_momentum")
 UNDERLYING = os.getenv("UNDERLYING", "SENSEX")
 UNDERLYING_EXCHANGE = os.getenv("UNDERLYING_EXCHANGE", "BSE_INDEX")
 OPTIONS_EXCHANGE = os.getenv("OPTIONS_EXCHANGE", "BFO")
-PRODUCT = os.getenv("PRODUCT", "MIS")           # MIS=Intraday, NRML=Positional
+PRODUCT = os.getenv("PRODUCT", "MIS")           # MIS=Intraday
 QUANTITY = int(os.getenv("QUANTITY", "1"))        # 1 lot = 10 units for SENSEX
-STRIKE_COUNT = int(os.getenv("STRIKE_COUNT", "12"))
+STRIKE_COUNT = int(os.getenv("STRIKE_COUNT", "15")) # Need wider range for walls
 
-# Strategy-specific parameters
-MIN_STRADDLE_PREMIUM = float(os.getenv("MIN_STRADDLE_PREMIUM", "400.0"))
-ENTRY_START_TIME = os.getenv("ENTRY_START_TIME", "10:00")
-ENTRY_END_TIME = os.getenv("ENTRY_END_TIME", "14:30")
-EXIT_TIME = os.getenv("EXIT_TIME", "15:15")
-FRIDAY_EXIT_TIME = os.getenv("FRIDAY_EXIT_TIME", "14:00") # Early exit on expiry day due to gamma risk
+# Strategy Logic Parameters
+PCR_BULLISH = float(os.getenv("PCR_BULLISH", "1.2"))
+PCR_BEARISH = float(os.getenv("PCR_BEARISH", "0.8"))
+WALL_PROXIMITY_PTS = float(os.getenv("WALL_PROXIMITY_PTS", "150.0")) # Points from wall to trigger
 
 # Risk parameters
-SL_PCT = float(os.getenv("SL_PCT", "35"))        # % of entry premium
-TP_PCT = float(os.getenv("TP_PCT", "45"))         # % of entry premium
-MAX_HOLD_MIN = int(os.getenv("MAX_HOLD_MIN", "45"))
+SL_PCT = float(os.getenv("SL_PCT", "25.0"))      # Tighter SL for directional plays
+TP_PCT = float(os.getenv("TP_PCT", "60.0"))       # Aggressive TP for momentum
+MAX_HOLD_MIN = int(os.getenv("MAX_HOLD_MIN", "20")) # Short hold time
 
 # Rate limiting
-COOLDOWN_SECONDS = int(os.getenv("COOLDOWN_SECONDS", "300"))
-SLEEP_SECONDS = int(os.getenv("SLEEP_SECONDS", "30"))
+COOLDOWN_SECONDS = int(os.getenv("COOLDOWN_SECONDS", "180"))
+SLEEP_SECONDS = int(os.getenv("SLEEP_SECONDS", "15"))
 EXPIRY_REFRESH_SEC = int(os.getenv("EXPIRY_REFRESH_SEC", "3600"))
-MAX_ORDERS_PER_DAY = int(os.getenv("MAX_ORDERS_PER_DAY", "1")) # Defined risk, usually 1 per day is enough
-MAX_ORDERS_PER_HOUR = int(os.getenv("MAX_ORDERS_PER_HOUR", "1"))
+MAX_ORDERS_PER_DAY = int(os.getenv("MAX_ORDERS_PER_DAY", "5"))
+MAX_ORDERS_PER_HOUR = int(os.getenv("MAX_ORDERS_PER_HOUR", "2"))
+
+# Time Filters
+ENTRY_START_TIME = os.getenv("ENTRY_START_TIME", "09:30")
+ENTRY_END_TIME = os.getenv("ENTRY_END_TIME", "14:30")
+EXIT_TIME = os.getenv("EXIT_TIME", "15:15")
+FRIDAY_EXIT_TIME = os.getenv("FRIDAY_EXIT_TIME", "14:30")
 
 # Manual expiry override (format: 14FEB26)
 EXPIRY_DATE = os.getenv("EXPIRY_DATE", "").strip()
@@ -158,7 +165,7 @@ class SimpleOrderClient:
             return {"status": "error", "message": str(e)}
 
 
-class SensexIronCondorStrategy:
+class SensexOIMomentumStrategy:
     def __init__(self):
         self.logger = PrintLogger()
         self.client = OptionChainClient(api_key=API_KEY, host=HOST)
@@ -178,15 +185,16 @@ class SensexIronCondorStrategy:
 
         self.expiry = EXPIRY_DATE if EXPIRY_DATE else None
         self.last_expiry_check = 0
-        self.entered_today = False
+        self.entered_today = False # Note: This strategy allows multiple trades per day if conditions met
 
         self.logger.info(f"Strategy Initialized: {STRATEGY_NAME}")
         self.logger.info(format_kv(
             underlying=UNDERLYING,
-            exchange=OPTIONS_EXCHANGE,
+            pcr_bull=PCR_BULLISH,
+            pcr_bear=PCR_BEARISH,
             sl_pct=SL_PCT,
             tp_pct=TP_PCT,
-            max_hold=MAX_HOLD_MIN
+            wall_prox=WALL_PROXIMITY_PTS
         ))
 
     def ensure_expiry(self):
@@ -261,6 +269,33 @@ class SensexIronCondorStrategy:
         except ValueError:
             return False, ""
 
+    def calculate_pcr_and_walls(self, chain):
+        """Calculates PCR and identifies OI walls (max OI strikes)."""
+        total_ce_oi = 0
+        total_pe_oi = 0
+        max_ce_oi = -1
+        max_pe_oi = -1
+        call_wall_strike = None
+        put_wall_strike = None
+
+        for item in chain:
+            ce_oi = safe_int(item.get("ce", {}).get("oi", 0))
+            pe_oi = safe_int(item.get("pe", {}).get("oi", 0))
+
+            total_ce_oi += ce_oi
+            total_pe_oi += pe_oi
+
+            if ce_oi > max_ce_oi:
+                max_ce_oi = ce_oi
+                call_wall_strike = item["strike"]
+
+            if pe_oi > max_pe_oi:
+                max_pe_oi = pe_oi
+                put_wall_strike = item["strike"]
+
+        pcr = (total_pe_oi / total_ce_oi) if total_ce_oi > 0 else 0.0
+        return pcr, call_wall_strike, put_wall_strike
+
     def get_atm_strike(self, chain):
         """Finds ATM strike from chain data."""
         for item in chain:
@@ -268,71 +303,43 @@ class SensexIronCondorStrategy:
                 return item["strike"]
         return None
 
-    def calculate_straddle_premium(self, chain, atm_strike):
-        """Calculates combined premium of ATM CE and PE."""
-        ce_ltp = 0.0
-        pe_ltp = 0.0
-
+    def get_option_details(self, chain, strike, option_type):
+        """Resolves symbol and LTP for a specific strike."""
         for item in chain:
-            if item["strike"] == atm_strike:
-                ce_ltp = safe_float(item.get("ce", {}).get("ltp", 0))
-                pe_ltp = safe_float(item.get("pe", {}).get("ltp", 0))
-                break
-
-        return ce_ltp + pe_ltp
-
-    def get_leg_details(self, chain, offset, option_type):
-        """Helper to resolve symbol and LTP from chain based on offset."""
-        for item in chain:
-            opt = item.get(option_type.lower(), {})
-            if opt.get("label") == offset:
+            if item["strike"] == strike:
+                opt = item.get(option_type.lower(), {})
                 return {
                     "symbol": opt.get("symbol"),
                     "ltp": safe_float(opt.get("ltp", 0)),
                     "quantity": QUANTITY,
                     "product": PRODUCT,
                     "option_type": option_type,
-                    "offset": offset
+                    "strike": strike
                 }
         return None
 
     def _close_position(self, chain, reason):
-        """Closes all open positions sequentially (BUY legs first)."""
+        """Closes all open positions."""
         self.logger.info(f"Closing position. Reason: {reason}")
 
         if not self.tracker.open_legs:
             return
 
-        # Prepare exit legs
-        exit_legs = []
         for leg in self.tracker.open_legs:
-            original_action = leg.get("action")
-            # Reverse action for exit
-            exit_action = "BUY" if original_action == "SELL" else "SELL"
+            # We are Long in this strategy (Buy CE or Buy PE)
+            # So exit is always SELL
+            exit_action = "SELL"
 
-            exit_legs.append({
-                "symbol": leg["symbol"],
-                "action": exit_action,
-                "quantity": leg["quantity"],
-                "product": PRODUCT
-            })
-
-        # Sort: BUY first to cover shorts and free up margin
-        exit_legs.sort(key=lambda x: 0 if x["action"] == "BUY" else 1)
-
-        # Execute sequentially using placesmartorder
-        for leg in exit_legs:
-            self.logger.info(f"Executing Exit: {leg['action']} {leg['symbol']}")
+            self.logger.info(f"Executing Exit: {exit_action} {leg['symbol']}")
             try:
                 resp = self.order_client.placesmartorder(
                     symbol=leg["symbol"],
-                    action=leg["action"],
+                    action=exit_action,
                     exchange=OPTIONS_EXCHANGE,
                     product=leg["product"],
                     quantity=leg["quantity"]
                 )
                 self.logger.info(f"Order Resp: {resp}")
-                # Small delay between orders to ensure processing
                 time.sleep(0.5)
             except Exception as e:
                 self.logger.error(f"Failed to close leg {leg['symbol']}: {e}")
@@ -340,74 +347,52 @@ class SensexIronCondorStrategy:
         self.tracker.clear()
         self.logger.info("Tracker cleared.")
 
-    def _open_position(self, chain, entry_reason):
-        """Places Iron Condor orders atomically."""
-        # Iron Condor Definition:
-        # Sell OTM2 Call, Sell OTM2 Put (Short Strangle)
-        # Buy OTM4 Call, Buy OTM4 Put (Long Wings)
+    def _open_position(self, chain, option_type, entry_reason):
+        """Places a single-leg directional order."""
+        atm_strike = self.get_atm_strike(chain)
+        if not atm_strike:
+            self.logger.warning("ATM strike not found.")
+            return
 
-        definitions = [
-            ("OTM4", "CE", "BUY"),
-            ("OTM4", "PE", "BUY"),
-            ("OTM2", "CE", "SELL"),
-            ("OTM2", "PE", "SELL")
-        ]
+        details = self.get_option_details(chain, atm_strike, option_type)
+        if not details or not details["symbol"]:
+            self.logger.warning(f"Could not resolve ATM {option_type} details.")
+            return
 
-        tracking_legs = []
-        entry_prices = []
-        api_legs = []
-        valid_setup = True
+        action = "BUY" # Directional Momentum
 
-        for offset, otype, action in definitions:
-            details = self.get_leg_details(chain, offset, otype)
-            if details:
-                # Add action to details for tracker
-                details["action"] = action
-                tracking_legs.append(details)
-                entry_prices.append(details["ltp"])
+        try:
+            self.logger.info(f"Placing {action} order for {details['symbol']} ({entry_reason})")
+            resp = self.order_client.placesmartorder(
+                symbol=details["symbol"],
+                action=action,
+                exchange=OPTIONS_EXCHANGE,
+                product=PRODUCT,
+                quantity=QUANTITY,
+                pricetype="MARKET"
+            )
 
-                # Construct API leg
-                api_legs.append({
-                    "offset": offset,
-                    "option_type": otype,
-                    "action": action,
-                    "quantity": QUANTITY,
-                    "product": PRODUCT
-                })
-            else:
-                self.logger.warning(f"Could not resolve leg: {offset} {otype}")
-                valid_setup = False
-                break
+            if resp.get("status") == "success":
+                self.logger.info(f"Order Success: {resp}")
+                self.limiter.record()
 
-        if valid_setup:
-            try:
-                # Use optionsmultiorder for atomic entry
-                response = self.client.optionsmultiorder(
-                    strategy=STRATEGY_NAME,
-                    underlying=UNDERLYING,
-                    exchange=UNDERLYING_EXCHANGE,
-                    expiry_date=self.expiry,
-                    legs=api_legs
+                # Add to tracker
+                # For BUY strategy, side="BUY" (Debit)
+                # Tracker needs list of legs
+                leg_for_tracker = details.copy()
+                leg_for_tracker["action"] = action
+
+                self.tracker.add_legs(
+                    legs=[leg_for_tracker],
+                    entry_prices=[details["ltp"]],
+                    side="BUY"
                 )
+                self.logger.info(f"Position tracked. Reason: {entry_reason}")
+            else:
+                self.logger.error(f"Order Failed: {resp.get('message')}")
 
-                if response.get("status") == "success":
-                    self.logger.info(f"Order Success: {response}")
-                    self.limiter.record()
-                    self.entered_today = True
-
-                    self.tracker.add_legs(
-                        legs=tracking_legs,
-                        entry_prices=entry_prices,
-                        side="SELL" # Net credit strategy
-                    )
-                    self.logger.info(f"Iron Condor positions tracked. Reason: {entry_reason}")
-                else:
-                    self.logger.error(f"Order Failed: {response.get('message')}")
-
-            except Exception as e:
-                self.logger.error(f"Order Execution Error: {e}")
-        else:
-            self.logger.warning("Setup invalid (missing strikes). Skipping.")
+        except Exception as e:
+            self.logger.error(f"Order Execution Error: {e}")
 
     def run(self):
         self.logger.info(f"Starting {STRATEGY_NAME} for {UNDERLYING} on {OPTIONS_EXCHANGE}")
@@ -416,9 +401,8 @@ class SensexIronCondorStrategy:
             try:
                 # Check Market Open
                 if not is_market_open_local():
-                    # Reset daily flag if new day (simplistic check using UTC hour < 3 i.e. < 8:30 IST)
                     if datetime.now(timezone.utc).hour < 3:
-                        self.entered_today = False
+                        self.entered_today = False # Reset for new day logic (if needed)
 
                     self.logger.debug("Market is closed.")
                     time.sleep(SLEEP_SECONDS)
@@ -438,7 +422,7 @@ class SensexIronCondorStrategy:
                     strike_count=STRIKE_COUNT,
                 )
 
-                valid, reason = is_chain_valid(chain_resp, min_strikes=8)
+                valid, reason = is_chain_valid(chain_resp, min_strikes=10) # Need more strikes for walls
                 if not valid:
                     self.logger.warning(f"Chain invalid: {reason}")
                     time.sleep(SLEEP_SECONDS)
@@ -447,7 +431,7 @@ class SensexIronCondorStrategy:
                 chain = chain_resp.get("chain", [])
                 underlying_ltp = safe_float(chain_resp.get("underlying_ltp", 0))
 
-                # 1. EXIT MANAGEMENT (always check exits BEFORE entries)
+                # 1. EXIT MANAGEMENT
                 should_term, term_reason = self.should_terminate()
 
                 if self.tracker.open_legs:
@@ -466,18 +450,27 @@ class SensexIronCondorStrategy:
                         continue
 
                 # 2. CALCULATE INDICATORS
-                atm_strike = self.get_atm_strike(chain)
-                straddle_premium = 0
-                if atm_strike:
-                    straddle_premium = self.calculate_straddle_premium(chain, atm_strike)
+                pcr, call_wall, put_wall = self.calculate_pcr_and_walls(chain)
+
+                # Proximity Checks
+                near_call_wall = False
+                near_put_wall = False
+
+                if call_wall:
+                    dist_call = abs(call_wall - underlying_ltp)
+                    near_call_wall = dist_call <= WALL_PROXIMITY_PTS
+
+                if put_wall:
+                    dist_put = abs(put_wall - underlying_ltp)
+                    near_put_wall = dist_put <= WALL_PROXIMITY_PTS
 
                 # 3. LOG STATUS
                 self.logger.info(format_kv(
                     spot=f"{underlying_ltp:.2f}",
-                    straddle=f"{straddle_premium:.2f}",
-                    pos="OPEN" if self.tracker.open_legs else "FLAT",
-                    expiry=self.expiry or "N/A",
-                    entered=self.entered_today
+                    pcr=f"{pcr:.2f}",
+                    walls=f"P:{put_wall}/C:{call_wall}",
+                    prox=f"{'NearCall' if near_call_wall else ''}{'NearPut' if near_put_wall else ''}",
+                    pos="OPEN" if self.tracker.open_legs else "FLAT"
                 ))
 
                 # 4. ENTRY LOGIC
@@ -489,15 +482,16 @@ class SensexIronCondorStrategy:
                     time.sleep(SLEEP_SECONDS)
                     continue
 
-                if self.limiter.allow() and self.is_time_window_open() and not self.entered_today:
-                    condition = straddle_premium >= MIN_STRADDLE_PREMIUM
+                if self.limiter.allow() and self.is_time_window_open():
+                    # BULLISH: PCR > 1.2 (Oversold/Support) AND Near Put Wall (Support Bounce)
+                    if pcr >= PCR_BULLISH and near_put_wall:
+                        if self.debouncer.edge("bullish_entry", True):
+                            self._open_position(chain, "CE", f"Bullish PCR:{pcr:.2f} + PutWall:{put_wall}")
 
-                    if condition:
-                        if self.debouncer.edge("entry_signal", True):
-                            self.logger.info(f"Entry Signal: Straddle {straddle_premium} >= {MIN_STRADDLE_PREMIUM}")
-                            self._open_position(chain, "premium_selling_opportunity")
-                    else:
-                        self.logger.debug(f"Waiting for premium. Current: {straddle_premium}, Target: {MIN_STRADDLE_PREMIUM}")
+                    # BEARISH: PCR < 0.8 (Overbought/Resistance) AND Near Call Wall (Resistance Reject)
+                    elif pcr <= PCR_BEARISH and near_call_wall:
+                        if self.debouncer.edge("bearish_entry", True):
+                            self._open_position(chain, "PE", f"Bearish PCR:{pcr:.2f} + CallWall:{call_wall}")
 
             except KeyboardInterrupt:
                 self.logger.info("Strategy stopped by user.")
@@ -509,7 +503,7 @@ class SensexIronCondorStrategy:
             time.sleep(SLEEP_SECONDS)
 
 if __name__ == "__main__":
-    Strategy = SensexIronCondorStrategy()
+    Strategy = SensexOIMomentumStrategy()
     try:
         Strategy.run()
     except Exception as e:
