@@ -1,5 +1,6 @@
 import copy
 import importlib
+import os
 import time
 import traceback
 from typing import Any, Dict, Optional, Tuple
@@ -25,7 +26,7 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Smart order delay
-SMART_ORDER_DELAY = "0.1"  # Default value, can be overridden by environment variable
+SMART_ORDER_DELAY = os.getenv("SMART_ORDER_DELAY", "0.1")  # Default value, can be overridden by environment variable
 
 
 def emit_analyzer_error(request_data: dict[str, Any], error_message: str) -> dict[str, Any]:
@@ -117,8 +118,10 @@ def validate_smart_order(order_data: dict[str, Any]) -> tuple[bool, str | None]:
 
     # Validate symbol and exchange exist (SecurityId check)
     if "symbol" in order_data and "exchange" in order_data:
+        # Check if SecurityId exists before sending to broker
         token = get_token(order_data["symbol"], order_data["exchange"])
         if not token:
+            # Return error immediately if token not found (avoids broker call)
             return False, "SecurityId Required"
 
     return True, None
@@ -205,7 +208,7 @@ def place_smart_order_with_auth(
     if not auth_token:
         error_response = {
             "status": "error",
-            "message": "Invalid Token",
+            "message": "Invalid Token: Authentication token is missing or empty",
         }
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 401
@@ -217,7 +220,8 @@ def place_smart_order_with_auth(
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 404
 
-    # Retry mechanism for 500-level errors
+    # Automatic retry mechanism for 500-level API responses
+    # Handles transient server errors by retrying with exponential backoff
     max_retries = 3
     retry_delay = 0.5
 
@@ -227,17 +231,20 @@ def place_smart_order_with_auth(
 
     for attempt in range(max_retries + 1):
         try:
+            # Attempt to place order via broker API
             res, response_data, order_id = broker_module.place_smartorder_api(
                 order_data, auth_token
             )
 
-            # Check for 500-level errors to retry
+            # Check status for 500-level errors to retry
+            # Supports both 'status' and 'status_code' attributes
             status = (
                 res.status
                 if res and hasattr(res, "status")
                 else (res.status_code if res and hasattr(res, "status_code") else None)
             )
 
+            # If status is >= 500 (Server Error), retry
             if status and status >= 500:
                 if attempt < max_retries:
                     wait_time = retry_delay * (2**attempt)
@@ -247,10 +254,11 @@ def place_smart_order_with_auth(
                     time.sleep(wait_time)
                     continue
 
-            # If successful or non-retriable error, break loop
+            # If successful or non-retriable error (e.g. 400), break loop
             break
 
         except Exception as e:
+            # Catch exceptions during API call (e.g. network error) and retry
             if attempt < max_retries:
                 wait_time = retry_delay * (2**attempt)
                 logger.warning(

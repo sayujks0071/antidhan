@@ -90,12 +90,12 @@ class AIHybridStrategy(BaseStrategy):
             quote = self.client.get_quote(self.symbol, self.exchange)
             ltp = quote.get('ltp', 0) if quote else 0
             if ltp > 0:
-                adaptive_qty = self.pm.calculate_adaptive_quantity_monthly_atr(500000, 1.0, monthly_atr, ltp)
+                adaptive_qty = self.pm.calculate_risk_adjusted_quantity(500000, 1.0, monthly_atr, ltp)
                 if adaptive_qty > 0:
                     base_qty = adaptive_qty
                     self.logger.info(f"Adaptive Base Qty: {base_qty} (Monthly ATR: {monthly_atr:.2f})")
         else:
-            base_qty = 100 # Fallback default used in original code
+            base_qty = 100 # Fallback default
 
         # Fetch Data
         exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"

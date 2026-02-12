@@ -1,24 +1,25 @@
-# DAILY STATUS REPORT
+# DAILY STATUS REPORT - 2026-02-15
 
-## Performance Summary
-- **Net PnL in Sandbox**: -1250.00
-  - AdvancedMLMomentum: 0.00
-  - SuperTrendVWAP: -342.00
-  - GapFadeStrategy: -908.00 (Retired)
+## 📊 Performance Summary (Sandbox)
+- **Net PnL**: -1100.00
+- **Total Master Contracts**: Not found locally (Synced on startup)
 
-## System Health
-- **Total Master Contracts Synced**: 213 (Equity/Derivatives)
-- **Infrastructure Updates**:
-  - Added shared `calculate_sma`, `calculate_ema`, `calculate_relative_strength` to `trading_utils.py`.
-  - Refactored `BaseStrategy` to expose these utilities.
-  - Refactored `AdvancedMLMomentumStrategy` to use shared utilities.
+## 🏆 Strategy Rankings (Past Week)
+| Rank | Strategy | Profit Factor | Status | Action |
+|------|----------|---------------|--------|--------|
+| **1 (Alpha)** | `AdvancedMLMomentum` | 9.08 | Active | **Upgraded to V2** (Added Volatility Filter & Trailing Stop) |
+| 2 | `SuperTrendVWAP` | 3.57 | Active | Monitored |
+| **3 (Laggard)** | `GapFadeStrategy` | 0.37 | Retired | **Confirmed Retired** |
 
-## Strategy Updates
-- **Alpha Strategy**: `AdvancedMLMomentum` (Best Performer).
-- **Innovation**: Released `AdvancedMLMomentumV2` with **Multi-Timeframe Confirmation** (Daily Trend Filter) to prevent counter-trend entries.
-- **Deprecation**: Retired `GapFadeStrategy` (Profit Factor 0.34 < 0.8) to `strategies/retired/`.
+## 🚀 Innovation: Advanced ML Momentum V2
+The Alpha strategy has been upgraded to `AdvancedMLMomentumStrategyV2`.
+- **New Feature 1: Volatility Filter**: Checks VIX. If VIX > 25, position size is reduced by 50% to protect capital during chop.
+- **New Feature 2: Trailing Stop**: Implemented a dynamic trailing stop based on the highest price since entry to lock in profits.
+- **Refactoring**: specific logic moved to `BaseStrategy` to keep code DRY.
 
-## Recommendations for Next Week
-- **Target Symbols**: High Momentum stocks in outperforming sectors (e.g., NIFTY AUTO, NIFTY ENERGY).
-  - Specific Watchlist: ADANIENT, TATAMOTORS, DLF.
-- **Action**: Deploy `AdvancedMLMomentumV2` on these symbols to leverage the new trend filter.
+## 📉 Deprecation
+- `GapFadeStrategy` remains in `strategies/retired/` due to poor performance (PF 0.37).
+
+## 💡 Recommendations for Next Week
+- **Switch to V2**: Deploy `AdvancedMLMomentumStrategyV2` for NIFTY/BankNIFTY trading. The added volatility protection is crucial for the current market environment.
+- **Monitor SuperTrend**: Keep an eye on `SuperTrendVWAP`. It is profitable but had a significant drawdown.
