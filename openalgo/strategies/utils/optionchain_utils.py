@@ -134,6 +134,28 @@ def is_chain_valid(chain_response, min_strikes=10, require_oi=True, require_volu
 
     return True, "OK"
 
+def get_atm_strike(chain):
+    """Finds ATM strike from chain data."""
+    # Assuming chain is sorted or we search for label="ATM"
+    for item in chain:
+        if item.get("ce", {}).get("label") == "ATM":
+            return item["strike"]
+    # Fallback using spot price if available in metadata (not passed here usually)
+    return None
+
+def calculate_straddle_premium(chain, atm_strike):
+    """Calculates combined premium of ATM CE and PE."""
+    ce_ltp = 0.0
+    pe_ltp = 0.0
+
+    for item in chain:
+        if item["strike"] == atm_strike:
+            ce_ltp = safe_float(item.get("ce", {}).get("ltp", 0))
+            pe_ltp = safe_float(item.get("pe", {}).get("ltp", 0))
+            break
+
+    return ce_ltp + pe_ltp
+
 class OptionChainClient:
     def __init__(self, api_key, host="http://127.0.0.1:5000"):
         self.api_key = api_key

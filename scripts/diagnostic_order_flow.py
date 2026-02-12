@@ -1,194 +1,159 @@
 #!/usr/bin/env python3
-"""
-Diagnostic script to simulate order flow and verify response handling.
-Attempts to place 5 different order types in the Dhan Sandbox.
-"""
-import os
 import sys
-import logging
+import os
 import json
-from unittest.mock import MagicMock, patch
-
-# Add repository root to path
-repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(repo_root)
-sys.path.append(os.path.join(repo_root, 'openalgo'))
-
-# Set dummy environment variables to avoid startup errors
-db_path = '/tmp/test_settings.db'
-if os.path.exists(db_path):
-    os.remove(db_path)
-os.environ['DATABASE_URL'] = f'sqlite:///{db_path}'
-os.environ['BROKER_API_KEY'] = 'test_key'
-os.environ['BROKER_API_SECRET'] = 'test_secret'
-os.environ['API_KEY_PEPPER'] = '01234567890123456789012345678901'  # 32 chars
-
-# Mock extensions to avoid DB issues during import of other modules that might use them
-sys.modules['extensions'] = MagicMock()
-sys.modules['database.telegram_db'] = MagicMock()
-sys.modules['database.analyzer_db'] = MagicMock()
-
-# Now import the service and DB utils using top-level names as the app does
-from services.place_smart_order_service import place_smart_order
-from utils.logging import get_logger
-from database.settings_db import init_db as init_settings_db
-import broker.dhan_sandbox.api.order_api
-import database.token_db
+import logging
+from unittest.mock import patch
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = get_logger(__name__)
+logger = logging.getLogger("DiagnosticOrderFlow")
 
-def test_order_flow():
-    logger.info("Starting Order Flow Simulation")
+# Set dummy env vars for DB
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["BROKER_API_KEY"] = "dummy_key"
+os.environ["API_KEY_PEPPER"] = "0" * 32
+os.environ["FLASK_SECRET_KEY"] = "dummy_secret_key_at_least_32_chars_long"
 
-    # Initialize Settings DB
-    try:
-        init_settings_db()
-        logger.info("Settings DB initialized")
-    except Exception as e:
-        logger.warning(f"Failed to initialize Settings DB: {e}")
+# Add repo root to path
+repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+openalgo_root = os.path.join(repo_root, "openalgo")
 
-    # Mock Auth Token and API Key
-    mock_auth_token = "MOCK_AUTH_TOKEN"
-    mock_api_key = "MOCK_API_KEY"
-    broker_name = "dhan_sandbox"
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+if openalgo_root not in sys.path:
+    sys.path.insert(0, openalgo_root)
 
-    # Define 5 order types to test
-    order_scenarios = [
-        {
-            "type": "LIMIT",
-            "data": {
-                "symbol": "SBIN",
-                "exchange": "NSE",
-                "action": "BUY",
-                "product": "MIS",
-                "pricetype": "LIMIT",
-                "quantity": "1",
-                "price": "500",
-                "trigger_price": "0",
-                "disclosed_quantity": "0",
-                "strategy": "TEST_STRATEGY",
-                "position_size": "0"
-            }
-        },
-        {
-            "type": "MARKET",
-            "data": {
-                "symbol": "SBIN",
-                "exchange": "NSE",
-                "action": "BUY",
-                "product": "MIS",
-                "pricetype": "MARKET",
-                "quantity": "1",
-                "price": "0",
-                "trigger_price": "0",
-                "disclosed_quantity": "0",
-                "strategy": "TEST_STRATEGY",
-                "position_size": "0"
-            }
-        },
-        {
-            "type": "STOP_LOSS",
-            "data": {
-                "symbol": "SBIN",
-                "exchange": "NSE",
-                "action": "SELL",
-                "product": "MIS",
-                "pricetype": "SL",
-                "quantity": "1",
-                "price": "490",
-                "trigger_price": "495",
-                "disclosed_quantity": "0",
-                "strategy": "TEST_STRATEGY",
-                "position_size": "0"
-            }
-        },
-        {
-            "type": "STOP_LOSS_MARKET",
-            "data": {
-                "symbol": "SBIN",
-                "exchange": "NSE",
-                "action": "SELL",
-                "product": "MIS",
-                "pricetype": "SL-M",
-                "quantity": "1",
-                "price": "0",
-                "trigger_price": "495",
-                "disclosed_quantity": "0",
-                "strategy": "TEST_STRATEGY",
-                "position_size": "0"
-            }
-        },
-        {
-            "type": "BRACKET_ORDER",
-            "data": {
-                "symbol": "SBIN",
-                "exchange": "NSE",
-                "action": "BUY",
-                "product": "BO",
-                "pricetype": "LIMIT",
-                "quantity": "1",
-                "price": "500",
-                "trigger_price": "0",
-                "disclosed_quantity": "0",
-                "strategy": "TEST_STRATEGY",
-                "position_size": "0"
-            }
-        }
+try:
+    from openalgo.services.place_smart_order_service import place_smart_order
+    # We need to patch utils.httpx_client.request because that's what the broker api uses
+    import openalgo.utils.httpx_client as httpx_client_module
+except ImportError as e:
+    logger.error(f"Failed to import modules: {e}")
+    sys.exit(1)
+
+class MockResponse:
+    def __init__(self, json_data, status_code):
+        self.json_data = json_data
+        self.status_code = status_code
+        self.text = json.dumps(json_data)
+        self.status = status_code # Some code checks .status
+
+    def json(self):
+        return self.json_data
+
+def mock_request(method, url, headers=None, content=None, max_retries=3):
+    logger.info(f"[MOCK] Request: {method} {url}")
+    if content:
+        logger.info(f"[MOCK] Payload: {content}")
+
+    # Simulate Dhan Sandbox Response for Market Closed
+    # HTTP 200 OK, but orderStatus is REJECTED
+    response_data = {
+        "status": "success",
+        "orderId": "1000001",
+        "orderStatus": "REJECTED",
+        "orderStatusMessage": "Market is Closed",
+        "rejectReason": "Market is Closed"
+    }
+    return MockResponse(response_data, 200)
+
+def run_diagnostic():
+    logger.info("Starting Order Flow Diagnostic (Market Closed Simulation)...")
+
+    # Order Types to Test
+    order_types = [
+        {"name": "LIMIT", "type": "LIMIT", "price": "500"},
+        {"name": "MARKET", "type": "MARKET", "price": "0"},
+        {"name": "SL", "type": "STOP_LOSS", "price": "500", "trigger_price": "490"},
+        {"name": "SL-M", "type": "STOP_LOSS_MARKET", "price": "0", "trigger_price": "490"},
+        {"name": "Bracket", "type": "BO", "price": "500", "trigger_price": "490", "stop_loss": "5", "take_profit": "10"}
     ]
 
-    # Patch modules using the paths they are imported as
-    with patch('broker.dhan_sandbox.api.order_api.request') as mock_request, \
-         patch('database.token_db.get_token', return_value="12345"), \
-         patch('services.place_smart_order_service.async_log_order') as mock_log:
+    # Dummy Data
+    symbol = "SBIN"
+    exchange = "NSE"
+    product = "MIS"
+    api_key = "test_api_key"
 
-        # Configure mock response for "Market Closed" rejection
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = json.dumps({
-            "status": "failed",
-            "remarks": "Market is Closed",
-            "data": {"rejectReason": "Market is Closed"},
-            "orderId": "123456",
-            "orderStatus": "REJECTED"
-        })
-        mock_response.json.return_value = json.loads(mock_response.text)
-        mock_request.return_value = mock_response
+    # Mock Token DB to return a valid token so validation passes
+    # Note: The app imports 'broker' and 'database' as top-level packages
+    with patch('database.token_db.get_token', return_value="1333"), \
+         patch('openalgo.services.place_smart_order_service.get_token', return_value="1333"), \
+         patch('broker.dhan_sandbox.api.order_api.get_token', return_value="1333"), \
+         patch('broker.dhan_sandbox.api.order_api.get_open_position', return_value="0"):
 
-        for scenario in order_scenarios:
-            logger.info(f"--- Testing {scenario['type']} Order ---")
-            order_data = scenario['data']
-            order_data['apikey'] = mock_api_key
+        # Mock Auth DB to return a valid auth token
+        with patch('openalgo.services.place_smart_order_service.get_auth_token_broker', return_value=("mock_auth_token", "dhan_sandbox")):
+            # Mock get_analyze_mode to False (Live/Paper Trading)
+            with patch('openalgo.services.place_smart_order_service.get_analyze_mode', return_value=False):
+                # Mock httpx request (patching local import in order_api)
+                with patch('broker.dhan_sandbox.api.order_api.request', side_effect=mock_request):
 
-            try:
-                success, response, status_code = place_smart_order(
-                    order_data=order_data,
-                    auth_token=mock_auth_token,
-                    api_key=mock_api_key,
-                    broker=broker_name
-                )
+                    failed_count = 0
+                    success_handled_count = 0
 
-                logger.info(f"Success: {success}")
-                logger.info(f"Status Code: {status_code}")
-                logger.info(f"Response: {response}")
+                    for order_conf in order_types:
+                        logger.info(f"\n--- Testing Order Type: {order_conf['name']} ---")
 
-                if success is False:
-                    if "Order Rejected" in str(response) or "Market is Closed" in str(response):
-                            logger.info("✅ Verified: Order correctly identified as rejected/failed.")
+                        order_data = {
+                            "symbol": symbol,
+                            "exchange": exchange,
+                            "action": "BUY",
+                            "quantity": "1",
+                            "pricetype": order_conf['type'],
+                            "product": product,
+                            "price": order_conf['price'],
+                            "trigger_price": order_conf.get('trigger_price', '0'),
+                            "disclosed_quantity": "0",
+                            "apikey": api_key,
+                            "strategy": "Diagnostic",
+                            "position_size": "1"
+                        }
+
+                        # Call the service
+                        # Note: place_smart_order returns (success, response, status_code)
+                        success, response, status_code = place_smart_order(
+                            order_data=order_data,
+                            api_key=api_key
+                        )
+
+                        logger.info(f"Service Result: Success={success}, Status={status_code}")
+                        logger.info(f"Response: {response}")
+
+                        # Verification Logic
+                        # We EXPECT the service to return success=False because the order was REJECTED by broker
+                        # even though HTTP status was 200.
+                        # However, place_smart_order_service implementation says:
+                        # if res and res.status == 200:
+                        #    if order_id is None: return False, ...
+                        #    else: return True, ...
+
+                        # In our mock, we return "orderId": "1000001".
+                        # But we also set "orderStatus": "REJECTED".
+
+                        # Let's see how `broker.dhan_sandbox.api.order_api.place_order_api` handles it.
+                        # It checks: if order_status in ["REJECTED", "FAILED"]: orderid = None
+
+                        # So place_order_api should return orderid=None.
+                        # Then place_smart_order_service should see order_id is None and return False.
+
+                        if not success:
+                            logger.info("PASS: Service correctly identified failure.")
+                            success_handled_count += 1
+                        else:
+                            logger.error("FAIL: Service reported success for a REJECTED order!")
+                            failed_count += 1
+
+                    logger.info("\n--- Diagnostic Summary ---")
+                    logger.info(f"Total Tests: {len(order_types)}")
+                    logger.info(f"Correctly Handled (Rejected): {success_handled_count}")
+                    logger.info(f"Incorrectly Handled (Success): {failed_count}")
+
+                    if failed_count > 0:
+                        sys.exit(1)
                     else:
-                            logger.info(f"Verified: Order failed as expected, but message was: {response}")
-                elif response.get("status") == "error":
-                        logger.info(f"Verified: Order failed logically: {response}")
-                else:
-                    # Check for rejection in response
-                    if response.get("message", "").startswith("Order Rejected"):
-                         logger.info("✅ Verified: Order correctly identified as rejected/failed.")
-                    else:
-                        logger.warning(f"Unexpected Success! Response: {response}")
-
-            except Exception as e:
-                logger.error(f"Exception during test: {e}")
+                        sys.exit(0)
 
 if __name__ == "__main__":
-    test_order_flow()
+    run_diagnostic()
