@@ -85,15 +85,15 @@ QUANTITY = int(os.getenv("QUANTITY", "1"))        # 1 lot = 10 units for SENSEX
 STRIKE_COUNT = int(os.getenv("STRIKE_COUNT", "12"))
 
 # Strategy-specific parameters
-MIN_STRADDLE_PREMIUM = float(os.getenv("MIN_STRADDLE_PREMIUM", "500.0"))
+MIN_STRADDLE_PREMIUM = float(os.getenv("MIN_STRADDLE_PREMIUM", "400.0"))
 ENTRY_START_TIME = os.getenv("ENTRY_START_TIME", "10:00")
 ENTRY_END_TIME = os.getenv("ENTRY_END_TIME", "14:30")
 EXIT_TIME = os.getenv("EXIT_TIME", "15:15")
 FRIDAY_EXIT_TIME = os.getenv("FRIDAY_EXIT_TIME", "14:00") # Early exit on expiry day
 
 # Risk parameters
-SL_PCT = float(os.getenv("SL_PCT", "35.0"))        # % of entry premium
-TP_PCT = float(os.getenv("TP_PCT", "45.0"))         # % of entry premium
+SL_PCT = float(os.getenv("SL_PCT", "35"))        # % of entry premium
+TP_PCT = float(os.getenv("TP_PCT", "45"))         # % of entry premium
 MAX_HOLD_MIN = int(os.getenv("MAX_HOLD_MIN", "45"))
 
 # Rate limiting
@@ -494,12 +494,12 @@ class SensexIronCondorStrategy:
                     # 1. Straddle Premium > MIN_STRADDLE_PREMIUM (Volatility Check)
                     # 2. Debounced signal
 
-                    is_premium_good = straddle_premium >= MIN_STRADDLE_PREMIUM
-                    entry_signal = self.debouncer.edge("entry_signal", is_premium_good)
+                    condition = straddle_premium >= MIN_STRADDLE_PREMIUM
 
-                    if entry_signal:
-                        self.logger.info(f"Entry Signal: Straddle {straddle_premium} >= {MIN_STRADDLE_PREMIUM}")
-                        self._open_position(chain, "premium_selling_opportunity")
+                    if condition:
+                        if self.debouncer.edge("entry_signal", True):
+                            self.logger.info(f"Entry Signal: Straddle {straddle_premium} >= {MIN_STRADDLE_PREMIUM}")
+                            self._open_position(chain, "premium_selling_opportunity")
                     else:
                         self.logger.debug(f"Waiting for premium. Current: {straddle_premium}, Target: {MIN_STRADDLE_PREMIUM}")
 
