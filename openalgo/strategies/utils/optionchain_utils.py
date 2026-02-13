@@ -197,6 +197,58 @@ class OptionChainClient:
             "legs": legs
         })
 
+    def placesmartorder(self, strategy, symbol, action, exchange, pricetype, product, quantity, position_size):
+        """
+        Places a smart order (single leg).
+        """
+        payload = {
+            "apikey": self.api_key,
+            "strategy": strategy,
+            "symbol": symbol,
+            "action": action,
+            "exchange": exchange,
+            "pricetype": pricetype,
+            "product": product,
+            "quantity": str(quantity),
+            "position_size": str(position_size),
+            "price": "0",
+            "trigger_price": "0",
+            "disclosed_quantity": "0"
+        }
+        # Note: endpoint is placesmartorder (not _post generic if key names differ, but here we construct payload manually)
+        # Using _post wrapper might be cleaner but _post adds apikey.
+        # Let's use _post but we need to be careful about payload structure if _post modifies it.
+        # _post does: payload["apikey"] = self.api_key.
+        # So we can just pass the fields.
+
+        return self._post("placesmartorder", {
+            "strategy": strategy,
+            "symbol": symbol,
+            "action": action,
+            "exchange": exchange,
+            "pricetype": pricetype,
+            "product": product,
+            "quantity": str(quantity),
+            "position_size": str(position_size),
+            "price": "0",
+            "trigger_price": "0",
+            "disclosed_quantity": "0"
+        })
+
+    def get_quote(self, symbol, exchange="NSE"):
+        """
+        Fetches a real-time quote for a symbol.
+        Returns the data dictionary (containing ltp, etc.) or None.
+        """
+        res = self._post("quotes", {
+            "symbol": symbol,
+            "exchange": exchange
+        })
+
+        if res.get("status") == "success" and "data" in res:
+            return res["data"]
+        return None
+
 class OptionPositionTracker:
     def __init__(self, sl_pct, tp_pct, max_hold_min):
         self.sl_pct = sl_pct
