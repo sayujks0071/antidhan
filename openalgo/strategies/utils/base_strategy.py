@@ -374,6 +374,10 @@ class BaseStrategy:
         """Calculate Rate of Change (ROC)."""
         return calculate_roc(series, period)
 
+    def calculate_bollinger_bands(self, series, window=20, num_std=2):
+        """Calculate Bollinger Bands."""
+        return calculate_bollinger_bands(series, window, num_std)
+
     def is_lunch_break(self):
         """Avoid trading during low volume lunch hours (12:00 - 13:00)."""
         now = datetime.now()
@@ -388,7 +392,17 @@ class BaseStrategy:
         try:
             target_symbol = symbol or self.symbol
             # Ensure we fetch enough data for ATR calculation (e.g. 35 days for 14 period + buffer)
-            df = self.fetch_history(days=40, symbol=target_symbol, interval="D")
+            # Use yesterday as end_date to leverage FileCache (which caches past dates)
+            end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            start_date = (datetime.now() - timedelta(days=45)).strftime("%Y-%m-%d")
+
+            df = self.client.history(
+                symbol=target_symbol,
+                interval="D",
+                exchange=self.exchange,
+                start_date=start_date,
+                end_date=end_date
+            )
 
             if df.empty or len(df) < 15:
                 self.logger.warning(f"Insufficient daily data for Monthly ATR calculation: {len(df)}")
