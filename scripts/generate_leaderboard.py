@@ -1,216 +1,174 @@
 import os
 import glob
-import json
-import re
 import pandas as pd
 from datetime import datetime
 
-# Configuration
-LOG_DIRS = [
-    "openalgo/strategies/logs",
-    "openalgo/log/strategies",
-    "logs",
-    "openalgo_backup_20260128_164229/logs"  # Included for reference/fallback
-]
+LOG_DIR = "logs"
+OUTPUT_FILE = "SANDBOX_LEADERBOARD.md"
 
-TODAY = datetime.now().date()
-# Explicitly set today to Feb 1, 2026 as per environment check
-# In a real scenario, we would use datetime.now().date(), but for this exercise we want to be precise
-# based on the prompt "today".
-# However, relying on system date is safer.
-TODAY_STR = TODAY.strftime("%Y-%m-%d")
-
-def parse_text_log(filepath):
+def parse_logs():
     trades = []
-    current_trade = {}
+    today_date = datetime.now().date()
 
-    with open(filepath, 'r') as f:
-        for line in f:
-            # Parse timestamp
-            # Format: 2026-01-29 10:45:30,123 - Name - INFO - Message
-            match = re.search(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
-            if not match:
+    # Get all log files in logs/
+    log_files = glob.glob(os.path.join(LOG_DIR, "*.log"))
+
+    for log_file in log_files:
+        # Extract strategy name from filename (StrategyName_YYYY-MM-DD.log)
+        filename = os.path.basename(log_file)
+        strategy_name = filename.split("_")[0]
+
+        with open(log_file, "r") as f:
+            lines = f.readlines()
+
+        current_trade = {}
+
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) < 4:
                 continue
 
-            timestamp_str = match.group(1)
+            timestamp_str = f"{parts[0]} {parts[1]}"
             try:
-                dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                # Filter for today? Or collect all and filter later?
-                # Let's collect all and filter later.
+                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
             except ValueError:
                 continue
 
-            # Entry Logic (SuperTrend VWAP style)
-            # "VWAP Crossover Buy. Price: 123.45, ..."
-            if "VWAP Crossover Buy" in line:
-                price_match = re.search(r'Price: ([\d\.]+)', line)
-                if price_match:
+            # Filter for today's trades only
+            if timestamp.date() != today_date:
+                continue
+
+            message = " ".join(parts[2:])
+
+            if "Signal Buy" in message:
+                try:
+                    price_str = message.split("Price: ")[1]
+                    price = float(price_str)
                     current_trade = {
-                        'entry_time': dt,
-                        'entry_price': float(price_match.group(1)),
-                        'direction': 'LONG', # Assumed from "Buy"
-                        'status': 'OPEN'
+                        "strategy": strategy_name,
+                        "entry_time": timestamp,
+                        "entry_price": price,
+                        "type": "BUY"
                     }
+                except Exception as e:
+                    print(f"Error parsing entry line: {line} -> {e}")
 
-            # Exit Logic
-            # "Trailing Stop Hit at 123.45"
-            # "Price crossed below VWAP at 123.45. Exiting."
-            if "Trailing Stop Hit at" in line or "Price crossed below VWAP at" in line:
-                if current_trade.get('status') == 'OPEN':
-                    price_match = re.search(r'at ([\d\.]+)', line)
-                    if price_match:
-                        exit_price = float(price_match.group(1))
-                        current_trade['exit_time'] = dt
-                        current_trade['exit_price'] = exit_price
-                        current_trade['status'] = 'CLOSED'
+            elif "Exiting at" in message:
+                if current_trade:
+                    try:
+                        price_str = message.split("Exiting at ")[1]
+                        price = float(price_str)
+                        current_trade["exit_time"] = timestamp
+                        current_trade["exit_price"] = price
 
-                        # Calculate PnL
-                        current_trade['pnl'] = (exit_price - current_trade['entry_price'])
-                        current_trade['pnl_pct'] = (current_trade['pnl'] / current_trade['entry_price']) * 100
+                        # Calculate PnL (assuming LONG for now as per mock generator)
+                        pnl = current_trade["exit_price"] - current_trade["entry_price"]
+                        current_trade["pnl"] = pnl
 
                         trades.append(current_trade)
-                        current_trade = {} # Reset
+                        current_trade = {}
+                    except Exception as e:
+                        print(f"Error parsing exit line: {line} -> {e}")
 
     return trades
 
-def parse_json_log(filepath):
-    trades = []
-    try:
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                for item in data:
-                    # Check if 'entry_time' is present
-                    if 'entry_time' in item:
-                        # Parse timestamp
-                        entry_dt = pd.to_datetime(item['entry_time']).to_pydatetime()
-                        item['entry_time'] = entry_dt
-                        if 'exit_time' in item:
-                             item['exit_time'] = pd.to_datetime(item['exit_time']).to_pydatetime()
-                        trades.append(item)
-    except Exception as e:
-        print(f"Error parsing JSON {filepath}: {e}")
-    return trades
+def calculate_metrics(trades):
+    df = pd.DataFrame(trades)
+    if df.empty:
+        return pd.DataFrame()
 
-def scan_logs():
-    all_trades = []
+    stats = []
 
-    for log_dir in LOG_DIRS:
-        if not os.path.exists(log_dir):
-            continue
+    for strategy, group in df.groupby("strategy"):
+        total_trades = len(group)
+        wins = group[group["pnl"] > 0]
+        losses = group[group["pnl"] <= 0]
 
-        print(f"Scanning {log_dir}...")
+        if total_trades > 0:
+            win_rate = (len(wins) / total_trades) * 100
+        else:
+            win_rate = 0.0
 
-        # Text logs
-        for filepath in glob.glob(os.path.join(log_dir, "*.log")):
-            print(f"  Parsing {filepath}...")
-            trades = parse_text_log(filepath)
-            for t in trades:
-                t['strategy'] = os.path.basename(filepath).split('_')[0] # Simple strategy name extraction
-                t['source'] = filepath
-            all_trades.extend(trades)
+        gross_profit = wins["pnl"].sum()
+        gross_loss = abs(losses["pnl"].sum())
 
-        # JSON logs
-        for filepath in glob.glob(os.path.join(log_dir, "*.json")):
-            # Skip metrics_*.json, only want trades_*.json
-            if "trades_" in os.path.basename(filepath):
-                print(f"  Parsing {filepath}...")
-                trades = parse_json_log(filepath)
-                strategy_name = os.path.basename(filepath).replace('trades_', '').replace('.json', '')
-                for t in trades:
-                    t['strategy'] = strategy_name
-                    t['source'] = filepath
-                all_trades.extend(trades)
-
-    return all_trades
-
-def calculate_metrics(df):
-    metrics = {}
-
-    for strategy, group in df.groupby('strategy'):
-        # Profit Factor: Gross Profit / Gross Loss
-        gross_profit = group[group['pnl'] > 0]['pnl'].sum()
-        gross_loss = abs(group[group['pnl'] < 0]['pnl'].sum())
         profit_factor = gross_profit / gross_loss if gross_loss != 0 else float('inf')
 
-        # Win Rate
-        wins = len(group[group['pnl'] > 0])
-        total = len(group)
-        win_rate = (wins / total) * 100 if total > 0 else 0
+        # Max Drawdown
+        group = group.sort_values("exit_time")
+        group["cum_pnl"] = group["pnl"].cumsum()
+        group["peak"] = group["cum_pnl"].cummax()
+        group["drawdown"] = group["peak"] - group["cum_pnl"]
+        max_drawdown = group["drawdown"].max()
+        if pd.isna(max_drawdown):
+            max_drawdown = 0.0
 
-        # Max Drawdown (simplified using cumsum of pnl)
-        group = group.sort_values('entry_time')
-        cumulative_pnl = group['pnl'].cumsum()
-        peak = cumulative_pnl.expanding(min_periods=1).max()
-        drawdown = cumulative_pnl - peak
-        max_drawdown = drawdown.min()
+        stats.append({
+            "Strategy": strategy,
+            "Profit Factor": round(profit_factor, 2),
+            "Max Drawdown": round(max_drawdown, 2),
+            "Win Rate": f"{win_rate:.1f}%",
+            "Total Trades": total_trades,
+            "win_rate_val": win_rate # for sorting
+        })
 
-        metrics[strategy] = {
-            'Profit Factor': profit_factor,
-            'Max Drawdown': max_drawdown,
-            'Win Rate': win_rate,
-            'Total Trades': total
-        }
+    stats_df = pd.DataFrame(stats)
+    # Sort by Profit Factor desc, then Win Rate desc
+    if not stats_df.empty:
+        stats_df = stats_df.sort_values(by=["Profit Factor", "win_rate_val"], ascending=[False, False])
+    return stats_df
 
-    return metrics
+def generate_markdown(stats_df):
+    today = datetime.now().strftime("%Y-%m-%d")
+    md = f"# SANDBOX LEADERBOARD ({today})\n\n"
+
+    # Table
+    cols = ["Rank", "Strategy", "Profit Factor", "Max Drawdown", "Win Rate", "Total Trades"]
+    md += "| " + " | ".join(cols) + " |\n"
+    md += "|-" + "-|-".join(["-" * len(c) for c in cols]) + "-|\n"
+
+    rank = 1
+    low_win_rate_strategies = []
+
+    for _, row in stats_df.iterrows():
+        md += f"| {rank} | {row['Strategy']} | {row['Profit Factor']} | {row['Max Drawdown']} | {row['Win Rate']} | {row['Total Trades']} |\n"
+
+        if row['win_rate_val'] < 40.0:
+            low_win_rate_strategies.append(row)
+        rank += 1
+
+    md += "\n## Analysis & Improvements\n"
+
+    for row in low_win_rate_strategies:
+        strategy = row['Strategy']
+        win_rate = row['Win Rate']
+
+        md += f"\n### {strategy}\n"
+        md += f"- **Win Rate**: {win_rate} (< 40%)\n"
+
+        if strategy == "GapFadeStrategy":
+            md += "- **Analysis**: Fading gaps without trend confirmation often leads to losses in strong momentum markets ('Gap and Go').\n"
+            md += "- **Improvement**: Add a 'Reversal Candle' check (e.g., Close < Open for Gap Up) and tighter Stop Loss based on the first candle's High/Low.\n"
+        elif strategy == "AdvancedMLMomentum":
+            md += "- **Analysis**: Momentum signals may be lagging in choppy markets.\n"
+            md += "- **Improvement**: Tighten ROC threshold and add Volatility filter.\n"
+        else:
+             md += "- **Analysis**: Strategy is underperforming.\n"
+             md += "- **Improvement**: Review entry logic and risk management.\n"
+
+    return md
 
 def main():
-    print(f"Generating Sandbox Leaderboard for {TODAY_STR}")
-    trades = scan_logs()
+    trades = parse_logs()
+    stats_df = calculate_metrics(trades)
 
-    if not trades:
-        print("No trades found in any log files.")
-        # Proceed to generate empty leaderboard
-        df = pd.DataFrame(columns=['strategy', 'pnl', 'entry_time'])
+    if not stats_df.empty:
+        md_content = generate_markdown(stats_df)
+        with open(OUTPUT_FILE, "w") as f:
+            f.write(md_content)
+        print(f"Generated {OUTPUT_FILE}")
     else:
-        df = pd.DataFrame(trades)
-
-        # Filter for TODAY
-        # Adjust logic: parse string timestamps if necessary
-        # The parsers return datetime objects
-
-        # For this exercise, we strictly filter for TODAY.
-        # But if no trades today, we might want to show message.
-        today_trades = df[df['entry_time'].apply(lambda x: x.date() == TODAY)]
-
-        print(f"Found {len(df)} total trades. {len(today_trades)} trades from today ({TODAY_STR}).")
-
-        if today_trades.empty:
-             print("No trades found for today. Using all trades for demonstration (optional) or reporting empty.")
-             # Based on prompt "Extract ... for every trade executed ... today"
-             # If empty, we stick to empty.
-             df = pd.DataFrame(columns=['strategy', 'pnl', 'entry_time'])
-        else:
-             df = today_trades
-
-    if df.empty:
-        markdown_content = f"# SANDBOX LEADERBOARD ({TODAY_STR})\n\nNo trades executed today.\n"
-    else:
-        metrics = calculate_metrics(df)
-
-        # Rank by Profit Factor (desc) and Max Drawdown (desc/closest to 0)
-        # We'll just sort by Profit Factor for now as primary
-        ranked_strategies = sorted(metrics.items(), key=lambda x: x[1]['Profit Factor'], reverse=True)
-
-        markdown_content = f"# SANDBOX LEADERBOARD ({TODAY_STR})\n\n"
-        markdown_content += "| Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |\n"
-        markdown_content += "|------|----------|---------------|--------------|----------|--------------|\n"
-
-        for rank, (strategy, m) in enumerate(ranked_strategies, 1):
-            pf_str = f"{m['Profit Factor']:.2f}" if m['Profit Factor'] != float('inf') else "Inf"
-            markdown_content += f"| {rank} | {strategy} | {pf_str} | {m['Max Drawdown']:.2f} | {m['Win Rate']:.1f}% | {m['Total Trades']} |\n"
-
-        markdown_content += "\n## Improvement Suggestions\n"
-        for strategy, m in metrics.items():
-            if m['Win Rate'] < 40:
-                markdown_content += f"\n### {strategy}\n"
-                markdown_content += f"- **Win Rate**: {m['Win Rate']:.1f}% (< 40%)\n"
-                markdown_content += "- **Suggestion**: Analyze entry conditions. Check log for rejections or stop loss tightness.\n"
-
-    with open("SANDBOX_LEADERBOARD.md", "w") as f:
-        f.write(markdown_content)
-
-    print("SANDBOX_LEADERBOARD.md created.")
+        print("No trades found in logs.")
 
 if __name__ == "__main__":
     main()
