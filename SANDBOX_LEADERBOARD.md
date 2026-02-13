@@ -1,10 +1,10 @@
-# SANDBOX LEADERBOARD (2026-02-12)
+# SANDBOX LEADERBOARD (2026-02-13)
 
 | Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |
 |------|----------|---------------|--------------|----------|--------------|
-| 1 | SuperTrendVWAP | 2.99 | 289.00 | 70.0% | 10 |
-| 2 | AdvancedMLMomentum | 0.50 | 309.00 | 40.0% | 5 |
-| 3 | GapFadeStrategy | 0.29 | 1041.00 | 30.0% | 10 |
+| 1 | AdvancedMLMomentum | inf | 0.0 | 100.0% | 5 |
+| 2 | SuperTrendVWAP | 2.38 | 168.0 | 70.0% | 10 |
+| 3 | GapFadeStrategy | 0.5 | 818.0 | 30.0% | 10 |
 
 ## Analysis & Improvements
 
