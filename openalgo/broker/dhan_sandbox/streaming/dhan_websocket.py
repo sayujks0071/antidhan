@@ -2057,8 +2057,8 @@ class DhanWebSocket:
             except struct.error as e:
                 logger.error(f"Error processing 20-level depth message (struct error): {e}")
                 logger.error(f"Exception type: {type(e).__name__}")
-                if "header" in locals():
-                    logger.error(f"Header hex: {header.hex()}")
+                if len(message) >= 12:
+                    logger.error(f"Header hex: {message[:12].hex()}")
                 logger.error(f"Full message length: {len(message)}")
                 # Log which parsing step failed
                 logger.error(f"msg_length parsed: {'msg_length' in locals()}")
