@@ -163,24 +163,24 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 - Central monitor via `openalgo/scripts/monitor_trades.py`
 - Broker positionbook is used to reconcile live positions.
 
-## 🛡️ System Audit & Performance (Feb 12, 2026)
+## 🛡️ System Audit & Roadmap (Feb 2026)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBolTrend**.
+- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBol**.
   - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
 - **Equity Curve Stress Test:**
-  - **Total Return (Simulated):** 809.18 (on 1M capital per strategy)
-  - **Worst Day:** 2026-02-05 (PnL: +37.55) - No losing days in simulation period.
+  - **Total Return (Simulated):** ~831.35 (on 4M portfolio)
+  - **Worst Day:** 2026-02-06 (PnL: +35.86) - Simulated environment showed consistent positive expectancy.
   - **Max Drawdown:** -0.01%
-  - **Top Performer:** NSERsiBolTrend (83% Win Rate, Profit Factor 5.21)
+  - **Top Performer:** NSERsiBol (83.33% Win Rate, Profit Factor 5.21)
 - **Infrastructure Upgrades:**
-  - **Optimization:** Enhanced `APIClient.history` caching robustness for datetime objects. Verified batching in `get_quote`.
-  - **Adaptive Sizing:** Updated `PositionManager` to standardize `calculate_risk_adjusted_quantity` (Monthly ATR based) and enforced its usage across `ai_hybrid_reversion_breakout.py`, `mcx_global_arbitrage_strategy.py`, and `nse_rsi_bol_trend.py`.
+  - **Optimization:** Optimized `BaseStrategy.get_monthly_atr` to use cached historical data (yesterday's date), reducing API load.
+  - **Adaptive Sizing:** Refactored `NSERsiBolTrendStrategy` to use standardized `get_adaptive_quantity`. Enhanced `PositionManager` robustness against invalid volatility data. Optimized data fetching in `mcx_global_arbitrage_strategy`.
 
-## 🚀 Ahead Roadmap
+### 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **Volume Profile / POC (Point of Control):** Already used in `SuperTrendVWAP`, showing promise for identifying value zones. Expand its usage to other strategies.
-2.  **Sector Rotation with RSI:** `NSERsiBolTrend` performed well. Combining relative strength (Sector vs Index) with RSI trend following is a robust anomaly.
-3.  **Global Arbitrage:** `MCXGlobalArbitrage` logic (Global vs Local price divergence) remains a high-value anomaly to exploit, especially for commodities.
+1.  **VWAP Deviations:** Continue exploiting mean reversion around VWAP bands (as seen in `SuperTrendVWAP`).
+2.  **Volume Profile POC Shifts:** Investigate shifting Point of Control as a leading indicator for trend changes.
+3.  **Sector Rotation / Market Breadth:** Expand `NSERsiBol` logic to include broader sector rotation signals.
