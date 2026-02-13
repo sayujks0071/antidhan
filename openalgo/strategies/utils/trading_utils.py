@@ -357,6 +357,11 @@ class PositionManager:
 
         Formula: Qty = (Capital * RiskPct) / (Volatility * 2.0)
         """
+        # Handle NaN or invalid values
+        if pd.isna(volatility) or pd.isna(price):
+            logger.warning(f"NaN Volatility ({volatility}) or Price ({price}) for sizing.")
+            return 0
+
         if volatility <= 0 or price <= 0:
             logger.warning(f"Invalid Volatility ({volatility}) or Price ({price}) for sizing.")
             return 0

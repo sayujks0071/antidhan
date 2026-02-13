@@ -1,11 +1,11 @@
 # Equity Curve Stress Test Report
 
-**Date**: 2026-02-12
+**Date**: 2026-02-13
 
 ## Portfolio Performance
-- **Total Return**: 809.18
-- **Worst Day**: 2026-02-05 (PnL: 37.55)
-- **Max Drawdown**: -0.01% on 2026-02-12
+- **Total Return**: 831.35
+- **Worst Day**: 2026-02-06 (PnL: 35.86)
+- **Max Drawdown**: -0.01% on 2026-02-13
 
 ## Strategy Performance
 | Strategy | Trades | Win Rate | Profit Factor | Total Return |
