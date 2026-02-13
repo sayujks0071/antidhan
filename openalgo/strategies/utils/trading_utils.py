@@ -956,3 +956,15 @@ def calculate_relative_strength(df, index_df, window=10):
     except Exception as e:
         logger.error(f"Relative Strength calculation failed: {e}")
         return 0.0
+
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    """
+    Calculate MACD, Signal, Hist.
+    Returns: macd, signal, hist (all Series)
+    """
+    exp1 = series.ewm(span=fast, adjust=False).mean()
+    exp2 = series.ewm(span=slow, adjust=False).mean()
+    macd = exp1 - exp2
+    signal_line = macd.ewm(span=signal, adjust=False).mean()
+    hist = macd - signal_line
+    return macd, signal_line, hist

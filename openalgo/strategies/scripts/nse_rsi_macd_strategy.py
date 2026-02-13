@@ -41,33 +41,17 @@ except ImportError:
 
 # robust import or local implementation for indicators
 try:
-    from trading_utils import calculate_rsi, calculate_atr
+    from trading_utils import calculate_rsi, calculate_atr, calculate_macd
 except ImportError:
     try:
-        from utils.trading_utils import calculate_rsi, calculate_atr
+        from utils.trading_utils import calculate_rsi, calculate_atr, calculate_macd
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import calculate_rsi, calculate_atr
+            from openalgo.strategies.utils.trading_utils import calculate_rsi, calculate_atr, calculate_macd
         except ImportError:
-            # Local implementation fallback
-            def calculate_rsi(series, period=14):
-                """Calculate Relative Strength Index."""
-                delta = series.diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-                rs = gain / loss
-                return 100 - (100 / (1 + rs))
-
-            def calculate_atr(df, period=14):
-                """Calculate Average True Range."""
-                high = df['high']
-                low = df['low']
-                close = df['close']
-                tr1 = high - low
-                tr2 = (high - close.shift(1)).abs()
-                tr3 = (low - close.shift(1)).abs()
-                tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-                return tr.rolling(period).mean()
+            # Fallback
+            sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
+            from strategies.utils.trading_utils import calculate_rsi, calculate_atr, calculate_macd
 
 class NSERsiMacdStrategy:
     def __init__(self, symbol, api_key, port, **kwargs):
@@ -97,15 +81,6 @@ class NSERsiMacdStrategy:
 
         self.pm = PositionManager(symbol) if PositionManager else None
 
-    def calculate_macd(self, df):
-        """Calculate MACD, Signal, Hist"""
-        exp1 = df['close'].ewm(span=self.macd_fast, adjust=False).mean()
-        exp2 = df['close'].ewm(span=self.macd_slow, adjust=False).mean()
-        macd = exp1 - exp2
-        signal = macd.ewm(span=self.macd_signal, adjust=False).mean()
-        hist = macd - signal
-        return macd, signal, hist
-
     def calculate_signal(self, df):
         """Calculate signal for backtesting support"""
         if df.empty or len(df) < max(self.macd_slow, self.rsi_period) + 5:
@@ -119,7 +94,7 @@ class NSERsiMacdStrategy:
              # Fallback if calculate_rsi implementation differs (e.g. no kwargs)
              df['rsi'] = calculate_rsi(df['close'])
 
-        macd, signal_line, _ = self.calculate_macd(df)
+        macd, signal_line, _ = calculate_macd(df['close'], fast=self.macd_fast, slow=self.macd_slow, signal=self.macd_signal)
         df['macd'] = macd
         df['signal'] = signal_line
 
@@ -188,7 +163,7 @@ class NSERsiMacdStrategy:
                 except TypeError:
                     df['rsi'] = calculate_rsi(df['close'])
 
-                macd, signal_line, _ = self.calculate_macd(df)
+                macd, signal_line, _ = calculate_macd(df['close'], fast=self.macd_fast, slow=self.macd_slow, signal=self.macd_signal)
                 df['macd'] = macd
                 df['signal'] = signal_line
 
