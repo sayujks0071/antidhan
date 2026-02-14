@@ -29,6 +29,7 @@ class GapFadeStrategy(BaseStrategy):
         self.gap_threshold = gap_threshold
         # State to track if we already traded today
         self.last_trade_date = None
+        self.stop_loss_price = None
 
     @classmethod
     def add_arguments(cls, parser):
@@ -81,18 +82,32 @@ class GapFadeStrategy(BaseStrategy):
                 else: # Short
                     pnl_pct = (entry_price - current_price) / entry_price * 100
 
-            # Stop Loss: 1%
-            if pnl_pct < -1.0:
-                self.logger.info(f"Stop Loss Hit ({pnl_pct:.2f}%). Exiting.")
+            # Stop Loss Check
+            sl_hit = False
+            if self.stop_loss_price:
+                if self.pm.current_position > 0 and current_price < self.stop_loss_price:
+                    sl_hit = True
+                    self.logger.info(f"Dynamic Stop Loss Hit @ {current_price} (SL: {self.stop_loss_price})")
+                elif self.pm.current_position < 0 and current_price > self.stop_loss_price:
+                    sl_hit = True
+                    self.logger.info(f"Dynamic Stop Loss Hit @ {current_price} (SL: {self.stop_loss_price})")
+            elif pnl_pct < -1.0: # Fallback
+                sl_hit = True
+                self.logger.info(f"Fixed Stop Loss Hit ({pnl_pct:.2f}%).")
+
+            if sl_hit:
+                self.logger.info("Exiting Position.")
                 action = "SELL" if self.pm.current_position > 0 else "BUY"
-                self.execute_trade(action, abs(self.pm.current_position))
+                if self.execute_trade(action, abs(self.pm.current_position)):
+                    self.stop_loss_price = None # Reset
                 return
 
             # Take Profit: 2%
             if pnl_pct > 2.0:
                 self.logger.info(f"Take Profit Hit ({pnl_pct:.2f}%). Exiting.")
                 action = "SELL" if self.pm.current_position > 0 else "BUY"
-                self.execute_trade(action, abs(self.pm.current_position))
+                if self.execute_trade(action, abs(self.pm.current_position)):
+                    self.stop_loss_price = None # Reset
                 return
 
             return # Position is open, no new entry
@@ -127,32 +142,54 @@ class GapFadeStrategy(BaseStrategy):
         if abs(gap_pct) < self.gap_threshold:
             return
 
+        # Fetch Intraday History for ADX and RSI (Optimization: Fetch once)
+        hist_df = self.fetch_history(days=3, interval="5m", symbol=target_symbol)
+        if hist_df.empty:
+            return
+
+        # ADX Filter: Avoid Strong Trends ("Gap and Go")
+        # Use calculate_adx_series explicitly for clarity and consistency with RSI
+        adx_series = self.calculate_adx_series(hist_df)
+        if not adx_series.empty:
+            adx = adx_series.iloc[-1]
+            if adx > 25:
+                self.logger.info(f"ADX {adx:.2f} > 25. Strong Trend. Skipping Fade.")
+                return
+
+        rsi = self.calculate_rsi(hist_df['close']).iloc[-1]
+        last_candle_high = hist_df.iloc[-1]['high']
+        last_candle_low = hist_df.iloc[-1]['low']
+
         # Reversal Confirmation Logic
         if gap_pct > self.gap_threshold: # Gap UP
             # Trend Confirmation: LTP must be below Open (Red Candle) to confirm fading
-            if current_price < day_open:
-                # RSI Check (Intraday 5m) - Reduce fetch size to 3 days
-                hist_df = self.fetch_history(days=3, interval="5m", symbol=target_symbol)
-                if not hist_df.empty:
-                    rsi = self.calculate_rsi(hist_df['close']).iloc[-1]
-                    if rsi > 60: # Overbought
-                        self.logger.info(f"Gap UP + Reversal (LTP {current_price} < Open {day_open}) + RSI {rsi:.2f}. SHORT.")
-                        qty = self.get_adaptive_quantity(current_price)
-                        if self.execute_trade("SELL", qty, current_price):
-                            self.last_trade_date = now.date()
+            # Improved: Check if price has reversed slightly (e.g. 0.1% below open)
+            if current_price < day_open * 0.999:
+                if rsi > 60: # Overbought
+                    self.logger.info(f"Gap UP + Reversal (LTP {current_price} < Open {day_open}) + RSI {rsi:.2f}. SHORT.")
+
+                    # Set Dynamic SL: High of last candle
+                    self.stop_loss_price = max(last_candle_high, current_price * 1.005)
+                    self.logger.info(f"Setting Dynamic SL: {self.stop_loss_price}")
+
+                    qty = self.get_adaptive_quantity(current_price)
+                    if self.execute_trade("SELL", qty, current_price):
+                        self.last_trade_date = now.date()
 
         elif gap_pct < -self.gap_threshold: # Gap DOWN
              # Trend Confirmation: LTP must be above Open (Green Candle) to confirm fading
-             if current_price > day_open:
-                # RSI Check - Reduce fetch size to 3 days
-                hist_df = self.fetch_history(days=3, interval="5m", symbol=target_symbol)
-                if not hist_df.empty:
-                    rsi = self.calculate_rsi(hist_df['close']).iloc[-1]
-                    if rsi < 40: # Oversold
-                        self.logger.info(f"Gap DOWN + Reversal (LTP {current_price} > Open {day_open}) + RSI {rsi:.2f}. LONG.")
-                        qty = self.get_adaptive_quantity(current_price)
-                        if self.execute_trade("BUY", qty, current_price):
-                            self.last_trade_date = now.date()
+             # Improved: Check if price has reversed slightly
+             if current_price > day_open * 1.001:
+                if rsi < 40: # Oversold
+                    self.logger.info(f"Gap DOWN + Reversal (LTP {current_price} > Open {day_open}) + RSI {rsi:.2f}. LONG.")
+
+                    # Set Dynamic SL: Low of last candle
+                    self.stop_loss_price = min(last_candle_low, current_price * 0.995)
+                    self.logger.info(f"Setting Dynamic SL: {self.stop_loss_price}")
+
+                    qty = self.get_adaptive_quantity(current_price)
+                    if self.execute_trade("BUY", qty, current_price):
+                        self.last_trade_date = now.date()
 
 if __name__ == "__main__":
     GapFadeStrategy.cli()

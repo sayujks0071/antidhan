@@ -34,6 +34,7 @@ try:
         calculate_bollinger_bands,
         calculate_ema,
         calculate_intraday_vwap,
+        calculate_macd,
         calculate_relative_strength,
         calculate_roc,
         calculate_rsi,
@@ -56,6 +57,7 @@ except ImportError:
             calculate_bollinger_bands,
             calculate_ema,
             calculate_intraday_vwap,
+            calculate_macd,
             calculate_relative_strength,
             calculate_roc,
             calculate_rsi,
@@ -78,6 +80,7 @@ except ImportError:
             calculate_bollinger_bands,
             calculate_ema,
             calculate_intraday_vwap,
+            calculate_macd,
             calculate_relative_strength,
             calculate_roc,
             calculate_rsi,
@@ -119,8 +122,8 @@ class BaseStrategy:
         # Resolve API Key
         self.api_key = self._resolve_api_key(api_key)
 
-        # Default to 5002 to match trading_utils default, allow override via env
-        self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5002')
+        # Default to 5000 to match trading_utils default, allow override via env
+        self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')
 
         if not self.api_key and not client:
              # Warn but don't fail immediately, allowing for test/mock scenarios
@@ -362,6 +365,10 @@ class BaseStrategy:
         """Calculate Relative Strength."""
         return calculate_relative_strength(df, index_df, period)
 
+    def calculate_macd(self, series, fast=12, slow=26, signal=9):
+        """Calculate MACD, Signal, Hist."""
+        return calculate_macd(series, fast, slow, signal)
+
     def calculate_atr(self, df, period=14):
         """Calculate Average True Range (Scalar)."""
         return calculate_atr(df, period).iloc[-1]
@@ -373,6 +380,10 @@ class BaseStrategy:
     def calculate_roc(self, series, period=10):
         """Calculate Rate of Change (ROC)."""
         return calculate_roc(series, period)
+
+    def calculate_bollinger_bands(self, series, window=20, num_std=2):
+        """Calculate Bollinger Bands."""
+        return calculate_bollinger_bands(series, window, num_std)
 
     def is_lunch_break(self):
         """Avoid trading during low volume lunch hours (12:00 - 13:00)."""
@@ -388,7 +399,17 @@ class BaseStrategy:
         try:
             target_symbol = symbol or self.symbol
             # Ensure we fetch enough data for ATR calculation (e.g. 35 days for 14 period + buffer)
-            df = self.fetch_history(days=40, symbol=target_symbol, interval="D")
+            # Use yesterday as end_date to leverage FileCache (which caches past dates)
+            end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            start_date = (datetime.now() - timedelta(days=45)).strftime("%Y-%m-%d")
+
+            df = self.client.history(
+                symbol=target_symbol,
+                interval="D",
+                exchange=self.exchange,
+                start_date=start_date,
+                end_date=end_date
+            )
 
             if df.empty or len(df) < 15:
                 self.logger.warning(f"Insufficient daily data for Monthly ATR calculation: {len(df)}")

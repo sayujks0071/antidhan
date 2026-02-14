@@ -92,12 +92,14 @@ class TestRetryLogic(unittest.TestCase):
         error_response = MagicMock(spec=httpx.Response)
         error_response.status_code = 502
         error_response.http_version = "HTTP/1.1"
+        error_response.headers = {}  # Add headers for retry logic
         error_response.request.extensions = {}
 
         success_response = MagicMock(spec=httpx.Response)
         success_response.status_code = 200
         success_response.json.return_value = {"status": "success"}
         success_response.http_version = "HTTP/1.1"
+        success_response.headers = {}  # Add headers
         success_response.request.extensions = {}
 
         mock_client_instance.request.side_effect = [error_response, success_response]
