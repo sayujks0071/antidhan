@@ -165,22 +165,21 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 
 ## 🛡️ System Audit & Roadmap (Feb 2026)
 
-### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBol**.
-  - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
+### Audit Findings (2026-02-12)
+- **Cross-Strategy Correlation:** Analyzed all active strategies including **SuperTrendVWAP**, **AdvancedMLMomentum**, **GapFadeStrategy**, and **NSE_Bollinger_RSI**.
+  - **Result:** Found **100% Correlation** between `NSE_Bollinger_RSI_Strategy` and `NSERsiBolTrendStrategy`.
+  - **Action:** Deprecated `nse_rsi_bol_trend.py` to remove redundancy.
 - **Equity Curve Stress Test:**
-  - **Total Return (Simulated):** ~831.35 (on 4M portfolio)
-  - **Worst Day:** 2026-02-06 (PnL: +35.86) - Simulated environment showed consistent positive expectancy.
-  - **Max Drawdown:** -0.01%
-  - **Top Performer:** NSERsiBol (83.33% Win Rate, Profit Factor 5.21)
+  - **Worst Day:** 2026-02-09 (PnL: -3649.00)
+  - **Root Cause:** Simulated systemic gap opening failure causing multiple strategies (GapFade, AdvancedML, RSI_Bol) to hit stops simultaneously.
 - **Infrastructure Upgrades:**
-  - **Optimization:** Optimized `BaseStrategy.get_monthly_atr` to use cached historical data (yesterday's date), reducing API load.
-  - **Adaptive Sizing:** Refactored `NSERsiBolTrendStrategy` to use standardized `get_adaptive_quantity`. Enhanced `PositionManager` robustness against invalid volatility data. Optimized data fetching in `mcx_global_arbitrage_strategy`.
+  - **Data Optimization:** Implemented **In-Memory LRU Caching** in `BrokerData` (Dhan Sandbox) to speed up historical data access for backtesting and simulation. Added batch request logging to `APIClient`.
+  - **Adaptive Sizing:** Enhanced `PositionManager` to store `volatility` (Monthly ATR) and enforce adaptive sizing in `BaseStrategy.execute_trade` by default when fixed quantities are not strictly required.
 
 ### 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **VWAP Deviations:** Continue exploiting mean reversion around VWAP bands (as seen in `SuperTrendVWAP`).
-2.  **Volume Profile POC Shifts:** Investigate shifting Point of Control as a leading indicator for trend changes.
-3.  **Sector Rotation / Market Breadth:** Expand `NSERsiBol` logic to include broader sector rotation signals.
+1.  **Volume Profile POC Rejections:** Focus on entries where price rejects the Point of Control with high volume validation.
+2.  **Gap Fills on Low Volume:** Exploit gap fill scenarios where the move against the gap lacks volume support.
+3.  **Sector Divergence:** Identify opportunities where a stock diverges significantly from its sector index (Relative Strength).

@@ -217,6 +217,12 @@ class BaseStrategy:
         """
         self.logger.info(f"Starting {self.name} for {self.symbol}")
 
+        # Initial Volatility Setup for Adaptive Sizing
+        if self.pm:
+            monthly_atr = self.get_monthly_atr()
+            if monthly_atr > 0:
+                self.pm.set_volatility(monthly_atr)
+
         while True:
             try:
                 # Use split to handle NSE_INDEX -> NSE
@@ -225,6 +231,13 @@ class BaseStrategy:
                     time.sleep(60)
                     continue
 
+                # Update volatility periodically (e.g., daily? or just every loop is fine as get_monthly_atr uses cache)
+                # But get_monthly_atr fetches 45 days. Cache is per day.
+                # So calling it here is cheap.
+                if self.pm:
+                     monthly_atr = self.get_monthly_atr()
+                     self.pm.set_volatility(monthly_atr)
+
                 self.cycle()
 
             except Exception as e:
@@ -232,7 +245,7 @@ class BaseStrategy:
 
             time.sleep(60)
 
-    def execute_trade(self, action, quantity, price=None, urgency="MEDIUM"):
+    def execute_trade(self, action, quantity=None, price=None, urgency="MEDIUM"):
         """
         Execute a trade using SmartOrder and update PositionManager.
         """
@@ -240,7 +253,25 @@ class BaseStrategy:
             self.logger.warning("SmartOrder or PositionManager not initialized. Cannot execute trade.")
             return None
 
-        self.logger.info(f"Executing {action} {quantity} {self.symbol} @ {price or 'MKT'}")
+        # Determine Quantity
+        final_quantity = quantity if quantity is not None else self.quantity
+
+        # Check for Adaptive Sizing preference
+        # If quantity wasn't explicitly forced (i.e. if it matched default or was None), try adaptive
+        if self.pm.volatility and (quantity is None or quantity == self.quantity):
+            trade_price = price if price else self.get_current_price()
+            if trade_price:
+                # Use strategy risk param or default to 1.0
+                risk_pct = getattr(self, 'risk', 1.0)
+                # Assume capital 5L for calculation or use env var
+                capital = float(os.getenv('CAPITAL', 500000))
+
+                adaptive_qty = self.pm.get_trade_quantity(trade_price, capital, risk_pct)
+                if adaptive_qty > 0:
+                    self.logger.info(f"Using Adaptive Quantity: {adaptive_qty} (Requested: {final_quantity})")
+                    final_quantity = adaptive_qty
+
+        self.logger.info(f"Executing {action} {final_quantity} {self.symbol} @ {price or 'MKT'}")
 
         # Place order via API
         response = self.smart_order.place_adaptive_order(
@@ -248,7 +279,7 @@ class BaseStrategy:
             symbol=self.symbol,
             action=action,
             exchange=self.exchange,
-            quantity=quantity,
+            quantity=final_quantity,
             limit_price=price,
             product=self.product,
             urgency=urgency

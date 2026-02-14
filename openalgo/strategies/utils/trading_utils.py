@@ -230,6 +230,19 @@ def calculate_roc(series, period=10):
     return series.pct_change(periods=period)
 
 
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    """
+    Calculate MACD, Signal, Hist.
+    Returns: macd_line, signal_line, histogram
+    """
+    exp1 = series.ewm(span=fast, adjust=False).mean()
+    exp2 = series.ewm(span=slow, adjust=False).mean()
+    macd = exp1 - exp2
+    signal_line = macd.ewm(span=signal, adjust=False).mean()
+    histogram = macd - signal_line
+    return macd, signal_line, histogram
+
+
 def calculate_vix_volatility_multiplier(vix, thresholds=None):
     """
     Calculate dynamic volatility multiplier based on VIX.
@@ -283,8 +296,27 @@ class PositionManager:
         self.position = 0
         self.entry_price = 0.0
         self.pnl = 0.0
+        self.volatility = None # Store volatility for adaptive sizing
 
         self.load_state()
+
+    def set_volatility(self, volatility):
+        """Set volatility (e.g. Monthly ATR) for adaptive sizing."""
+        self.volatility = float(volatility) if volatility else None
+        if self.volatility:
+            logger.info(f"PositionManager: Volatility set to {self.volatility:.2f}")
+
+    def get_trade_quantity(self, price, capital, risk_pct):
+        """
+        Calculate trade quantity based on stored volatility.
+        """
+        if self.volatility and self.volatility > 0:
+            qty = self.calculate_risk_adjusted_quantity(capital, risk_pct, self.volatility, price)
+            logger.info(f"PositionManager: Calculated Adaptive Qty: {qty} (Price: {price}, Vol: {self.volatility:.2f})")
+            return qty
+        else:
+            logger.warning("PositionManager: Volatility not set or invalid. Cannot calculate adaptive quantity.")
+            return 0
 
     def load_state(self):
         if self.state_file.exists():
@@ -653,6 +685,9 @@ class APIClient:
                 ts, data = self.quote_cache[cache_key]
                 if now - ts < self.quote_ttl:
                     return data
+        else:
+             # Log batch request for optimization verification
+             logger.debug(f"Batch quote request for {len(symbol)} symbols on {exchange}")
 
         url = f"{self.host}/api/v1/quotes"
         payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}

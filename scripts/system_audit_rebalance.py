@@ -43,9 +43,83 @@ def parse_logs():
                 print(f"Error parsing {filepath}: {e}")
 
         # 2. Parse Text Logs (Fallback/Supplementary)
-        # Assuming format: "YYYY-MM-DD HH:MM:SS ... Action ... Price: ..."
-        # This is complex to do perfectly without regex for every strategy variant.
-        # For this audit, we'll focus on JSON logs if available, or try simple text parsing.
+        # Format: "YYYY-MM-DD HH:MM:SS INFO Strategy: Signal Buy Price"
+        # Format: "YYYY-MM-DD HH:MM:SS INFO Strategy: Exiting at Price"
+
+        # We need to track open positions per strategy to pair entries and exits
+        open_positions = {} # {strategy: {entry_time, entry_price, direction}}
+
+        for filepath in glob.glob(os.path.join(log_dir, "*.log")):
+            try:
+                # Deduce strategy name from filename if possible, but reliable way is from log content
+                # Filename format: StrategyName_YYYY-MM-DD.log
+                filename = os.path.basename(filepath)
+                strategy_from_file = filename.split('_')[0]
+
+                with open(filepath, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line: continue
+
+                        # Regex for basic components
+                        # 2026-01-15 09:27:00 INFO AdvancedMLMomentum: ...
+                        match = re.match(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) INFO ([^:]+): (.*)", line)
+                        if match:
+                            timestamp_str, strategy_name, message = match.groups()
+                            timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+
+                            # Normalize strategy name (sometimes file has it, sometimes log)
+                            # In mock logs: "AdvancedMLMomentum" is in log content.
+
+                            if "Signal Buy" in message:
+                                # Entry
+                                # Signal Buy <Price>
+                                try:
+                                    parts = message.split()
+                                    price = float(parts[-1])
+                                    direction = "BUY"
+
+                                    # Store open position
+                                    # Assuming FIFO or single position per strategy for simplicity
+                                    if strategy_name not in open_positions:
+                                        open_positions[strategy_name] = []
+
+                                    open_positions[strategy_name].append({
+                                        'entry_time': timestamp,
+                                        'entry_price': price,
+                                        'direction': direction,
+                                        'strategy': strategy_name
+                                    })
+                                except ValueError:
+                                    pass
+
+                            elif "Exiting at" in message:
+                                # Exit
+                                # Exiting at <Price>
+                                try:
+                                    parts = message.split()
+                                    exit_price = float(parts[-1])
+
+                                    if strategy_name in open_positions and open_positions[strategy_name]:
+                                        # Pop the earliest entry (FIFO)
+                                        position = open_positions[strategy_name].pop(0)
+
+                                        position['exit_time'] = timestamp
+                                        position['exit_price'] = exit_price
+
+                                        # Calculate PnL
+                                        # Assuming Quantity = 1 for mock
+                                        if position['direction'] == 'BUY':
+                                            position['pnl'] = exit_price - position['entry_price']
+                                        else:
+                                            position['pnl'] = position['entry_price'] - exit_price
+
+                                        all_trades.append(position)
+                                except ValueError:
+                                    pass
+
+            except Exception as e:
+                print(f"Error parsing {filepath}: {e}")
 
     # Convert to DataFrame
     if not all_trades:
@@ -102,6 +176,8 @@ def analyze_correlation(df):
 
             # Fill 1 or -1 between entry and exit
             # Handle indexing carefully
+            # Using slice assignment requires matching index length or scalar
+            # We iterate through time points which is slow but safe, or use boolean mask
             mask = (series.index >= entry_idx) & (series.index <= exit_idx)
             series.loc[mask] = direction
 
@@ -114,10 +190,11 @@ def analyze_correlation(df):
 
     # Identify high correlation
     high_corr_pairs = []
-    for i in range(len(corr_matrix.columns)):
-        for j in range(i+1, len(corr_matrix.columns)):
-            s1 = corr_matrix.columns[i]
-            s2 = corr_matrix.columns[j]
+    columns = corr_matrix.columns
+    for i in range(len(columns)):
+        for j in range(i+1, len(columns)):
+            s1 = columns[i]
+            s2 = columns[j]
             val = corr_matrix.iloc[i, j]
             if val > 0.7:
                 high_corr_pairs.append((s1, s2, val))
@@ -130,6 +207,8 @@ def analyze_correlation(df):
     else:
         print("\n[OK] No high correlation detected between strategies.")
 
+    return high_corr_pairs
+
 def analyze_equity_curve(df):
     """
     Reconstruct equity curve and find worst day.
@@ -141,10 +220,8 @@ def analyze_equity_curve(df):
     print("\n=== Equity Curve Stress Test ===")
 
     if 'pnl' not in df.columns:
-        # Calculate PnL if missing
-        # Assuming quantity is 1 if missing for simplicity, or look for 'quantity'
-        # PnL = (Exit - Entry) * Qty * Direction
-        pass # Assuming JSON has PnL
+        print("PnL data missing.")
+        return
 
     # Aggregate by Day
     df['date'] = df['exit_time'].dt.date
@@ -170,13 +247,13 @@ def analyze_equity_curve(df):
     print(f"Strategies involved on {worst_day}: {', '.join(strategies_involved)}")
 
     # Heuristic checks
-    if worst_loss < -5000: # Arbitrary threshold for "Major Crash"
+    if worst_loss < -500: # Adjusted threshold for mock data
         print("  - Severity: HIGH")
         # Check if it was a gap up/down?
-        # We don't have price data here easily without fetching.
-        # But we can infer from entry/exit times.
         first_entry = worst_day_trades['entry_time'].min().time()
-        if first_entry < datetime.strptime("09:20", "%H:%M").time():
+        market_open_limit = datetime.strptime("09:20", "%H:%M").time()
+
+        if first_entry < market_open_limit:
              print("  - Timing: Early morning losses. Possible Gap Opening failure.")
         else:
              print("  - Timing: Intraday volatility.")
@@ -198,7 +275,7 @@ def main():
         print("No trade logs found. Skipping analysis.")
         return
 
-    analyze_correlation(df)
+    high_corr = analyze_correlation(df)
     analyze_equity_curve(df)
 
 if __name__ == "__main__":

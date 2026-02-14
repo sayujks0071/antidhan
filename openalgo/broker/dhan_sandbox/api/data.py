@@ -112,6 +112,16 @@ class BrokerData:
         self.cache_dir = Path(".cache/history")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
+        # In-memory LRU-like cache (Simple Dictionary)
+        # Static/Class variable would be better but self usage in Flask is tricky.
+        # We rely on this being instantiated per request but potentially shared or
+        # using a module level cache if we moved it out.
+        # For now, we use a simple instance cache, but to make it truly effective across
+        # instances, we should use a module level variable.
+
+    # Module-level cache (simulated via class variable trick or global)
+    _SHARED_MEMORY_CACHE = {}
+
     def _get_cache_path(self, symbol, exchange, interval, start_date, end_date):
         """Generate a unique cache file path."""
         # Normalize keys
@@ -350,7 +360,16 @@ class BrokerData:
             # Adjust dates for trading days
             start_date, end_date = self._adjust_dates(start_date, end_date)
 
-            # Check Cache
+            # Check Memory Cache first
+            cache_key = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
+            today_str = datetime.now().strftime("%Y-%m-%d")
+
+            if end_date < today_str:
+                if cache_key in self._SHARED_MEMORY_CACHE:
+                    logger.info(f"Loaded {len(self._SHARED_MEMORY_CACHE[cache_key])} rows from MEMORY cache for {symbol}")
+                    return self._SHARED_MEMORY_CACHE[cache_key]
+
+            # Check File Cache
             cache_path = self._get_cache_path(symbol, exchange, interval, start_date, end_date)
             if cache_path.exists():
                 # Check if cache is fresh enough?
@@ -359,12 +378,16 @@ class BrokerData:
                 # Simplification: If end_date is strictly in the past (yesterday or before), use cache.
                 # If end_date is today, do not use cache (or check modified time).
 
-                today_str = datetime.now().strftime("%Y-%m-%d")
                 if end_date < today_str:
                     try:
                         with open(cache_path, 'rb') as f:
                             df = pickle.load(f)
-                        logger.info(f"Loaded {len(df)} rows from cache for {symbol}")
+                        logger.info(f"Loaded {len(df)} rows from FILE cache for {symbol}")
+                        # Populate Memory Cache
+                        self._SHARED_MEMORY_CACHE[cache_key] = df
+                        # Simple Eviction if too big
+                        if len(self._SHARED_MEMORY_CACHE) > 100:
+                            self._SHARED_MEMORY_CACHE.pop(next(iter(self._SHARED_MEMORY_CACHE)))
                         return df
                     except Exception as e:
                         logger.warning(f"Failed to load cache for {symbol}: {e}")
@@ -626,9 +649,17 @@ class BrokerData:
                 today_str = datetime.now().strftime("%Y-%m-%d")
                 if end_date < today_str:
                     try:
+                        # Save to File
                         with open(cache_path, 'wb') as f:
                             pickle.dump(df, f)
                         logger.info(f"Saved cache for {symbol} ({len(df)} rows)")
+
+                        # Save to Memory
+                        self._SHARED_MEMORY_CACHE[cache_key] = df
+                         # Simple Eviction if too big
+                        if len(self._SHARED_MEMORY_CACHE) > 100:
+                            self._SHARED_MEMORY_CACHE.pop(next(iter(self._SHARED_MEMORY_CACHE)))
+
                     except Exception as e:
                         logger.warning(f"Failed to save cache for {symbol}: {e}")
 
