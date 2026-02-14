@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-Nifty Smart Iron Condor - NIFTY Options (OpenAlgo Web UI Compatible)
-High-probability, defined-risk Iron Condor strategy for NIFTY.
-Sells OTM2 strikes (Strangle) and buys OTM4 strikes (Wings) for protection.
-Includes smart entry filters (Time, Premium, PCR) and robust exit management.
+[Nifty Smart Iron Condor] - NIFTY Options (OpenAlgo Web UI Compatible)
+High-Probability Income Strategy entering Iron Condors in neutral/high-IV conditions.
+Logic:
+- Entry: > 10:00 AM, Straddle Premium > 120, PCR 0.8-1.2 (Neutral).
+- Setup: Sell OTM2 Strangle + Buy OTM4 Wings (Iron Condor).
+- Risk: SL 40% of Net Credit | TP 50% of Net Credit.
+- Management: Max Hold 45 mins, 1 Trade/Day, EOD Exit 3:15 PM.
 """
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # Line-buffered output (required for real-time log capture)
 if hasattr(sys.stdout, "reconfigure"):
@@ -19,11 +22,11 @@ if hasattr(sys.stderr, "reconfigure"):
 # Path setup for utility imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
 strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, "utils")
-sys.path.insert(0, utils_dir)
+# Add both potential utils locations to path
+sys.path.insert(0, os.path.join(strategies_dir, "utils"))
+sys.path.insert(0, os.path.join(script_dir, "utils"))
 
 try:
-    from trading_utils import is_market_open, APIClient
     from optionchain_utils import (
         OptionChainClient,
         OptionPositionTracker,
@@ -46,37 +49,7 @@ class PrintLogger:
     def debug(self, msg): print(msg, flush=True)
 
 
-# Configuration Section
-STRATEGY_NAME = os.getenv("STRATEGY_NAME", "NiftySmartIronCondor")
-UNDERLYING = os.getenv("UNDERLYING", "NIFTY")
-UNDERLYING_EXCHANGE = os.getenv("UNDERLYING_EXCHANGE", "NSE_INDEX")
-OPTIONS_EXCHANGE = os.getenv("OPTIONS_EXCHANGE", "NFO")
-PRODUCT = os.getenv("PRODUCT", "MIS")
-QUANTITY = safe_int(os.getenv("QUANTITY", "1"))
-STRIKE_COUNT = safe_int(os.getenv("STRIKE_COUNT", "12"))
-
-# Risk Parameters
-SL_PCT = safe_float(os.getenv("SL_PCT", "40.0"))     # Stop Loss % of Premium Sum
-TP_PCT = safe_float(os.getenv("TP_PCT", "50.0"))     # Take Profit % of Premium Sum
-MAX_HOLD_MIN = safe_int(os.getenv("MAX_HOLD_MIN", "45"))
-
-# Trade Frequency & Timing
-COOLDOWN_SECONDS = safe_int(os.getenv("COOLDOWN_SECONDS", "300"))
-SLEEP_SECONDS = safe_int(os.getenv("SLEEP_SECONDS", "20"))
-EXPIRY_REFRESH_SEC = safe_int(os.getenv("EXPIRY_REFRESH_SEC", "3600"))
-MAX_ORDERS_PER_DAY = safe_int(os.getenv("MAX_ORDERS_PER_DAY", "1"))
-MAX_ORDERS_PER_HOUR = safe_int(os.getenv("MAX_ORDERS_PER_HOUR", "1"))
-
-ENTRY_START_TIME = os.getenv("ENTRY_START_TIME", "09:45")
-ENTRY_END_TIME = os.getenv("ENTRY_END_TIME", "14:30")
-EXIT_TIME = os.getenv("EXIT_TIME", "15:15")
-
-# Entry Filters
-MIN_PREMIUM = safe_float(os.getenv("MIN_PREMIUM", "120.0")) # Min ATM Straddle Premium
-MIN_PCR = safe_float(os.getenv("MIN_PCR", "0.6"))
-MAX_PCR = safe_float(os.getenv("MAX_PCR", "1.4"))
-
-
+# API Key retrieval (MANDATORY)
 API_KEY = os.getenv("OPENALGO_APIKEY")
 HOST = os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000")
 
@@ -96,180 +69,294 @@ if not API_KEY:
     raise ValueError("API Key must be set in OPENALGO_APIKEY environment variable")
 
 
+# ===========================
+# CONFIGURATION
+# ===========================
+STRATEGY_NAME = os.getenv("STRATEGY_NAME", "NiftySmartIronCondor")
+UNDERLYING = os.getenv("UNDERLYING", "NIFTY")
+UNDERLYING_EXCHANGE = os.getenv("UNDERLYING_EXCHANGE", "NSE_INDEX")
+OPTIONS_EXCHANGE = os.getenv("OPTIONS_EXCHANGE", "NFO")
+PRODUCT = os.getenv("PRODUCT", "MIS")
+QUANTITY = safe_int(os.getenv("QUANTITY", "1"))
+STRIKE_COUNT = safe_int(os.getenv("STRIKE_COUNT", "12"))
+
+# Strategy Parameters
+SELL_OFFSET = os.getenv("SELL_OFFSET", "OTM2")
+BUY_OFFSET = os.getenv("BUY_OFFSET", "OTM4")
+MIN_STRADDLE_PREMIUM = safe_float(os.getenv("MIN_STRADDLE_PREMIUM", "120.0"))
+PCR_MIN = safe_float(os.getenv("PCR_MIN", "0.8"))
+PCR_MAX = safe_float(os.getenv("PCR_MAX", "1.2"))
+ENTRY_START_TIME = os.getenv("ENTRY_START_TIME", "10:00")
+ENTRY_END_TIME = os.getenv("ENTRY_END_TIME", "14:30")
+
+# Risk Parameters (Percentage of NET CREDIT)
+SL_PCT = safe_float(os.getenv("SL_PCT", "40.0"))
+TP_PCT = safe_float(os.getenv("TP_PCT", "50.0"))
+MAX_HOLD_MIN = safe_int(os.getenv("MAX_HOLD_MIN", "45"))
+
+# Rate Limiting
+COOLDOWN_SECONDS = safe_int(os.getenv("COOLDOWN_SECONDS", "300"))
+SLEEP_SECONDS = safe_int(os.getenv("SLEEP_SECONDS", "20"))
+EXPIRY_REFRESH_SEC = safe_int(os.getenv("EXPIRY_REFRESH_SEC", "3600"))
+MAX_ORDERS_PER_DAY = safe_int(os.getenv("MAX_ORDERS_PER_DAY", "1"))
+MAX_ORDERS_PER_HOUR = safe_int(os.getenv("MAX_ORDERS_PER_HOUR", "1"))
+
+# Manual Expiry Override
+EXPIRY_DATE = os.getenv("EXPIRY_DATE", "").strip()
+
+
+# Robust Market Open Check (Local Fallback)
+def is_market_open_local():
+    """Check if market is open (09:15 - 15:30 IST)."""
+    # IST is UTC+5:30
+    ist_offset = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(ist_offset)
+
+    # Check weekend (5=Saturday, 6=Sunday)
+    if now.weekday() >= 5:
+        return False
+
+    current_time = now.time()
+    start_time = datetime.strptime("09:15", "%H:%M").time()
+    end_time = datetime.strptime("15:30", "%H:%M").time()
+
+    return start_time <= current_time <= end_time
+
+
+class NetCreditPositionTracker(OptionPositionTracker):
+    """
+    Custom Position Tracker for Credit Strategies (e.g. Iron Condor).
+    Calculates PnL based on Net Credit Collected, not Gross Premium Traded.
+    """
+    def should_exit(self, chain):
+        if not self.open_legs:
+            return False, [], ""
+
+        # 1. Time Stop
+        if self.entry_time:
+            minutes_held = (datetime.now() - self.entry_time).total_seconds() / 60
+            if minutes_held >= self.max_hold_min:
+                return True, self.open_legs, f"time_stop ({int(minutes_held)}m)"
+
+        # 2. Net Credit PnL Check
+        ltp_map = {}
+        for item in chain:
+            ce = item.get("ce", {})
+            pe = item.get("pe", {})
+            if ce.get("symbol"): ltp_map[ce["symbol"]] = safe_float(ce.get("ltp"))
+            if pe.get("symbol"): ltp_map[pe["symbol"]] = safe_float(pe.get("ltp"))
+
+        net_credit_collected = 0.0
+        current_cost_to_close = 0.0
+
+        for leg in self.open_legs:
+            sym = leg["symbol"]
+            entry = leg["entry_price"]
+            curr = ltp_map.get(sym, entry) # Fallback to entry
+            action = leg["action"].upper()
+            qty = safe_int(leg.get("quantity", 1))
+
+            if action == "SELL":
+                net_credit_collected += (entry * qty)
+                current_cost_to_close += (curr * qty)
+            else: # BUY
+                net_credit_collected -= (entry * qty)
+                current_cost_to_close -= (curr * qty)
+
+        # Avoid division by zero
+        if abs(net_credit_collected) < 0.01:
+            return False, [], ""
+
+        # PnL = (Net Credit Collected) - (Cost to Close)
+        # Positive PnL means we kept more credit than it costs to close.
+        pnl = net_credit_collected - current_cost_to_close
+
+        # PnL % relative to MAX POTENTIAL PROFIT (Net Credit)
+        pnl_pct = (pnl / abs(net_credit_collected)) * 100
+
+        # Check SL (e.g. -40%)
+        if pnl_pct <= -self.sl_pct:
+            return True, self.open_legs, f"stop_loss ({pnl_pct:.1f}%)"
+
+        # Check TP (e.g. +50%)
+        if pnl_pct >= self.tp_pct:
+            return True, self.open_legs, f"take_profit ({pnl_pct:.1f}%)"
+
+        return False, [], ""
+
+
 class NiftySmartIronCondorStrategy:
     def __init__(self):
         self.logger = PrintLogger()
         self.client = OptionChainClient(api_key=API_KEY, host=HOST)
-        self.api_client = APIClient(api_key=API_KEY, host=HOST) # For single leg exits
-
-        self.tracker = OptionPositionTracker(
+        # Use Custom Tracker for Net Credit PnL
+        self.tracker = NetCreditPositionTracker(
             sl_pct=SL_PCT,
             tp_pct=TP_PCT,
             max_hold_min=MAX_HOLD_MIN
         )
+        self.debouncer = SignalDebouncer()
         self.limiter = TradeLimiter(
             max_per_day=MAX_ORDERS_PER_DAY,
             max_per_hour=MAX_ORDERS_PER_HOUR,
             cooldown_seconds=COOLDOWN_SECONDS
         )
-        self.debouncer = SignalDebouncer()
-
-        self.expiry = None
+        self.expiry = EXPIRY_DATE
         self.last_expiry_check = 0
-
-        # Track daily entry status to enforce one-trade-per-day strictly if needed
         self.entered_today = False
         self.current_date = datetime.now().date()
 
-        self.logger.info(f"Strategy Initialized: {STRATEGY_NAME}")
-        self.logger.info(format_kv(
-            underlying=UNDERLYING,
-            sl_pct=SL_PCT,
-            tp_pct=TP_PCT,
-            max_hold=MAX_HOLD_MIN,
-            entry_start=ENTRY_START_TIME
-        ))
-
     def ensure_expiry(self):
-        """Refreshes expiry date if needed."""
-        now = time.time()
-        if not self.expiry or (now - self.last_expiry_check > EXPIRY_REFRESH_SEC):
-            try:
-                res = self.client.expiry(UNDERLYING, OPTIONS_EXCHANGE, "options")
-                if res.get("status") == "success":
-                    dates = res.get("data", [])
-                    if dates:
-                        self.expiry = choose_nearest_expiry(dates)
-                        self.last_expiry_check = now
-                        self.logger.info(f"Selected Expiry: {self.expiry}")
-                    else:
-                        self.logger.warning("No expiry dates found.")
+        """Refresh expiry date if needed."""
+        if self.expiry and (time.time() - self.last_expiry_check < EXPIRY_REFRESH_SEC):
+            return
+
+        # If manually set via env var, respect it unless empty
+        if os.getenv("EXPIRY_DATE"):
+            self.expiry = os.getenv("EXPIRY_DATE")
+            return
+
+        self.logger.info("Fetching available expiry dates...")
+        try:
+            res = self.client.expiry(UNDERLYING, OPTIONS_EXCHANGE, "options")
+            if res.get("status") == "success":
+                dates = res.get("data", [])
+                nearest = choose_nearest_expiry(dates)
+                if nearest:
+                    self.expiry = nearest
+                    self.last_expiry_check = time.time()
+                    self.logger.info(f"Selected expiry: {self.expiry}")
                 else:
-                    self.logger.warning(f"Expiry fetch failed: {res.get('message')}")
-            except Exception as e:
-                self.logger.error(f"Error fetching expiry: {e}")
-
-    def is_time_window_open(self):
-        """Checks if current time is within entry window."""
-        now = datetime.now().time()
-        try:
-            start = datetime.strptime(ENTRY_START_TIME, "%H:%M").time()
-            end = datetime.strptime(ENTRY_END_TIME, "%H:%M").time()
-            return start <= now <= end
-        except ValueError:
-            self.logger.error("Invalid time format in configuration")
-            return False
-
-    def should_terminate(self):
-        """Checks if strategy should terminate for the day (after 3:15 PM)."""
-        now = datetime.now().time()
-        try:
-            exit_time = datetime.strptime(EXIT_TIME, "%H:%M").time()
-            return now >= exit_time
-        except ValueError:
-            return False
-
-    def get_atm_strike(self, chain):
-        """Finds ATM strike from chain data."""
-        # Search for label="ATM"
-        for item in chain:
-            if item.get("ce", {}).get("label") == "ATM":
-                return item["strike"]
-        # Fallback: find strike closest to underlying_ltp if available
-        # But usually 'label' is reliable from OptionChainClient
-        return None
-
-    def calculate_straddle_premium(self, chain, atm_strike):
-        """Calculates combined premium of ATM CE and PE."""
-        ce_ltp = 0.0
-        pe_ltp = 0.0
-
-        for item in chain:
-            if item["strike"] == atm_strike:
-                ce_ltp = safe_float(item.get("ce", {}).get("ltp", 0))
-                pe_ltp = safe_float(item.get("pe", {}).get("ltp", 0))
-                break
-
-        return ce_ltp + pe_ltp
-
-    def calculate_pcr(self, chain):
-        """Calculates Put-Call Ratio based on Open Interest."""
-        total_ce_oi = 0
-        total_pe_oi = 0
-        for item in chain:
-            total_ce_oi += safe_int(item.get("ce", {}).get("oi", 0))
-            total_pe_oi += safe_int(item.get("pe", {}).get("oi", 0))
-
-        if total_ce_oi == 0:
-            return 0.0
-        return round(total_pe_oi / total_ce_oi, 2)
-
-    def get_leg_details(self, chain, offset, option_type):
-        """Helper to resolve symbol and LTP from chain based on offset."""
-        for item in chain:
-            opt = item.get(option_type.lower(), {})
-            if opt.get("label") == offset:
-                return {
-                    "symbol": opt.get("symbol"),
-                    "ltp": safe_float(opt.get("ltp", 0)),
-                    "quantity": QUANTITY,
-                    "product": PRODUCT
-                }
-        return None
+                    self.logger.warning("No valid future expiry found.")
+            else:
+                self.logger.error(f"Failed to fetch expiry: {res.get('message')}")
+        except Exception as e:
+            self.logger.error(f"Expiry fetch error: {e}")
 
     def _close_position(self, chain, reason):
-        """
-        Closes all open positions safely.
-        Prioritizes BUY legs (to cover shorts/reduce margin) before SELL legs.
-        """
+        """Close all open legs."""
         self.logger.info(f"Closing position. Reason: {reason}")
 
         if not self.tracker.open_legs:
-            self.logger.warning("No open legs to close.")
             return
 
-        # Prepare exit legs
-        exit_legs = []
+        # Prepare exit legs (Reverse actions)
+        legs_to_close = []
         for leg in self.tracker.open_legs:
-            # Reverse action: SELL -> BUY, BUY -> SELL
-            exit_action = "BUY" if leg.get("action") == "SELL" else "SELL"
-            exit_legs.append({
+            close_leg = {
                 "symbol": leg["symbol"],
-                "action": exit_action,
+                "option_type": leg["option_type"],
+                "action": "BUY" if leg["action"] == "SELL" else "SELL",
                 "quantity": leg["quantity"],
-                "product": PRODUCT,
-                "pricetype": "MARKET"
-            })
+                "product": leg.get("product", PRODUCT)
+            }
+            legs_to_close.append(close_leg)
 
-        # SORT: BUYs first to reduce margin requirement
-        # If we sell first, we might increase margin utilization (naked shorts)
-        exit_legs.sort(key=lambda x: 0 if x["action"] == "BUY" else 1)
+        # Sort: BUY actions (closing shorts) first for margin safety
+        legs_to_close.sort(key=lambda x: 0 if x["action"] == "BUY" else 1)
 
-        for leg in exit_legs:
-            try:
-                # Using placesmartorder for individual execution
-                # This ensures we get confirmation per leg
-                res = self.api_client.placesmartorder(
-                    strategy=STRATEGY_NAME,
-                    symbol=leg["symbol"],
-                    action=leg["action"],
-                    exchange=OPTIONS_EXCHANGE,
-                    pricetype="MARKET",
-                    product=leg["product"],
-                    quantity=leg["quantity"],
-                    position_size=leg["quantity"]
-                )
-                self.logger.info(f"Exit Order: {leg['symbol']} {leg['action']} -> {res.get('status', 'unknown')}")
-                # Brief sleep to ensure order processing order
-                time.sleep(0.5)
-            except Exception as e:
-                self.logger.error(f"Exit failed for {leg['symbol']}: {e}")
+        try:
+            res = self.client.optionsmultiorder(
+                strategy=STRATEGY_NAME,
+                underlying=UNDERLYING,
+                exchange=OPTIONS_EXCHANGE,
+                expiry_date=self.expiry,
+                legs=legs_to_close
+            )
+            self.logger.info(f"Exit Order Response: {res}")
 
-        self.tracker.clear()
-        self.logger.info("Position closed and tracker cleared.")
+            if res.get("status") == "success":
+                self.tracker.clear()
+            else:
+                self.logger.error(f"Exit failed: {res.get('message')}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to close position: {e}")
+
+    def _open_position(self, chain, entry_reason):
+        """Open Iron Condor Position."""
+        self.logger.info(f"Attempting to open Iron Condor ({entry_reason})...")
+
+        # Define legs based on offsets
+        legs_config = [
+            {"offset": BUY_OFFSET, "option_type": "CE", "action": "BUY"},   # Wings (Protection)
+            {"offset": BUY_OFFSET, "option_type": "PE", "action": "BUY"},
+            {"offset": SELL_OFFSET, "option_type": "CE", "action": "SELL"}, # Body (Credit)
+            {"offset": SELL_OFFSET, "option_type": "PE", "action": "SELL"},
+        ]
+
+        resolved_legs = []
+        api_legs = []
+
+        # Resolve symbols and LTPs
+        for cfg in legs_config:
+            offset = cfg["offset"]
+            otype = cfg["option_type"].lower()
+
+            found_item = None
+            for item in chain:
+                opt = item.get(otype, {})
+                if opt.get("label") == offset:
+                    found_item = opt
+                    break
+
+            if found_item:
+                symbol = found_item.get("symbol")
+                ltp = safe_float(found_item.get("ltp"))
+
+                api_legs.append({
+                    "offset": offset,
+                    "option_type": cfg["option_type"],
+                    "action": cfg["action"],
+                    "quantity": QUANTITY,
+                    "product": PRODUCT
+                })
+
+                resolved_legs.append({
+                    "symbol": symbol,
+                    "option_type": cfg["option_type"],
+                    "action": cfg["action"],
+                    "quantity": QUANTITY,
+                    "entry_price": ltp,
+                    "product": PRODUCT
+                })
+            else:
+                self.logger.warning(f"Could not resolve {offset} {cfg['option_type']}")
+                return
+
+        if len(resolved_legs) != 4:
+            self.logger.error("Failed to resolve all 4 legs.")
+            return
+
+        # Sort API legs: BUY first
+        api_legs.sort(key=lambda x: 0 if x["action"] == "BUY" else 1)
+
+        try:
+            res = self.client.optionsmultiorder(
+                strategy=STRATEGY_NAME,
+                underlying=UNDERLYING,
+                exchange=OPTIONS_EXCHANGE,
+                expiry_date=self.expiry,
+                legs=api_legs
+            )
+
+            if res.get("status") == "success":
+                self.logger.info(f"Entry Order Success: {res}")
+
+                # Add to Tracker
+                entry_prices = [leg["entry_price"] for leg in resolved_legs]
+                self.tracker.add_legs(resolved_legs, entry_prices, side="SELL") # Iron Condor is Credit strategy
+
+                self.entered_today = True
+                self.limiter.record()
+            else:
+                self.logger.error(f"Entry Order Failed: {res.get('message')}")
+
+        except Exception as e:
+            self.logger.error(f"Entry execution error: {e}")
 
     def run(self):
-        self.logger.info("Starting Nifty Smart Iron Condor Loop...")
+        self.logger.info(f"Starting {STRATEGY_NAME} for {UNDERLYING} on {OPTIONS_EXCHANGE}")
 
         while True:
             try:
@@ -278,160 +365,111 @@ class NiftySmartIronCondorStrategy:
                     self.entered_today = False
                     self.current_date = datetime.now().date()
 
-                # 1. Check Market Open
-                if not is_market_open():
-                    self.logger.debug("Market is closed. Sleeping...")
-                    time.sleep(SLEEP_SECONDS)
+                # 1. Market Hours Check
+                if not is_market_open_local():
+                    time.sleep(60)
                     continue
 
-                # 2. Ensure Expiry
+                # 2. Expiry Check
                 self.ensure_expiry()
                 if not self.expiry:
+                    self.logger.warning("No expiry available.")
                     time.sleep(SLEEP_SECONDS)
                     continue
 
-                # 3. Get Option Chain
+                # 3. Fetch Data
                 chain_resp = self.client.optionchain(
                     underlying=UNDERLYING,
                     exchange=UNDERLYING_EXCHANGE,
                     expiry_date=self.expiry,
-                    strike_count=STRIKE_COUNT
+                    strike_count=STRIKE_COUNT,
                 )
 
-                valid, reason = is_chain_valid(chain_resp, min_strikes=8)
+                valid, reason = is_chain_valid(chain_resp, min_strikes=STRIKE_COUNT)
                 if not valid:
-                    self.logger.warning(f"Invalid chain: {reason}")
+                    self.logger.warning(f"Chain invalid: {reason}")
                     time.sleep(SLEEP_SECONDS)
                     continue
 
                 chain = chain_resp.get("chain", [])
+                underlying_ltp = safe_float(chain_resp.get("underlying_ltp", 0))
 
-                # 4. EXIT MANAGEMENT (Always Check Exits First)
+                # 4. Exit Management (Priority)
                 if self.tracker.open_legs:
                     exit_now, legs, exit_reason = self.tracker.should_exit(chain)
-                    if exit_now or self.should_terminate():
-                        reason = exit_reason if exit_now else "EOD Auto-Squareoff"
-                        self._close_position(chain, reason)
+
+                    # EOD Exit (3:15 PM)
+                    ist_offset = timezone(timedelta(hours=5, minutes=30))
+                    now = datetime.now(ist_offset)
+                    eod_time = datetime.strptime("15:15", "%H:%M").time()
+
+                    if now.time() >= eod_time:
+                        exit_now = True
+                        exit_reason = "eod_sqoff"
+
+                    if exit_now:
+                        self.logger.info(f"Exit Signal: {exit_reason}")
+                        self._close_position(chain, exit_reason)
                         time.sleep(SLEEP_SECONDS)
                         continue
                     else:
-                        # Log status occasionally
-                        self.logger.debug(f"Position Open. Holding... (Time: {datetime.now().strftime('%H:%M:%S')})")
+                         self.logger.info(format_kv(
+                            spot=f"{underlying_ltp:.2f}",
+                            pos="OPEN",
+                            expiry=self.expiry
+                        ))
 
-                # 5. ENTRY LOGIC
-                if not self.tracker.open_legs and self.is_time_window_open():
+                # 5. Entry Logic
+                if not self.tracker.open_legs and not self.entered_today:
 
-                    # Pre-check limits
-                    if not self.limiter.allow():
-                        # Log only occasionally to avoid spam
-                        if int(time.time()) % 60 == 0:
-                            self.logger.debug("Trade limiter active or cooldown. Skipping entry.")
-                        time.sleep(SLEEP_SECONDS)
-                        continue
+                    # Time Check
+                    ist_offset = timezone(timedelta(hours=5, minutes=30))
+                    now = datetime.now(ist_offset)
+                    start_time_dt = datetime.strptime(ENTRY_START_TIME, "%H:%M").time()
+                    end_time_dt = datetime.strptime(ENTRY_END_TIME, "%H:%M").time()
 
-                    atm_strike = self.get_atm_strike(chain)
-                    if not atm_strike:
-                        time.sleep(SLEEP_SECONDS)
-                        continue
+                    if start_time_dt <= now.time() <= end_time_dt:
 
-                    # Calculate Indicators
-                    premium = self.calculate_straddle_premium(chain, atm_strike)
-                    pcr = self.calculate_pcr(chain)
+                        if self.limiter.allow():
+                            # Logic: Straddle Premium > Threshold AND PCR Neutral
+                            atm_item = next((item for item in chain if (item.get("ce") or {}).get("label") == "ATM"), None)
 
-                    self.logger.info(format_kv(spot="ATM", strike=atm_strike, premium=premium, pcr=pcr))
+                            if atm_item:
+                                ce_ltp = safe_float((atm_item.get("ce") or {}).get("ltp"))
+                                pe_ltp = safe_float((atm_item.get("pe") or {}).get("ltp"))
+                                straddle_premium = ce_ltp + pe_ltp
 
-                    # Filter Logic
-                    premium_ok = premium >= MIN_PREMIUM
-                    pcr_ok = MIN_PCR <= pcr <= MAX_PCR
+                                # Calculate PCR
+                                total_ce_oi = sum([safe_int(i.get("ce", {}).get("oi", 0)) for i in chain])
+                                total_pe_oi = sum([safe_int(i.get("pe", {}).get("oi", 0)) for i in chain])
+                                pcr = total_pe_oi / total_ce_oi if total_ce_oi > 0 else 0.0
 
-                    combined_signal = premium_ok and pcr_ok
+                                self.logger.info(format_kv(
+                                    spot=f"{underlying_ltp:.2f}",
+                                    straddle=f"{straddle_premium:.2f}",
+                                    pcr=f"{pcr:.2f}",
+                                    pos="FLAT",
+                                    expiry=self.expiry
+                                ))
 
-                    if self.debouncer.edge("ENTRY_SIGNAL", combined_signal):
-                        self.logger.info(f"Entry Signal Detected! Premium={premium}, PCR={pcr}")
+                                # Conditions
+                                iv_ok = straddle_premium > MIN_STRADDLE_PREMIUM
+                                pcr_neutral = PCR_MIN <= pcr <= PCR_MAX
 
-                        # Iron Condor Definition (Sell OTM2, Buy OTM4)
-                        definitions = [
-                            ("OTM4", "CE", "BUY"),  # Buy Wings First (Logically)
-                            ("OTM4", "PE", "BUY"),
-                            ("OTM2", "CE", "SELL"), # Sell Body
-                            ("OTM2", "PE", "SELL")
-                        ]
+                                should_enter = iv_ok and pcr_neutral
 
-                        tracking_legs = []
-                        entry_prices = []
-                        valid_setup = True
-
-                        # Resolve details
-                        for offset, otype, action in definitions:
-                            details = self.get_leg_details(chain, offset, otype)
-                            if details:
-                                details["action"] = action
-                                tracking_legs.append(details)
-                                entry_prices.append(details["ltp"])
-                            else:
-                                self.logger.warning(f"Could not resolve leg: {offset} {otype}")
-                                valid_setup = False
-                                break
-
-                        if valid_setup:
-                            # Construct API payload
-                            api_legs = []
-                            for offset, otype, action in definitions:
-                                api_legs.append({
-                                    "offset": offset,
-                                    "option_type": otype,
-                                    "action": action,
-                                    "quantity": QUANTITY,
-                                    "product": PRODUCT
-                                })
-
-                            try:
-                                self.logger.info("Placing Iron Condor Multi-Leg Order...")
-                                response = self.client.optionsmultiorder(
-                                    strategy=STRATEGY_NAME,
-                                    underlying=UNDERLYING,
-                                    exchange=UNDERLYING_EXCHANGE,
-                                    expiry_date=self.expiry,
-                                    legs=api_legs
-                                )
-
-                                if response.get("status") == "success":
-                                    self.logger.info(f"Order Success: {response}")
-                                    self.limiter.record()
-                                    self.entered_today = True
-
-                                    # Add to tracker immediately
-                                    self.tracker.add_legs(
-                                        legs=tracking_legs,
-                                        entry_prices=entry_prices,
-                                        side="SELL" # Net credit strategy
-                                    )
-                                    self.logger.info("Iron Condor positions tracked.")
-                                else:
-                                    self.logger.error(f"Order Failed: {response.get('message')}")
-
-                            except Exception as e:
-                                self.logger.error(f"Order Execution Error: {e}")
-                        else:
-                            self.logger.warning("Setup invalid (missing strikes). Skipping.")
+                                if self.debouncer.edge("entry_signal", should_enter):
+                                    entry_reason = f"straddle_{straddle_premium:.2f}_gt_{MIN_STRADDLE_PREMIUM}_pcr_{pcr:.2f}"
+                                    self._open_position(chain, entry_reason)
                     else:
-                        if not premium_ok:
-                            self.logger.debug(f"Premium {premium} < {MIN_PREMIUM}. Waiting.")
-                        if not pcr_ok:
-                            self.logger.debug(f"PCR {pcr} out of range. Waiting.")
+                        # Outside entry window, just log occasionally or sleep
+                        pass
 
             except Exception as e:
-                self.logger.error(f"Error in main loop: {e}", exc_info=True)
-                time.sleep(SLEEP_SECONDS)
+                self.logger.error(f"Error: {e}", exc_info=True)
 
             time.sleep(SLEEP_SECONDS)
 
 if __name__ == "__main__":
-    try:
-        strategy = NiftySmartIronCondorStrategy()
-        strategy.run()
-    except KeyboardInterrupt:
-        print("Strategy stopped by user.")
-    except Exception as e:
-        print(f"Critical Error: {e}")
-        sys.exit(1)
+    strategy = NiftySmartIronCondorStrategy()
+    strategy.run()
