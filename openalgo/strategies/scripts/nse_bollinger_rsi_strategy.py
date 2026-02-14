@@ -64,9 +64,6 @@ class NSEBollingerRSIStrategy(BaseStrategy):
 
     def calculate_signal(self, df):
         """Calculate signal for backtesting support"""
-        # BaseStrategy doesn't import calculate_bollinger_bands by default
-        from trading_utils import calculate_bollinger_bands
-
         if df.empty or len(df) < max(self.rsi_period, self.bb_period):
             return 'HOLD', 0.0, {}
 
@@ -74,7 +71,7 @@ class NSEBollingerRSIStrategy(BaseStrategy):
         try:
             df = df.copy()
             df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
-            df['sma'], df['upper'], df['lower'] = calculate_bollinger_bands(df['close'], window=self.bb_period, num_std=self.bb_std)
+            df['sma'], df['upper'], df['lower'] = self.calculate_bollinger_bands(df['close'], window=self.bb_period, num_std=self.bb_std)
         except Exception as e:
             self.logger.error(f"Indicator calculation error: {e}")
             return 'HOLD', 0.0, {}
