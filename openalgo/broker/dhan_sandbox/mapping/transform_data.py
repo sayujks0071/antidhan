@@ -196,6 +196,6 @@ def reverse_map_product_type(product):
         str: OpenAlgo product type.
     """
     # Exchange to OpenAlgo product type mapping for 'D'
-    product_mapping = {"CNC": "CNC", "MARGIN": "NRML", "MIS": "INTRADAY"}
+    product_mapping = {"CNC": "CNC", "MARGIN": "NRML", "INTRADAY": "MIS"}
 
     return product_mapping.get(product)  # Removed default; will return None if not found
