@@ -34,6 +34,7 @@ try:
         calculate_bollinger_bands,
         calculate_ema,
         calculate_intraday_vwap,
+        calculate_macd,
         calculate_relative_strength,
         calculate_roc,
         calculate_rsi,
@@ -56,6 +57,7 @@ except ImportError:
             calculate_bollinger_bands,
             calculate_ema,
             calculate_intraday_vwap,
+            calculate_macd,
             calculate_relative_strength,
             calculate_roc,
             calculate_rsi,
@@ -78,6 +80,7 @@ except ImportError:
             calculate_bollinger_bands,
             calculate_ema,
             calculate_intraday_vwap,
+            calculate_macd,
             calculate_relative_strength,
             calculate_roc,
             calculate_rsi,
@@ -361,6 +364,10 @@ class BaseStrategy:
     def calculate_relative_strength(self, df, index_df, period=10):
         """Calculate Relative Strength."""
         return calculate_relative_strength(df, index_df, period)
+
+    def calculate_macd(self, series, fast=12, slow=26, signal=9):
+        """Calculate MACD, Signal, Hist."""
+        return calculate_macd(series, fast, slow, signal)
 
     def calculate_atr(self, df, period=14):
         """Calculate Average True Range (Scalar)."""
