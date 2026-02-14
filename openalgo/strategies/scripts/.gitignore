@@ -21,3 +21,4 @@ __pycache__/
 # Keep the directory but ignore contents
 # This ensures the scripts folder exists in git but user strategies are not tracked
 !nse_ma_crossover_strategy.py
+!mcx_zinc_breakout_strategy.py
