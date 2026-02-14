@@ -25,44 +25,22 @@ except ImportError:
     from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
 
 class SuperTrendVWAPStrategy(BaseStrategy):
-    def __init__(self, symbol, quantity, api_key=None, host=None, ignore_time=False,
-                 sector_benchmark='NIFTY BANK', log_file=None, client=None, **kwargs):
-        super().__init__(
-            name=f"VWAP_{symbol}",
-            symbol=symbol,
-            quantity=quantity,
-            api_key=api_key,
-            host=host,
-            ignore_time=ignore_time,
-            log_file=log_file,
-            client=client
-        )
-        self.sector_benchmark = sector_benchmark
+    def setup(self):
+        if self.symbol:
+            self.name = f"VWAP_{self.symbol}"
+
+        # Logic for sector benchmark (BaseStrategy handles --sector -> self.sector)
+        self.sector_benchmark = self.sector if self.sector else 'NIFTY BANK'
 
         # Optimization Parameters
-        self.threshold = 150 # Note: This parameter was previously unused in logic. Keeping for compatibility but ignoring.
-        self.stop_pct = 1.8
-        self.adx_threshold = 20
-        self.adx_period = 14
+        self.threshold = getattr(self, "threshold", 150)
+        self.stop_pct = getattr(self, "stop_pct", 1.8)
+        self.adx_threshold = getattr(self, "adx_threshold", 20)
+        self.adx_period = getattr(self, "adx_period", 14)
 
         # State
         self.trailing_stop = 0.0
         self.atr = 0.0
-
-    @classmethod
-    def add_arguments(cls, parser):
-        parser.add_argument("--underlying", type=str, help="Underlying Asset (e.g. NIFTY)")
-        parser.add_argument("--type", type=str, default="EQUITY", help="Instrument Type (EQUITY, FUT, OPT)")
-        parser.add_argument("--exchange", type=str, default="NSE", help="Exchange")
-        # --sector is already added by BaseStrategy
-
-    @classmethod
-    def parse_arguments(cls, args):
-        kwargs = super().parse_arguments(args)
-        # Use provided sector or default to 'NIFTY BANK'
-        kwargs['sector_benchmark'] = args.sector if args.sector else 'NIFTY BANK'
-        # BaseStrategy already extracts log_file from args.logfile
-        return kwargs
 
     def cycle(self):
         """

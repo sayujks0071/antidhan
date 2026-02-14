@@ -34,12 +34,11 @@ except ImportError:
         from openalgo.strategies.utils.base_strategy import BaseStrategy
 
 class MCXSmartStrategyV2(BaseStrategy):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup(self):
         # Default Parameters if not provided
-        self.period_rsi = kwargs.get("period_rsi", 14)
-        self.period_atr = kwargs.get("period_atr", 14)
-        self.adx_threshold = kwargs.get("adx_threshold", 25) # New Feature
+        self.period_rsi = getattr(self, "period_rsi", 14)
+        self.period_atr = getattr(self, "period_atr", 14)
+        self.adx_threshold = getattr(self, "adx_threshold", 25) # New Feature
 
     def calculate_indicators(self, df):
         """Calculate technical indicators using BaseStrategy helpers."""
@@ -53,16 +52,7 @@ class MCXSmartStrategyV2(BaseStrategy):
         df['rsi'] = self.calculate_rsi(df['close'], period=self.period_rsi)
 
         # Bollinger Bands (20, 2)
-        # BaseStrategy.calculate_bollinger_bands returns sma, upper, lower
-        # But we need series. calculate_bollinger_bands in trading_utils returns series.
-        # Let's check BaseStrategy implementation.
-        # It calls calculate_bollinger_bands from trading_utils which returns (sma, upper, lower) series.
-        try:
-            from trading_utils import calculate_bollinger_bands
-            df['bb_mid'], df['bb_upper'], df['bb_lower'] = calculate_bollinger_bands(df['close'], window=20, num_std=2)
-        except ImportError:
-            # Fallback if import fails (shouldn't happens since BaseStrategy works)
-            pass
+        df['bb_mid'], df['bb_upper'], df['bb_lower'] = self.calculate_bollinger_bands(df['close'], window=20, num_std=2)
 
         # ATR 14
         df['atr'] = self.calculate_atr_series(df, period=self.period_atr)

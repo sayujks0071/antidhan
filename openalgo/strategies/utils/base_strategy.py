@@ -113,6 +113,9 @@ class BaseStrategy:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+        # Allow subclasses to perform custom initialization (configuration)
+        self.setup()
+
         # Ensure project root is in path for DB access
         self._add_project_root_to_path()
 
@@ -140,6 +143,13 @@ class BaseStrategy:
 
         self.pm = PositionManager(self.symbol) if (PositionManager and self.symbol) else None
         self.smart_order = SmartOrder(self.client) if SmartOrder else None
+
+    def setup(self):
+        """
+        Hook for subclasses to perform initialization logic.
+        Override this method to set up strategy-specific attributes without overriding __init__.
+        """
+        pass
 
     def _add_project_root_to_path(self):
         """Add the openalgo root directory to sys.path to allow importing database modules."""
