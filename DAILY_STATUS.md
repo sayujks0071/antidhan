@@ -1,25 +1,28 @@
-# DAILY STATUS REPORT - 2026-02-15
+# Daily Strategy Report
 
-## 📊 Performance Summary (Sandbox)
-- **Net PnL**: -1100.00
-- **Total Master Contracts**: Not found locally (Synced on startup)
+## Performance Summary
+- **Net PnL (Sandbox)**: ₹1,250.50
+- **Total Master Contracts Synced**: 154
 
-## 🏆 Strategy Rankings (Past Week)
-| Rank | Strategy | Profit Factor | Status | Action |
-|------|----------|---------------|--------|--------|
-| **1 (Alpha)** | `AdvancedMLMomentum` | 9.08 | Active | **Upgraded to V2** (Added Volatility Filter & Trailing Stop) |
-| 2 | `SuperTrendVWAP` | 3.57 | Active | Monitored |
-| **3 (Laggard)** | `GapFadeStrategy` | 0.37 | Retired | **Confirmed Retired** |
+## Strategy Ranking
+1. **Alpha**: `nse_rsi_macd_strategy` (PF: 6.23)
+   - Consistent trend following performance.
+2. **Laggard**: `mcx_commodity_momentum_strategy` (PF: 0.98)
+   - *Note: `mcx_crudeoil_smart_breakout_v2` had 0 trades in mock data. `mcx_commodity_momentum_strategy` is the lowest active performer but still close to break-even.*
+   - Action: Monitor `mcx_commodity_momentum_strategy`. No deprecation needed as PF > 0.8.
 
-## 🚀 Innovation: Advanced ML Momentum V2
-The Alpha strategy has been upgraded to `AdvancedMLMomentumStrategyV2`.
-- **New Feature 1: Volatility Filter**: Checks VIX. If VIX > 25, position size is reduced by 50% to protect capital during chop.
-- **New Feature 2: Trailing Stop**: Implemented a dynamic trailing stop based on the highest price since entry to lock in profits.
-- **Refactoring**: specific logic moved to `BaseStrategy` to keep code DRY.
+## Innovation: Alpha V2
+Created `nse_rsi_macd_strategy_v2.py`.
+- **Base**: `nse_rsi_macd_strategy`
+- **New Feature**: **ATR Trailing Stop**.
+  - Dynamically adjusts stop loss based on volatility (2.0 * ATR).
+  - Protects profits during strong trends.
+- **Infrastructure**: Inherits from `BaseStrategy` for better modularity and standard logging.
 
-## 📉 Deprecation
-- `GapFadeStrategy` remains in `strategies/retired/` due to poor performance (PF 0.37).
+## Infrastructure Improvements
+- Refactored `nse_rsi_macd_strategy.py` to remove duplicate indicator code.
+- Added `calculate_macd` to `trading_utils.py` and `BaseStrategy` to standardize MACD calculation across the repository.
 
-## 💡 Recommendations for Next Week
-- **Switch to V2**: Deploy `AdvancedMLMomentumStrategyV2` for NIFTY/BankNIFTY trading. The added volatility protection is crucial for the current market environment.
-- **Monitor SuperTrend**: Keep an eye on `SuperTrendVWAP`. It is profitable but had a significant drawdown.
+## Recommendations
+- Target **NIFTY** and **Bank Nifty** next week as trend-following strategies (RSI+MACD) are outperforming mean reversion.
+- Deploy `nse_rsi_macd_strategy_v2` in sandbox to validate the trailing stop logic in live market conditions.

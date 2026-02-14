@@ -2,159 +2,52 @@ import requests
 import time
 from datetime import datetime, timedelta
 
-def safe_float(value, default=0.0):
+try:
+    from .trading_utils import (
+        safe_float,
+        safe_int,
+        normalize_expiry,
+        choose_nearest_expiry,
+        choose_monthly_expiry,
+        is_chain_valid,
+        get_atm_strike,
+        calculate_straddle_premium,
+    )
+except ImportError:
+    # Fallback if running as script or different context
     try:
-        if value is None:
-            return default
-        return float(value)
-    except (ValueError, TypeError):
-        return default
+        from trading_utils import (
+            safe_float,
+            safe_int,
+            normalize_expiry,
+            choose_nearest_expiry,
+            choose_monthly_expiry,
+            is_chain_valid,
+            get_atm_strike,
+            calculate_straddle_premium,
+        )
+    except ImportError:
+        # Fallback implementation if trading_utils not found (should not happen in prod)
+        def safe_float(value, default=0.0):
+            try:
+                if value is None: return default
+                return float(value)
+            except (ValueError, TypeError): return default
 
-def safe_int(value, default=0):
-    try:
-        if value is None:
-            return default
-        return int(float(value))
-    except (ValueError, TypeError):
-        return default
+        def safe_int(value, default=0):
+            try:
+                if value is None: return default
+                return int(float(value))
+            except (ValueError, TypeError): return default
 
-def normalize_expiry(expiry_date):
-    """Normalizes expiry date string to DDMMMYY format (e.g., 14FEB26)."""
-    if not expiry_date:
-        return None
-    try:
-        # If already in format, return as is (uppercase)
-        # Check if it matches expected format length roughly
-        expiry_date = expiry_date.strip().upper()
-        datetime.strptime(expiry_date, "%d%b%y")
-        return expiry_date
-    except ValueError:
-        pass
-
-    # Try other formats if needed, but usually API returns DDMMMYY
-    return expiry_date
-
-def choose_nearest_expiry(expiry_dates):
-    """
-    Selects the nearest future expiry date from a list of strings (DDMMMYY).
-    """
-    if not expiry_dates:
-        return None
-
-    today = datetime.now().date()
-    valid_dates = []
-
-    for d_str in expiry_dates:
-        try:
-            d_date = datetime.strptime(d_str, "%d%b%y").date()
-            if d_date >= today:
-                valid_dates.append((d_date, d_str))
-        except ValueError:
-            continue
-
-    if not valid_dates:
-        return None
-
-    # Sort by date and return the string of the earliest one
-    valid_dates.sort(key=lambda x: x[0])
-    return valid_dates[0][1]
-
-
-def choose_monthly_expiry(expiry_dates):
-    """
-    Selects the nearest monthly expiry date (last expiry of the month).
-    """
-    if not expiry_dates:
-        return None
-
-    today = datetime.now().date()
-    future_dates = []
-
-    for d_str in expiry_dates:
-        try:
-            d_date = datetime.strptime(d_str, "%d%b%y").date()
-            if d_date >= today:
-                future_dates.append((d_date, d_str))
-        except ValueError:
-            continue
-
-    if not future_dates:
-        return None
-
-    # Group by (Year, Month) and find the max date in each group
-    monthly_expiries = {}
-    for d_date, d_str in future_dates:
-        key = (d_date.year, d_date.month)
-        if key not in monthly_expiries:
-            monthly_expiries[key] = (d_date, d_str)
-        else:
-            # Update if current date is greater than stored date for this month
-            if d_date > monthly_expiries[key][0]:
-                monthly_expiries[key] = (d_date, d_str)
-
-    # Collect all monthly expiries
-    final_candidates = list(monthly_expiries.values())
-
-    if not final_candidates:
-        return None
-
-    # Sort by date and return the earliest one
-    final_candidates.sort(key=lambda x: x[0])
-    return final_candidates[0][1]
-
-def is_chain_valid(chain_response, min_strikes=10, require_oi=True, require_volume=False):
-    """
-    Validates option chain response.
-    Returns (bool, reason_string)
-    """
-    if not chain_response or chain_response.get("status") != "success":
-        return False, "API Error or Invalid Response"
-
-    chain = chain_response.get("chain", [])
-    if not chain:
-        return False, "Empty Chain"
-
-    if len(chain) < min_strikes:
-        return False, f"Insufficient Strikes: {len(chain)} < {min_strikes}"
-
-    # Check if data looks populated (LTP > 0 for at least some strikes)
-    # And specifically for OI/Volume if requested
-
-    valid_strikes = 0
-    for item in chain:
-        ce = item.get("ce", {})
-        pe = item.get("pe", {})
-
-        # Check basic LTP validity
-        if safe_float(ce.get("ltp")) > 0 or safe_float(pe.get("ltp")) > 0:
-            valid_strikes += 1
-
-    if valid_strikes < min_strikes // 2:
-        return False, "Chain Data Seems Stale/Empty (LTPs are 0)"
-
-    return True, "OK"
-
-def get_atm_strike(chain):
-    """Finds ATM strike from chain data."""
-    # Assuming chain is sorted or we search for label="ATM"
-    for item in chain:
-        if item.get("ce", {}).get("label") == "ATM":
-            return item["strike"]
-    # Fallback using spot price if available in metadata (not passed here usually)
-    return None
-
-def calculate_straddle_premium(chain, atm_strike):
-    """Calculates combined premium of ATM CE and PE."""
-    ce_ltp = 0.0
-    pe_ltp = 0.0
-
-    for item in chain:
-        if item["strike"] == atm_strike:
-            ce_ltp = safe_float(item.get("ce", {}).get("ltp", 0))
-            pe_ltp = safe_float(item.get("pe", {}).get("ltp", 0))
-            break
-
-    return ce_ltp + pe_ltp
+        def normalize_expiry(expiry_date):
+            if not expiry_date: return None
+            try:
+                expiry_date = expiry_date.strip().upper()
+                datetime.strptime(expiry_date, "%d%b%y")
+                return expiry_date
+            except ValueError: pass
+            return expiry_date
 
 class OptionChainClient:
     def __init__(self, api_key, host="http://127.0.0.1:5000"):
@@ -196,6 +89,58 @@ class OptionChainClient:
             "expiry_date": expiry_date,
             "legs": legs
         })
+
+    def placesmartorder(self, strategy, symbol, action, exchange, pricetype, product, quantity, position_size):
+        """
+        Places a smart order (single leg).
+        """
+        payload = {
+            "apikey": self.api_key,
+            "strategy": strategy,
+            "symbol": symbol,
+            "action": action,
+            "exchange": exchange,
+            "pricetype": pricetype,
+            "product": product,
+            "quantity": str(quantity),
+            "position_size": str(position_size),
+            "price": "0",
+            "trigger_price": "0",
+            "disclosed_quantity": "0"
+        }
+        # Note: endpoint is placesmartorder (not _post generic if key names differ, but here we construct payload manually)
+        # Using _post wrapper might be cleaner but _post adds apikey.
+        # Let's use _post but we need to be careful about payload structure if _post modifies it.
+        # _post does: payload["apikey"] = self.api_key.
+        # So we can just pass the fields.
+
+        return self._post("placesmartorder", {
+            "strategy": strategy,
+            "symbol": symbol,
+            "action": action,
+            "exchange": exchange,
+            "pricetype": pricetype,
+            "product": product,
+            "quantity": str(quantity),
+            "position_size": str(position_size),
+            "price": "0",
+            "trigger_price": "0",
+            "disclosed_quantity": "0"
+        })
+
+    def get_quote(self, symbol, exchange="NSE"):
+        """
+        Fetches a real-time quote for a symbol.
+        Returns the data dictionary (containing ltp, etc.) or None.
+        """
+        res = self._post("quotes", {
+            "symbol": symbol,
+            "exchange": exchange
+        })
+
+        if res.get("status") == "success" and "data" in res:
+            return res["data"]
+        return None
 
 class OptionPositionTracker:
     def __init__(self, sl_pct, tp_pct, max_hold_min):

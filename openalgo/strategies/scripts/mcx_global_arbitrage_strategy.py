@@ -72,8 +72,9 @@ class MCXGlobalArbitrageStrategy:
             if not self.api_client or not calculate_atr:
                 return 0.0
 
+            # Use yesterday as end_date to leverage FileCache
             start_date = (datetime.now() - timedelta(days=45)).strftime("%Y-%m-%d")
-            end_date = datetime.now().strftime("%Y-%m-%d")
+            end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
             df = self.api_client.history(
                 symbol=self.symbol,
