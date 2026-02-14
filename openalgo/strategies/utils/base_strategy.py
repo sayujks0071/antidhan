@@ -122,8 +122,8 @@ class BaseStrategy:
         # Resolve API Key
         self.api_key = self._resolve_api_key(api_key)
 
-        # Default to 5002 to match trading_utils default, allow override via env
-        self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5002')
+        # Default to 5000 to match trading_utils default, allow override via env
+        self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')
 
         if not self.api_key and not client:
              # Warn but don't fail immediately, allowing for test/mock scenarios

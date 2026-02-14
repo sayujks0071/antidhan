@@ -6,73 +6,74 @@ Exit: Close > Upper Band OR RSI > 70
 """
 import os
 import sys
-import time
-import argparse
 import logging
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
 
-# Add project root to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, 'utils')
-sys.path.insert(0, utils_dir)
-sys.path.insert(0, os.path.dirname(strategies_dir))
-
+# Add repo root to path
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol, calculate_rsi, calculate_bollinger_bands
+    from base_strategy import BaseStrategy
 except ImportError:
-    try:
-        sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol, calculate_rsi, calculate_bollinger_bands
-    except ImportError:
-        try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol, calculate_rsi, calculate_bollinger_bands
-        except ImportError:
-            print("Warning: openalgo package not found or imports failed.")
-            APIClient = None
-            PositionManager = None
-            normalize_symbol = lambda s: s
-            is_market_open = lambda: True
-            calculate_rsi = lambda s, p: pd.Series(0, index=s.index)
-            calculate_bollinger_bands = lambda s, w, n: (s, s, s)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    strategies_dir = os.path.dirname(script_dir)
+    utils_dir = os.path.join(strategies_dir, 'utils')
+    if utils_dir not in sys.path:
+        sys.path.insert(0, utils_dir)
+    from base_strategy import BaseStrategy
 
-class NSEBollingerRSIStrategy:
-    def __init__(self, symbol, api_key, port, **kwargs):
-        self.symbol = symbol
-        self.host = f"http://127.0.0.1:{port}"
-        self.client = APIClient(api_key=api_key, host=self.host) if APIClient else None
-
-        # Setup Logger
-        self.logger = logging.getLogger(f"NSE_{symbol}")
-        self.logger.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-        # Avoid duplicate handlers
-        if not self.logger.handlers:
-            ch = logging.StreamHandler()
-            ch.setFormatter(formatter)
-            self.logger.addHandler(ch)
+class NSEBollingerRSIStrategy(BaseStrategy):
+    def __init__(self, symbol, api_key=None, host=None, **kwargs):
+        super().__init__(
+            name=f"NSE_Bollinger_{symbol}",
+            symbol=symbol,
+            api_key=api_key,
+            host=host,
+            exchange="NSE",
+            interval="5m",
+            **kwargs
+        )
 
         # Strategy parameters
-        self.rsi_period = kwargs.get('rsi_period', 14)
-        self.bb_period = kwargs.get('bb_period', 20)
-        self.bb_std = kwargs.get('bb_std', 2.0)
-        self.risk_pct = kwargs.get('risk_pct', 2.0)
+        self.rsi_period = int(kwargs.get('rsi_period', 14))
+        self.bb_period = int(kwargs.get('bb_period', 20))
+        self.bb_std = float(kwargs.get('bb_std', 2.0))
+        self.risk_pct = float(kwargs.get('risk_pct', 2.0))
 
-        self.pm = PositionManager(symbol) if PositionManager else None
+    @classmethod
+    def add_arguments(cls, parser):
+        parser.add_argument('--rsi_period', type=int, default=14, help='RSI Period')
+        parser.add_argument('--bb_period', type=int, default=20, help='Bollinger Band Period')
+        parser.add_argument('--bb_std', type=float, default=2.0, help='Bollinger Band Std Dev')
+        parser.add_argument('--risk_pct', type=float, default=2.0, help='Risk Percentage')
+        # Legacy port argument support
+        parser.add_argument("--port", type=int, help="API Port (Legacy support)")
+
+    @classmethod
+    def parse_arguments(cls, args):
+        kwargs = super().parse_arguments(args)
+        if hasattr(args, 'rsi_period'): kwargs['rsi_period'] = args.rsi_period
+        if hasattr(args, 'bb_period'): kwargs['bb_period'] = args.bb_period
+        if hasattr(args, 'bb_std'): kwargs['bb_std'] = args.bb_std
+        if hasattr(args, 'risk_pct'): kwargs['risk_pct'] = args.risk_pct
+
+        # Support legacy --port arg by constructing host
+        if hasattr(args, 'port') and args.port:
+            kwargs['host'] = f"http://127.0.0.1:{args.port}"
+
+        return kwargs
 
     def calculate_signal(self, df):
         """Calculate signal for backtesting support"""
+        # BaseStrategy doesn't import calculate_bollinger_bands by default
+        from trading_utils import calculate_bollinger_bands
+
         if df.empty or len(df) < max(self.rsi_period, self.bb_period):
             return 'HOLD', 0.0, {}
 
         # Calculate indicators
         try:
-            # Create a copy to avoid SettingWithCopyWarning if df is a slice
             df = df.copy()
-            df['rsi'] = calculate_rsi(df['close'], period=self.rsi_period)
+            df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
             df['sma'], df['upper'], df['lower'] = calculate_bollinger_bands(df['close'], window=self.bb_period, num_std=self.bb_std)
         except Exception as e:
             self.logger.error(f"Indicator calculation error: {e}")
@@ -93,8 +94,7 @@ class NSEBollingerRSIStrategy:
                 'lower_band': lower
             }
 
-        # Exit logic is handled in run(), but for backtesting signal generation, we might want to return SELL if exit condition met
-        # Exit: Close > Upper Band OR RSI > 70 (Overbought)
+        # Exit logic: Close > Upper Band OR RSI > 70 (Overbought)
         if close > upper or rsi > 70:
              return 'SELL', 1.0, {
                 'reason': 'Overbought (RSI > 70) or Above Upper Band',
@@ -105,99 +105,46 @@ class NSEBollingerRSIStrategy:
 
         return 'HOLD', 0.0, {}
 
-    def run(self):
-        self.symbol = normalize_symbol(self.symbol)
-        self.logger.info(f"Starting strategy for {self.symbol}")
+    def cycle(self):
+        """Main execution cycle"""
+        # Determine exchange (NSE for stocks, NSE_INDEX for indices)
+        exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
 
-        while True:
-            if not is_market_open():
-                self.logger.info("Market is closed. Sleeping...")
-                time.sleep(60)
-                continue
+        # Fetch historical data
+        df = self.fetch_history(days=5, interval="5m", exchange=exchange)
 
-            try:
-                # Determine exchange (NSE for stocks, NSE_INDEX for indices)
-                exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
+        if df.empty or len(df) < max(self.rsi_period, self.bb_period):
+            self.logger.warning("Insufficient data. Retrying...")
+            return
 
-                # Fetch historical data
-                now = datetime.now()
-                start_date = (now - timedelta(days=5)).strftime("%Y-%m-%d") # Fetch enough data for indicators
-                end_date = now.strftime("%Y-%m-%d")
+        # Calculate indicators & generate signal
+        signal, signal_qty, metadata = self.calculate_signal(df)
 
-                df = self.client.history(
-                    symbol=self.symbol,
-                    interval="5m",
-                    exchange=exchange,
-                    start_date=start_date,
-                    end_date=end_date
-                )
+        last = df.iloc[-1]
+        current_price = last['close']
 
-                if df.empty or len(df) < max(self.rsi_period, self.bb_period):
-                    self.logger.warning("Insufficient data. Retrying...")
-                    time.sleep(60)
-                    continue
+        # Position management
+        if self.pm:
+            if self.pm.has_position():
+                # Exit logic
+                pnl = self.pm.get_pnl(current_price)
 
-                # Calculate indicators & generate signal
-                signal, signal_qty, metadata = self.calculate_signal(df)
+                # Check exit condition from signal (SELL)
+                if signal == 'SELL':
+                    self.logger.info(f"Exit signal detected: {metadata}. PnL: {pnl:.2f}")
+                    self.execute_trade('SELL', abs(self.pm.position), current_price)
+            else:
+                # Entry logic
+                if signal == 'BUY':
+                    # Adaptive Quantity
+                    # Use PM's adaptive quantity logic
+                    # Using placeholder capital 100000 and 1.0 volatility (ATR placeholder if not available)
 
-                last = df.iloc[-1]
-                current_price = last['close']
+                    qty = self.pm.calculate_adaptive_quantity(100000, self.risk_pct, 1.0, current_price)
+                    qty = max(1, qty)
 
-                # Position management
-                if self.pm:
-                    # Sync with real position if possible, but here rely on local state or PM logic
-                    if self.pm.has_position():
-                        # Exit logic
-                        pnl = self.pm.get_pnl(current_price)
-
-                        # Check exit condition from signal (SELL)
-                        if signal == 'SELL':
-                            self.logger.info(f"Exit signal detected: {metadata}. PnL: {pnl:.2f}")
-                            self.pm.update_position(abs(self.pm.position), current_price, 'SELL')
-
-                    else:
-                        # Entry logic
-                        if signal == 'BUY':
-                            # Adaptive Quantity
-                            qty = self.pm.calculate_adaptive_quantity(100000, self.risk_pct, 1.0, current_price) # Placeholder capital
-                            qty = max(1, qty) # Ensure at least 1
-
-                            self.logger.info(f"Entry signal detected: {metadata}. Buying {qty} at {current_price}")
-                            self.pm.update_position(qty, current_price, 'BUY')
-
-            except Exception as e:
-                self.logger.error(f"Error: {e}", exc_info=True)
-                time.sleep(60)
-
-            time.sleep(60)  # Sleep between iterations
-
-def run_strategy():
-    parser = argparse.ArgumentParser(description='NSE Bollinger RSI Strategy')
-    parser.add_argument('--symbol', type=str, required=True, help='Stock Symbol')
-    parser.add_argument('--port', type=int, default=5001, help='API Port')
-    parser.add_argument('--api_key', type=str, help='API Key')
-
-    # Custom parameters
-    parser.add_argument('--rsi_period', type=int, default=14, help='RSI Period')
-    parser.add_argument('--bb_period', type=int, default=20, help='Bollinger Band Period')
-    parser.add_argument('--bb_std', type=float, default=2.0, help='Bollinger Band Std Dev')
-
-    args = parser.parse_args()
-
-    api_key = args.api_key or os.getenv('OPENALGO_APIKEY')
-    if not api_key:
-        print("Error: API Key required")
-        return
-
-    strategy = NSEBollingerRSIStrategy(
-        args.symbol,
-        api_key,
-        args.port,
-        rsi_period=args.rsi_period,
-        bb_period=args.bb_period,
-        bb_std=args.bb_std
-    )
-    strategy.run()
+                    self.logger.info(f"Entry signal detected: {metadata}. Buying {qty} at {current_price}")
+                    self.execute_trade('BUY', qty, current_price)
 
 # Backtesting support
 def generate_signal(df, client=None, symbol=None, params=None):
@@ -211,8 +158,8 @@ def generate_signal(df, client=None, symbol=None, params=None):
 
     strat = NSEBollingerRSIStrategy(
         symbol=symbol or "TEST",
-        api_key="dummy",
-        port=5001,
+        api_key="BACKTEST",
+        host="http://127.0.0.1:5000",
         **strat_params
     )
 
@@ -223,4 +170,4 @@ def generate_signal(df, client=None, symbol=None, params=None):
     return strat.calculate_signal(df)
 
 if __name__ == "__main__":
-    run_strategy()
+    NSEBollingerRSIStrategy.cli()
