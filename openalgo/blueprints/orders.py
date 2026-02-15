@@ -500,6 +500,44 @@ def export_positions():
         return "Error exporting positions", 500
 
 
+@orders_bp.route("/placesmartorder", methods=["POST"])
+@check_session_validity
+@limiter.limit(API_RATE_LIMIT)
+def placesmartorder():
+    """Place a smart order"""
+    try:
+        # Get data from request
+        data = request.json
+
+        # Get auth token from session
+        login_username = session["user"]
+        auth_token = get_auth_token(login_username)
+        broker_name = session.get("broker")
+
+        # Get API key (needed for analyze mode and for validation)
+        # Note: Local import is redundant if imported at top, but keeping logic clean
+        from database.auth_db import get_api_key_for_tradingview
+
+        api_key = get_api_key_for_tradingview(login_username)
+
+        # Delegate to service which handles:
+        # 1. Validation (SecurityId Required)
+        # 2. Auth checks (Invalid Token) - returns 401 if auth_token is missing/invalid
+        # 3. Automatic retry mechanism for 500-level errors (including 502, 503, 504)
+        success, response_data, status_code = place_smart_order(
+            order_data=data,
+            api_key=api_key,
+            auth_token=auth_token,
+            broker=broker_name,
+        )
+
+        return jsonify(response_data), status_code
+
+    except Exception as e:
+        logger.exception(f"Error in placesmartorder endpoint: {str(e)}")
+        return jsonify({"status": "error", "message": f"An error occurred: {str(e)}"}), 500
+
+
 @orders_bp.route("/close_position", methods=["POST"])
 @check_session_validity
 @limiter.limit(API_RATE_LIMIT)
