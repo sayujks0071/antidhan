@@ -49,6 +49,49 @@ except ImportError:
             except ValueError: pass
             return expiry_date
 
+        def choose_nearest_expiry(expiry_dates):
+            if not expiry_dates: return None
+            today = datetime.now().date()
+            valid_dates = []
+            for d_str in expiry_dates:
+                try:
+                    d_date = datetime.strptime(d_str, "%d%b%y").date()
+                    if d_date >= today:
+                        valid_dates.append((d_date, d_str))
+                except ValueError:
+                    continue
+            if not valid_dates: return None
+            valid_dates.sort(key=lambda x: x[0])
+            return valid_dates[0][1]
+
+        def choose_monthly_expiry(expiry_dates):
+            # Simplified fallback
+            return choose_nearest_expiry(expiry_dates)
+
+        def is_chain_valid(chain_response, min_strikes=10, require_oi=True, require_volume=False):
+            if not chain_response or chain_response.get("status") != "success":
+                return False, "API Error or Invalid Response"
+            chain = chain_response.get("chain", [])
+            if not chain:
+                return False, "Empty Chain"
+            if len(chain) < min_strikes:
+                return False, f"Insufficient Strikes: {len(chain)} < {min_strikes}"
+            return True, "OK"
+
+        def get_atm_strike(chain):
+            for item in chain:
+                if item.get("ce", {}).get("label") == "ATM":
+                    return item["strike"]
+            return None
+
+        def calculate_straddle_premium(chain, atm_strike):
+            for item in chain:
+                if item["strike"] == atm_strike:
+                    ce_ltp = safe_float(item.get("ce", {}).get("ltp", 0))
+                    pe_ltp = safe_float(item.get("pe", {}).get("ltp", 0))
+                    return ce_ltp + pe_ltp
+            return 0.0
+
 class OptionChainClient:
     def __init__(self, api_key, host="http://127.0.0.1:5000"):
         self.api_key = api_key
