@@ -11,4 +11,4 @@ The "OpenAlgo Strategy Development Prompt" mandates that:
 - Strategies must use `APIClient` from `trading_utils` and avoid `requests` library.
 - Strategies must follow the specified file structure and logging practices.
 
-Please read `docs/strategy_prompt.md` before writing any new strategy code.
+This file serves as the definitive guide for all strategy development tasks. Please read `docs/strategy_prompt.md` before writing any new strategy code.
