@@ -121,6 +121,9 @@ def validate_smart_order(order_data: dict[str, Any]) -> tuple[bool, str | None]:
         # Check if SecurityId exists before sending to broker
         token = get_token(order_data["symbol"], order_data["exchange"])
         if not token:
+            logger.error(
+                f"SecurityId Required: Token not found for {order_data['symbol']} {order_data['exchange']}"
+            )
             # Return error immediately if token not found (avoids broker call)
             return False, "SecurityId Required"
 
@@ -206,6 +209,7 @@ def place_smart_order_with_auth(
 
     # Check if auth_token is valid
     if not auth_token:
+        logger.error("Invalid Token: Authentication token is missing or empty")
         error_response = {
             "status": "error",
             "message": "Invalid Token: Authentication token is missing or empty",
