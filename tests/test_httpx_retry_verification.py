@@ -111,24 +111,14 @@ class TestHttpxRetryVerification(unittest.TestCase):
 
         mock_client_instance.request.side_effect = [response_429, response_200]
 
-        with patch('openalgo.utils.httpx_client.datetime') as mock_datetime:
-            # Mock datetime.now to return a fixed time so subtraction works predictably
-            # But the code uses datetime.now(retry_date.tzinfo)
-            # This is tricky to mock perfectly without refactoring, but we can rely on delta
-            # Let's just ensure it parses and calls sleep with roughly the right amount
-            # Actually, let's trust the logic if we can mock the now()
+        request("GET", "http://test.com/api", max_retries=3)
 
-            # Re-implementation for test stability:
-            # We just want to ensure it parses the date and calculates a diff
-            request("GET", "http://test.com/api", max_retries=3)
-
-            # Check if sleep was called. Since we can't easily control "now" inside the function
-            # without more complex mocking, we just check sleep was called with a float
-            self.assertTrue(mock_sleep.call_count >= 1)
-            args, _ = mock_sleep.call_args
-            self.assertIsInstance(args[0], float)
-            # It should be around 5.0 (capped at 60)
-            self.assertTrue(0 < args[0] <= 60)
+        # Check if sleep was called with a positive value
+        self.assertTrue(mock_sleep.call_count >= 1)
+        args, _ = mock_sleep.call_args
+        self.assertIsInstance(args[0], float)
+        # Should be roughly 5 seconds (give or take a bit for execution time)
+        self.assertTrue(0 < args[0] <= 60)
 
     @patch('openalgo.utils.httpx_client.get_httpx_client')
     @patch('time.sleep')
