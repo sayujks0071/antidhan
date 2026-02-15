@@ -149,6 +149,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Logic
         df['ema200'] = self.calculate_ema(df['close'], period=200)
+        last = df.iloc[-1]
         is_uptrend = True
         if not pd.isna(last['ema200']):
             is_uptrend = last['close'] > last['ema200']

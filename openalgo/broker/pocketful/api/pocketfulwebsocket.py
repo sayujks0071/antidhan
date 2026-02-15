@@ -177,6 +177,20 @@ def get_ws_connection_status():
     return ws_connected
 
 
+def send_message(message_type, packet):
+    """Placeholder for send_message used in threads"""
+    logger.info(f"Sending message: {message_type}, {packet}")
+    # Implementation missing in original code, adding placeholder to prevent runtime errors
+    pass
+
+
+def unsubscribe_update(message_type, packet):
+    """Placeholder for unsubscribe_update used in threads"""
+    logger.info(f"Unsubscribing update: {message_type}, {packet}")
+    # Implementation missing in original code
+    pass
+
+
 class PocketfulSocket:
     base_url = "https://trade.pocketful.in"
 
