@@ -165,22 +165,21 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 
 ## 🛡️ System Audit & Roadmap (Feb 2026)
 
-### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBol**.
-  - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
+### Audit Findings (Latest Rebalancing)
+- **Cross-Strategy Correlation:** Identified 7 pairs with > 0.7 correlation.
+  - **Action:** Deprecated `mcx_naturalgas_momentum_strategy`, `nse_rsi_macd_strategy_v2`, `mcx_silver_momentum`, `nse_rsi_bol_trend`, and `mcx_gold_momentum_strategy` to eliminate redundancy and favor higher Calmar Ratio variants.
 - **Equity Curve Stress Test:**
-  - **Total Return (Simulated):** ~831.35 (on 4M portfolio)
-  - **Worst Day:** 2026-02-06 (PnL: +35.86) - Simulated environment showed consistent positive expectancy.
-  - **Max Drawdown:** -0.01%
-  - **Top Performer:** NSERsiBol (83.33% Win Rate, Profit Factor 5.21)
+  - **Scenario:** Simulated Market Crash (-5% drop).
+  - **Worst Day:** 2026-02-01 (Loss: ₹-3,021.70).
+  - **Result:** Portfolio resilience tested; diversification prevented catastrophic loss despite correlated failures in momentum strategies.
 - **Infrastructure Upgrades:**
-  - **Optimization:** Optimized `BaseStrategy.get_monthly_atr` to use cached historical data (yesterday's date), reducing API load.
-  - **Adaptive Sizing:** Refactored `NSERsiBolTrendStrategy` to use standardized `get_adaptive_quantity`. Enhanced `PositionManager` robustness against invalid volatility data. Optimized data fetching in `mcx_global_arbitrage_strategy`.
+  - **Optimization:** Implemented `multiquotes` batch requesting in `APIClient` to reduce latency.
+  - **Adaptive Sizing:** Enforced Monthly ATR-based position sizing in `BaseStrategy` to normalize risk across the portfolio.
 
 ### 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **VWAP Deviations:** Continue exploiting mean reversion around VWAP bands (as seen in `SuperTrendVWAP`).
-2.  **Volume Profile POC Shifts:** Investigate shifting Point of Control as a leading indicator for trend changes.
-3.  **Sector Rotation / Market Breadth:** Expand `NSERsiBol` logic to include broader sector rotation signals.
+1.  **Gamma Exposure (GEX):** Integrate GEX levels to anticipate volatility pinning or explosion zones, filtering entries near high-risk strikes.
+2.  **Volume Profile Imbalance:** Investigate intraday Volume Profile imbalances (Buying/Selling tails) as a leading indicator for trend reversal or continuation.
+3.  **Calendar Spread Arbitrage:** Explore lower-risk, theta-positive Calendar Spreads to buffer the portfolio against high-volatility directional drawdowns.

@@ -242,13 +242,27 @@ class BaseStrategy:
 
             time.sleep(60)
 
-    def execute_trade(self, action, quantity, price=None, urgency="MEDIUM"):
+    def execute_trade(self, action, quantity=None, price=None, urgency="MEDIUM"):
         """
         Execute a trade using SmartOrder and update PositionManager.
+        If quantity is None, adaptive sizing is used.
         """
         if not self.smart_order or not self.pm:
             self.logger.warning("SmartOrder or PositionManager not initialized. Cannot execute trade.")
             return None
+
+        # Determine price for calculations (even if order is Market)
+        current_price = price if price else self.get_current_price()
+
+        # Adaptive Sizing
+        if quantity is None:
+            if current_price:
+                # Use default risk of 1.0% and default capital 5L if not configured elsewhere
+                # TODO: Make risk and capital configurable via strategy params
+                quantity = self.get_adaptive_quantity(current_price)
+            else:
+                self.logger.warning("Cannot calculate adaptive quantity without price. Using default quantity.")
+                quantity = self.quantity
 
         self.logger.info(f"Executing {action} {quantity} {self.symbol} @ {price or 'MKT'}")
 
@@ -270,11 +284,8 @@ class BaseStrategy:
             # We assume success if we got a response. In a real system, we'd check 'status'
             update_price = price if price else 0 # Use 0 or fetch LTP? PositionManager handles 0?
             # If price is None (Market), we might want to fetch LTP for accurate PnL tracking
-            if not update_price:
-                 # Quick LTP fetch or just use 0 (PositionManager uses it for PnL)
-                 quote = self.client.get_quote(self.symbol, self.exchange)
-                 if quote and 'ltp' in quote:
-                     update_price = float(quote['ltp'])
+            if not update_price and current_price:
+                 update_price = current_price
 
             self.pm.update_position(quantity, update_price, action)
             return response
@@ -282,11 +293,11 @@ class BaseStrategy:
             self.logger.error("Trade execution failed (no response from API)")
             return None
 
-    def buy(self, quantity, price=None, urgency="MEDIUM"):
+    def buy(self, quantity=None, price=None, urgency="MEDIUM"):
         """Convenience wrapper for BUY trade."""
         return self.execute_trade("BUY", quantity, price, urgency)
 
-    def sell(self, quantity, price=None, urgency="MEDIUM"):
+    def sell(self, quantity=None, price=None, urgency="MEDIUM"):
         """Convenience wrapper for SELL trade."""
         return self.execute_trade("SELL", quantity, price, urgency)
 

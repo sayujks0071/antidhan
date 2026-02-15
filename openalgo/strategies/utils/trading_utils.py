@@ -667,8 +667,15 @@ class APIClient:
                 if now - ts < self.quote_ttl:
                     return data
 
-        url = f"{self.host}/api/v1/quotes"
-        payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
+            # Single symbol request
+            url = f"{self.host}/api/v1/quotes"
+            payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
+        else:
+            # Batch request
+            url = f"{self.host}/api/v1/multiquotes"
+            # Format payload for MultiQuotesSchema
+            symbols_list = [{"symbol": s, "exchange": exchange} for s in symbol]
+            payload = {"symbols": symbols_list, "apikey": self.api_key}
 
         try:
             response = httpx_client.post(

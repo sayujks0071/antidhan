@@ -1,0 +1,346 @@
+{
+    "strategies": {
+        "mcx_commodity_momentum_strategy": {
+            "metrics": {
+                "total_return_pct": -0.05456242107211147,
+                "win_rate": 39.285714285714285,
+                "profit_factor": 0.5527992505302879,
+                "max_drawdown_pct": 0.07158781517383177,
+                "avg_win": 61.31487828664963,
+                "avg_loss": -71.7698748161288,
+                "largest_win": 76.92230068180652,
+                "largest_loss": -147.8496018800106,
+                "sharpe_ratio": -4.566252265439768,
+                "total_profit": 674.463661153146,
+                "total_loss": -1220.0878718741897
+            },
+            "calmar_ratio": -0.7621746932717711,
+            "trade_count": 28
+        },
+        "mcx_crudeoil_smart_breakout": {
+            "metrics": {
+                "total_return_pct": 0.02822716875217157,
+                "win_rate": 80.0,
+                "profit_factor": 1.8342314051265816,
+                "max_drawdown_pct": 0.05189875171310469,
+                "avg_win": 155.15826629419462,
+                "avg_loss": -338.36137765504463,
+                "largest_win": 213.68920756478656,
+                "largest_loss": -338.36137765504463,
+                "sharpe_ratio": 4.79818909149456,
+                "total_profit": 620.6330651767785,
+                "total_loss": -338.36137765504463
+            },
+            "calmar_ratio": 0.5438891653543194,
+            "trade_count": 5
+        },
+        "ai_hybrid_reversion_breakout": {
+            "metrics": {
+                "total_return_pct": 0.0,
+                "win_rate": 0.0,
+                "profit_factor": 0.0,
+                "max_drawdown_pct": 0.0,
+                "avg_win": 0.0,
+                "avg_loss": 0.0,
+                "largest_win": 0.0,
+                "largest_loss": 0.0,
+                "sharpe_ratio": 0.0
+            },
+            "calmar_ratio": 0,
+            "trade_count": 0
+        },
+        "nse_rsi_macd_strategy": {
+            "metrics": {
+                "total_return_pct": 0.07916103828565682,
+                "win_rate": 71.42857142857143,
+                "profit_factor": 3.5056808426844395,
+                "max_drawdown_pct": 0.047189513196208996,
+                "avg_win": 221.50732900823022,
+                "avg_loss": -157.96313109225684,
+                "largest_win": 237.95080149144087,
+                "largest_loss": -195.14184419110643,
+                "sharpe_ratio": 10.641119325374461,
+                "total_profit": 1107.5366450411511,
+                "total_loss": -315.9262621845137
+            },
+            "calmar_ratio": 1.677513348283836,
+            "trade_count": 7
+        },
+        "nse_ma_crossover_strategy": {
+            "metrics": {
+                "total_return_pct": 0.0571171561351628,
+                "win_rate": 71.42857142857143,
+                "profit_factor": 2.0944706541437106,
+                "max_drawdown_pct": 0.07764824177979938,
+                "avg_win": 218.60834170437084,
+                "avg_loss": -260.93507358515035,
+                "largest_win": 255.27272753402576,
+                "largest_loss": -306.3197531500937,
+                "sharpe_ratio": 6.068185270857422,
+                "total_profit": 1093.0417085218542,
+                "total_loss": -521.8701471703007
+            },
+            "calmar_ratio": 0.7355885313815584,
+            "trade_count": 7
+        },
+        "supertrend_vwap_strategy": {
+            "metrics": {
+                "total_return_pct": 0.0,
+                "win_rate": 0.0,
+                "profit_factor": 0.0,
+                "max_drawdown_pct": 0.0,
+                "avg_win": 0.0,
+                "avg_loss": 0.0,
+                "largest_win": 0.0,
+                "largest_loss": 0.0,
+                "sharpe_ratio": 0.0
+            },
+            "calmar_ratio": 0,
+            "trade_count": 0
+        },
+        "mcx_crudeoil_trend_strategy": {
+            "metrics": {
+                "total_return_pct": 0.030398015095782466,
+                "win_rate": 54.54545454545454,
+                "profit_factor": 1.3323700960198366,
+                "max_drawdown_pct": 0.09953932604739343,
+                "avg_win": 203.0939143692179,
+                "avg_loss": -182.91666705151948,
+                "largest_win": 227.55439635943185,
+                "largest_loss": -280.5028509749318,
+                "sharpe_ratio": 2.382604044631196,
+                "total_profit": 1218.5634862153074,
+                "total_loss": -914.5833352575974
+            },
+            "calmar_ratio": 0.3053869892720504,
+            "trade_count": 11
+        },
+        "nse_bollinger_rsi_strategy": {
+            "metrics": {
+                "total_return_pct": 0.02378728983135661,
+                "win_rate": 58.333333333333336,
+                "profit_factor": 1.218434291253191,
+                "max_drawdown_pct": 0.12067078183212508,
+                "avg_win": 189.551933838047,
+                "avg_loss": -217.79812771054168,
+                "largest_win": 272.04394107258304,
+                "largest_loss": -251.9425706972197,
+                "sharpe_ratio": 1.6481690307270052,
+                "total_profit": 1326.863536866329,
+                "total_loss": -1088.9906385527083
+            },
+            "calmar_ratio": 0.19712551348551832,
+            "trade_count": 12
+        },
+        "nse_rsi_bol_trend": {
+            "metrics": {
+                "total_return_pct": 0.02378728983135661,
+                "win_rate": 58.333333333333336,
+                "profit_factor": 1.218434291253191,
+                "max_drawdown_pct": 0.12067078183212508,
+                "avg_win": 189.551933838047,
+                "avg_loss": -217.79812771054168,
+                "largest_win": 272.04394107258304,
+                "largest_loss": -251.9425706972197,
+                "sharpe_ratio": 1.6481690307270052,
+                "total_profit": 1326.863536866329,
+                "total_loss": -1088.9906385527083
+            },
+            "calmar_ratio": 0.19712551348551832,
+            "trade_count": 12
+        },
+        "nse_rsi_macd_strategy_v2": {
+            "metrics": {
+                "total_return_pct": 0.07916103828565682,
+                "win_rate": 71.42857142857143,
+                "profit_factor": 3.5056808426844395,
+                "max_drawdown_pct": 0.047189513196208996,
+                "avg_win": 221.50732900823022,
+                "avg_loss": -157.96313109225684,
+                "largest_win": 237.95080149144087,
+                "largest_loss": -195.14184419110643,
+                "sharpe_ratio": 10.641119325374461,
+                "total_profit": 1107.5366450411511,
+                "total_loss": -315.9262621845137
+            },
+            "calmar_ratio": 1.677513348283836,
+            "trade_count": 7
+        },
+        "mcx_silver_trend_strategy": {
+            "metrics": {
+                "total_return_pct": 0.011019670974602923,
+                "win_rate": 50.0,
+                "profit_factor": 1.2231010824270032,
+                "max_drawdown_pct": 0.0581839750525076,
+                "avg_win": 201.37615575262802,
+                "avg_loss": -164.64391917063526,
+                "largest_win": 213.9209680250915,
+                "largest_loss": -228.71098854370211,
+                "sharpe_ratio": 1.7074171827346716,
+                "total_profit": 604.128467257884,
+                "total_loss": -493.93175751190574
+            },
+            "calmar_ratio": 0.18939357382609767,
+            "trade_count": 6
+        },
+        "mcx_aluminium_trend_strategy": {
+            "metrics": {
+                "total_return_pct": 0.031250084780575706,
+                "win_rate": 66.66666666666666,
+                "profit_factor": 1.432315587438312,
+                "max_drawdown_pct": 0.06821000721589132,
+                "avg_win": 172.55906271770587,
+                "avg_loss": -240.9511761668764,
+                "largest_win": 232.83078349113202,
+                "largest_loss": -293.0275817463953,
+                "sharpe_ratio": 2.860310873497296,
+                "total_profit": 1035.3543763062353,
+                "total_loss": -722.8535285006292
+            },
+            "calmar_ratio": 0.45814516162806057,
+            "trade_count": 9
+        },
+        "advanced_ml_momentum_strategy": {
+            "metrics": {
+                "total_return_pct": 0.008458090377727058,
+                "win_rate": 50.0,
+                "profit_factor": 1.1212072013816623,
+                "max_drawdown_pct": 0.06803409261275085,
+                "avg_win": 195.60042087720785,
+                "avg_loss": -174.45519493289885,
+                "largest_win": 221.0105291405689,
+                "largest_loss": -228.71098854370211,
+                "sharpe_ratio": 0.9188955573997936,
+                "total_profit": 782.4016835088314,
+                "total_loss": -697.8207797315954
+            },
+            "calmar_ratio": 0.12432135202964188,
+            "trade_count": 8
+        },
+        "mcx_gold_momentum_strategy": {
+            "metrics": {
+                "total_return_pct": 0.025763223058963197,
+                "win_rate": 66.66666666666666,
+                "profit_factor": 1.3532870900926266,
+                "max_drawdown_pct": 0.07361932270298571,
+                "avg_win": 164.47924904233787,
+                "avg_loss": -243.08108788812874,
+                "largest_win": 200.03892332309078,
+                "largest_loss": -293.0275817463953,
+                "sharpe_ratio": 2.434033862775346,
+                "total_profit": 986.8754942540272,
+                "total_loss": -729.2432636643862
+            },
+            "calmar_ratio": 0.34995191633185646,
+            "trade_count": 9
+        },
+        "mcx_crudeoil_smart_breakout_v2": {
+            "metrics": {
+                "total_return_pct": -0.01984408398786327,
+                "win_rate": 0.0,
+                "profit_factor": 0.0,
+                "max_drawdown_pct": 0.02621805297685534,
+                "avg_win": 0,
+                "avg_loss": -66.14694662619695,
+                "largest_win": 0,
+                "largest_loss": -73.34364960355924,
+                "sharpe_ratio": -176.07490352551707,
+                "total_profit": 0,
+                "total_loss": -198.44083987859085
+            },
+            "calmar_ratio": -0.7568862571671949,
+            "trade_count": 3
+        },
+        "mcx_silver_momentum": {
+            "metrics": {
+                "total_return_pct": 0.030398015095782466,
+                "win_rate": 54.54545454545454,
+                "profit_factor": 1.3323700960198366,
+                "max_drawdown_pct": 0.09953932604739343,
+                "avg_win": 203.0939143692179,
+                "avg_loss": -182.91666705151948,
+                "largest_win": 227.55439635943185,
+                "largest_loss": -280.5028509749318,
+                "sharpe_ratio": 2.382604044631196,
+                "total_profit": 1218.5634862153074,
+                "total_loss": -914.5833352575974
+            },
+            "calmar_ratio": 0.3053869892720504,
+            "trade_count": 11
+        },
+        "mcx_naturalgas_momentum_strategy": {
+            "metrics": {
+                "total_return_pct": 0.015671520148415583,
+                "win_rate": 50.0,
+                "profit_factor": 1.3171824146049715,
+                "max_drawdown_pct": 0.0808543634904903,
+                "avg_win": 216.93353518482158,
+                "avg_loss": -164.69513469011872,
+                "largest_win": 228.730256169727,
+                "largest_loss": -280.5028509749318,
+                "sharpe_ratio": 2.206259148125585,
+                "total_profit": 650.8006055544647,
+                "total_loss": -494.08540407035616
+            },
+            "calmar_ratio": 0.19382404946220116,
+            "trade_count": 6
+        }
+    },
+    "portfolio_equity": {},
+    "correlation_pairs": [
+        {
+            "strategy_1": "mcx_crudeoil_smart_breakout",
+            "strategy_2": "mcx_naturalgas_momentum_strategy",
+            "correlation": 0.8175810519078992,
+            "s1_calmar": 0.5438891653543194,
+            "s2_calmar": 0.19382404946220116
+        },
+        {
+            "strategy_1": "nse_rsi_macd_strategy",
+            "strategy_2": "nse_rsi_macd_strategy_v2",
+            "correlation": 1.0,
+            "s1_calmar": 1.677513348283836,
+            "s2_calmar": 1.677513348283836
+        },
+        {
+            "strategy_1": "mcx_crudeoil_trend_strategy",
+            "strategy_2": "mcx_silver_momentum",
+            "correlation": 1.0,
+            "s1_calmar": 0.3053869892720504,
+            "s2_calmar": 0.3053869892720504
+        },
+        {
+            "strategy_1": "nse_bollinger_rsi_strategy",
+            "strategy_2": "nse_rsi_bol_trend",
+            "correlation": 1.0,
+            "s1_calmar": 0.19712551348551832,
+            "s2_calmar": 0.19712551348551832
+        },
+        {
+            "strategy_1": "mcx_silver_trend_strategy",
+            "strategy_2": "mcx_naturalgas_momentum_strategy",
+            "correlation": 0.8525526835043739,
+            "s1_calmar": 0.18939357382609767,
+            "s2_calmar": 0.19382404946220116
+        },
+        {
+            "strategy_1": "mcx_aluminium_trend_strategy",
+            "strategy_2": "mcx_gold_momentum_strategy",
+            "correlation": 0.8144477659117831,
+            "s1_calmar": 0.45814516162806057,
+            "s2_calmar": 0.34995191633185646
+        },
+        {
+            "strategy_1": "advanced_ml_momentum_strategy",
+            "strategy_2": "mcx_gold_momentum_strategy",
+            "correlation": 0.7620980288709929,
+            "s1_calmar": 0.12432135202964188,
+            "s2_calmar": 0.34995191633185646
+        }
+    ],
+    "stress_test": {
+        "worst_day": "2026-02-01",
+        "worst_day_loss": -3021.7013300310355,
+        "total_portfolio_return": 3909.23732578638
+    }
+}
