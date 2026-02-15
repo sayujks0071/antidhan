@@ -4,80 +4,102 @@ NSE MA Crossover Strategy
 Simple Moving Average Crossover for NSE stocks.
 Entry: Buy when SMA 20 crosses above SMA 50.
 Exit: Sell when SMA 20 crosses below SMA 50.
+Inherits from BaseStrategy for significant code reduction.
 """
 import os
 import sys
-import time
-import argparse
-import logging
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
 
-# Add project root to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, 'utils')
-sys.path.insert(0, utils_dir)
-
+# Add repo root to path to find BaseStrategy
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol
+    from base_strategy import BaseStrategy
 except ImportError:
-    try:
-        sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol
-    except ImportError:
-        try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, normalize_symbol
-        except ImportError:
-            print("Warning: openalgo package not found or imports failed.")
-            APIClient = None
-            PositionManager = None
-            normalize_symbol = lambda s: s
-            is_market_open = lambda: True
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    strategies_dir = os.path.dirname(current_dir)
+    utils_dir = os.path.join(strategies_dir, "utils")
+    if utils_dir not in sys.path:
+        sys.path.insert(0, utils_dir)
+    from base_strategy import BaseStrategy
 
-class NSEMaCrossoverStrategy:
-    def __init__(self, symbol, api_key, port, **kwargs):
-        self.symbol = symbol
-        self.host = f"http://127.0.0.1:{port}"
-        self.client = APIClient(api_key=api_key, host=self.host) if APIClient else None
+class NSEMaCrossoverStrategy(BaseStrategy):
+    def setup(self):
+        # Parameters
+        self.short_window = int(getattr(self, 'short_window', 20))
+        self.long_window = int(getattr(self, 'long_window', 50))
 
-        # Setup Logger
-        self.logger = logging.getLogger(f"NSE_{symbol}")
-        self.logger.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        # Auto-detect exchange for Indices
+        if self.symbol and ("NIFTY" in self.symbol.upper() or "BANKNIFTY" in self.symbol.upper()):
+            self.exchange = "NSE_INDEX"
 
-        # Clear existing handlers
-        if self.logger.hasHandlers():
-            self.logger.handlers.clear()
+    @classmethod
+    def add_arguments(cls, parser):
+        parser.add_argument('--short_window', type=int, default=20, help='Short Moving Average Window')
+        parser.add_argument('--long_window', type=int, default=50, help='Long Moving Average Window')
+        parser.add_argument('--port', type=int, help='API Port (Legacy)')
 
-        ch = logging.StreamHandler()
-        ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
+    @classmethod
+    def parse_arguments(cls, args):
+        kwargs = super().parse_arguments(args)
+        # Support legacy --port arg
+        if hasattr(args, 'port') and args.port:
+            kwargs['host'] = f"http://127.0.0.1:{args.port}"
+        return kwargs
 
-        # Strategy parameters from kwargs
-        self.short_window = int(kwargs.get('short_window', 20))
-        self.long_window = int(kwargs.get('long_window', 50))
-        self.quantity = int(kwargs.get('quantity', 1))
+    def calculate_indicators(self, df):
+        df = df.copy()
+        df['short_mavg'] = self.calculate_sma(df['close'], period=self.short_window)
+        df['long_mavg'] = self.calculate_sma(df['close'], period=self.long_window)
+        return df
 
-        self.pm = PositionManager(symbol) if PositionManager else None
+    def cycle(self):
+        # Fetch Data
+        df = self.fetch_history(days=5, interval="5m")
+        if df.empty or len(df) < self.long_window:
+            self.logger.warning("Insufficient data.")
+            return
 
-    def calculate_signal(self, df):
-        """Calculate signal for backtesting support"""
+        # New Candle Check
+        if not self.check_new_candle(df):
+            return
+
+        df = self.calculate_indicators(df)
+        self.check_signals(df)
+
+    def check_signals(self, df):
+        last = df.iloc[-1]
+        prev = df.iloc[-2]
+        current_price = last['close']
+
+        self.logger.info(f"Price: {current_price}, SMA{self.short_window}: {last['short_mavg']:.2f}, SMA{self.long_window}: {last['long_mavg']:.2f}")
+
+        has_pos = self.pm.has_position() if self.pm else False
+        pos_qty = self.pm.position if self.pm else 0
+
+        # Golden Cross (Buy)
+        if (prev['short_mavg'] <= prev['long_mavg']) and (last['short_mavg'] > last['long_mavg']):
+            if not has_pos:
+                self.logger.info(f"Entry signal detected (Golden Cross). Buying {self.quantity} at {current_price}")
+                self.buy(self.quantity, current_price)
+            elif pos_qty < 0:
+                self.logger.info("Reversing Short to Long")
+                self.buy(abs(pos_qty) + self.quantity, current_price)
+
+        # Death Cross (Sell)
+        elif (prev['short_mavg'] >= prev['long_mavg']) and (last['short_mavg'] < last['long_mavg']):
+            if has_pos and pos_qty > 0:
+                self.logger.info(f"Exiting position (Death Cross).")
+                self.sell(abs(pos_qty), current_price)
+
+    def get_signal(self, df):
+        """Backtesting signal generation"""
         if df.empty or len(df) < self.long_window + 5:
             return 'HOLD', 0.0, {}
 
-        # Calculate indicators
-        df['short_mavg'] = df['close'].rolling(window=self.short_window, min_periods=1).mean()
-        df['long_mavg'] = df['close'].rolling(window=self.long_window, min_periods=1).mean()
-
+        df = self.calculate_indicators(df)
         last = df.iloc[-1]
         prev = df.iloc[-2]
 
-        # Entry logic: Buy if Short MA crosses above Long MA (Golden Cross)
-        bullish_crossover = (prev['short_mavg'] <= prev['long_mavg']) and (last['short_mavg'] > last['long_mavg'])
-
-        if bullish_crossover:
+        # Entry logic
+        if (prev['short_mavg'] <= prev['long_mavg']) and (last['short_mavg'] > last['long_mavg']):
             return 'BUY', 1.0, {
                 'reason': 'MA Crossover (Golden Cross)',
                 'price': last['close'],
@@ -85,10 +107,8 @@ class NSEMaCrossoverStrategy:
                 'long_mavg': last['long_mavg']
             }
 
-        # Exit logic: Sell if Short MA crosses below Long MA (Death Cross)
-        bearish_crossover = (prev['short_mavg'] >= prev['long_mavg']) and (last['short_mavg'] < last['long_mavg'])
-
-        if bearish_crossover:
+        # Exit logic
+        if (prev['short_mavg'] >= prev['long_mavg']) and (last['short_mavg'] < last['long_mavg']):
              return 'SELL', 1.0, {
                 'reason': 'MA Crossover (Death Cross)',
                 'price': last['close'],
@@ -98,127 +118,8 @@ class NSEMaCrossoverStrategy:
 
         return 'HOLD', 0.0, {}
 
-    def run(self):
-        self.symbol = normalize_symbol(self.symbol)
-        self.logger.info(f"Starting NSE MA Crossover Strategy for {self.symbol}")
-        self.logger.info(f"Params: Short={self.short_window}, Long={self.long_window}, Qty={self.quantity}")
-
-        while True:
-            if not is_market_open():
-                self.logger.info("Market is closed. Sleeping...")
-                time.sleep(60)
-                continue
-
-            try:
-                # Determine exchange (NSE for stocks, NSE_INDEX for indices)
-                exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
-
-                # Fetch historical data
-                # Fetch enough data for the long window
-                df = self.client.history(
-                    symbol=self.symbol,
-                    interval="5m",
-                    exchange=exchange,
-                    start_date=datetime.now().strftime("%Y-%m-%d"),
-                    end_date=datetime.now().strftime("%Y-%m-%d")
-                )
-
-                if df.empty or len(df) < self.long_window:
-                    self.logger.info("Waiting for sufficient data...")
-                    time.sleep(60)
-                    continue
-
-                # Calculate indicators locally
-                df['short_mavg'] = df['close'].rolling(window=self.short_window, min_periods=1).mean()
-                df['long_mavg'] = df['close'].rolling(window=self.long_window, min_periods=1).mean()
-
-                last = df.iloc[-1]
-                prev = df.iloc[-2]
-                current_price = last['close']
-                current_short = last['short_mavg']
-                current_long = last['long_mavg']
-
-                self.logger.info(f"Price: {current_price}, SMA{self.short_window}: {current_short:.2f}, SMA{self.long_window}: {current_long:.2f}")
-
-                # Position management
-                if self.pm and self.pm.has_position():
-                    # Exit logic
-                    pnl = self.pm.get_pnl(current_price)
-
-                    # Exit on Death Cross
-                    bearish_crossover = (prev['short_mavg'] >= prev['long_mavg']) and (last['short_mavg'] < last['long_mavg'])
-
-                    if bearish_crossover:
-                        self.logger.info(f"Exiting position (Death Cross). PnL: {pnl:.2f}")
-                        self.pm.update_position(abs(self.pm.position), current_price, 'SELL' if self.pm.position > 0 else 'BUY')
-                else:
-                    # Entry logic
-                    # Enter on Golden Cross
-                    bullish_crossover = (prev['short_mavg'] <= prev['long_mavg']) and (last['short_mavg'] > last['long_mavg'])
-
-                    if bullish_crossover:
-                        qty = self.quantity
-                        self.logger.info(f"Entry signal detected (Golden Cross). Buying {qty} at {current_price}")
-                        self.pm.update_position(qty, current_price, 'BUY')
-
-            except Exception as e:
-                self.logger.error(f"Error: {e}", exc_info=True)
-                time.sleep(60)
-
-            time.sleep(60)  # Sleep between iterations
-
-def run_strategy():
-    parser = argparse.ArgumentParser(description='NSE MA Crossover Strategy')
-    parser.add_argument('--symbol', type=str, required=True, help='Stock Symbol (e.g., RELIANCE)')
-    parser.add_argument('--port', type=int, default=5001, help='API Port')
-    parser.add_argument('--api_key', type=str, help='API Key')
-
-    # Custom parameters
-    parser.add_argument('--short_window', type=int, default=20, help='Short Moving Average Window')
-    parser.add_argument('--long_window', type=int, default=50, help='Long Moving Average Window')
-    parser.add_argument('--quantity', type=int, default=1, help='Trade Quantity')
-
-    args = parser.parse_args()
-
-    api_key = args.api_key or os.getenv('OPENALGO_APIKEY')
-    if not api_key:
-        print("Error: API Key required. Set OPENALGO_APIKEY env var or pass --api_key")
-        return
-
-    strategy = NSEMaCrossoverStrategy(
-        args.symbol,
-        api_key,
-        args.port,
-        short_window=args.short_window,
-        long_window=args.long_window,
-        quantity=args.quantity
-    )
-    strategy.run()
-
-# Backtesting support
-def generate_signal(df, client=None, symbol=None, params=None):
-    """
-    Generate signal for backtesting.
-    """
-    strat_params = {
-        'short_window': 20,
-        'long_window': 50
-    }
-    if params:
-        strat_params.update(params)
-
-    strat = NSEMaCrossoverStrategy(
-        symbol=symbol or "TEST",
-        api_key="dummy",
-        port=5001,
-        **strat_params
-    )
-
-    # Disable logging for backtest
-    strat.logger.handlers = []
-    strat.logger.addHandler(logging.NullHandler())
-
-    return strat.calculate_signal(df)
+# Backtesting alias
+generate_signal = NSEMaCrossoverStrategy.backtest_signal
 
 if __name__ == "__main__":
-    run_strategy()
+    NSEMaCrossoverStrategy.cli()

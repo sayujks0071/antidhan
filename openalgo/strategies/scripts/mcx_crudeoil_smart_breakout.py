@@ -84,18 +84,8 @@ class MCXSmartStrategy(BaseStrategy):
             return
 
         # Check if we have a new candle
-        # Assuming index is datetime or datetime column exists
-        if isinstance(df.index, pd.DatetimeIndex):
-            current_time = df.index[-1]
-        elif 'datetime' in df.columns:
-            current_time = pd.to_datetime(df['datetime'].iloc[-1])
-        else:
-            current_time = pd.Timestamp.now() # Fallback
-
-        if self.last_candle_time == current_time:
-            # Already processed this candle
+        if not self.check_new_candle(df):
             return
-        self.last_candle_time = current_time
 
         self.data = df
 
@@ -196,8 +186,8 @@ class MCXSmartStrategy(BaseStrategy):
                     self.logger.info(f"EXIT SHORT ({reason}): Price={current['close']}, Entry={entry_price}")
                     self.execute_trade("BUY", abs(pos_qty), current['close'])
 
-    def generate_signal(self, df):
-        """Generate signal for backtesting"""
+    def get_signal(self, df):
+        """Backtesting signal generation"""
         if df.empty:
             return "HOLD", 0.0, {}
 
@@ -233,28 +223,8 @@ class MCXSmartStrategy(BaseStrategy):
 
         return "HOLD", 0.0, {}
 
-# Backtesting support wrapper
-DEFAULT_PARAMS = {
-    "period_rsi": 14,
-    "period_atr": 14,
-}
-def generate_signal(df, client=None, symbol=None, params=None):
-    strat_params = DEFAULT_PARAMS.copy()
-    if params:
-        strat_params.update(params)
-
-    # Instantiate using BaseStrategy compatible init
-    strat = MCXSmartStrategy(
-        symbol=symbol or "TEST",
-        api_key="BACKTEST",
-        host="http://127.0.0.1:5000",
-        **strat_params
-    )
-    # Silence logger
-    strat.logger.handlers = []
-    strat.logger.addHandler(logging.NullHandler())
-
-    return strat.generate_signal(df)
+# Backtesting alias
+generate_signal = MCXSmartStrategy.backtest_signal
 
 if __name__ == "__main__":
     MCXSmartStrategy.cli()
