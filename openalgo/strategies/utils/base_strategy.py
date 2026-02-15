@@ -113,6 +113,8 @@ class BaseStrategy:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+        self.last_candle_time = None
+
         # Allow subclasses to perform custom initialization (configuration)
         self.setup()
 
@@ -150,6 +152,31 @@ class BaseStrategy:
         Override this method to set up strategy-specific attributes without overriding __init__.
         """
         pass
+
+    def check_new_candle(self, df):
+        """
+        Check if we have a new candle to process.
+        Manages self.last_candle_time state.
+        Returns True if new candle detected, False otherwise.
+        """
+        if df.empty:
+            return False
+
+        # Determine timestamp
+        if isinstance(df.index, pd.DatetimeIndex):
+            current_time = df.index[-1]
+        elif 'datetime' in df.columns:
+            current_time = pd.to_datetime(df['datetime'].iloc[-1])
+        else:
+            # Fallback if no time info, always process
+            return True
+
+        # Check against last processed
+        if self.last_candle_time == current_time:
+            return False
+
+        self.last_candle_time = current_time
+        return True
 
     def _add_project_root_to_path(self):
         """Add the openalgo root directory to sys.path to allow importing database modules."""
@@ -302,6 +329,17 @@ class BaseStrategy:
         Override this method to implement strategy logic per cycle.
         """
         raise NotImplementedError("Strategy must implement cycle() method")
+
+    def get_signal(self, df):
+        """
+        Standard interface for backtesting signal generation.
+        Strategies should implement this to return (signal, confidence, details).
+
+        Returns:
+            tuple: (Signal, Confidence, DetailsDict)
+            Example: ("BUY", 1.0, {"reason": "RSI Oversold"})
+        """
+        raise NotImplementedError("Strategy must implement get_signal(df) for backtesting support.")
 
     def fetch_history(self, days=5, symbol=None, exchange=None, interval=None):
         """
@@ -590,3 +628,36 @@ class BaseStrategy:
              print(f"Error instantiating strategy: {e}")
              import traceback
              traceback.print_exc()
+
+    @classmethod
+    def backtest_signal(cls, df, params=None):
+        """
+        Standard wrapper for generating signals in backtests without boilerplate.
+        Instantiates the strategy in a 'mock' mode and calls get_signal(df).
+        """
+        # Create dummy kwargs for initialization
+        kwargs = {
+            'symbol': 'BACKTEST',
+            'api_key': 'BACKTEST_KEY',
+            'host': 'http://localhost',
+            'quantity': 1,
+            'ignore_time': True
+        }
+        if params:
+            kwargs.update(params)
+
+        try:
+            # Instantiate strategy
+            strategy = cls(**kwargs)
+
+            # Silence logging
+            strategy.logger.handlers = []
+            strategy.logger.addHandler(logging.NullHandler())
+
+            return strategy.get_signal(df)
+        except Exception as e:
+            # Fallback for strategies that might not implement get_signal or fail init
+            print(f"Backtest wrapper failed for {cls.__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            return "HOLD", 0.0, {"error": str(e)}
