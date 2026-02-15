@@ -230,6 +230,19 @@ def calculate_roc(series, period=10):
     return series.pct_change(periods=period)
 
 
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    """
+    Calculate MACD, Signal, Hist.
+    Returns: macd, signal, hist (all Series)
+    """
+    exp1 = series.ewm(span=fast, adjust=False).mean()
+    exp2 = series.ewm(span=slow, adjust=False).mean()
+    macd = exp1 - exp2
+    sig = macd.ewm(span=signal, adjust=False).mean()
+    hist = macd - sig
+    return macd, sig, hist
+
+
 def calculate_vix_volatility_multiplier(vix, thresholds=None):
     """
     Calculate dynamic volatility multiplier based on VIX.

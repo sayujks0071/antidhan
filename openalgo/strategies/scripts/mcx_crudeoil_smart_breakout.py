@@ -100,11 +100,9 @@ class MCXSmartStrategy(BaseStrategy):
         self.data = df
 
         # Calculate Indicators locally
-        from trading_utils import calculate_bollinger_bands
-
         df['sma_50'] = self.calculate_sma(df['close'], period=50)
         df['rsi'] = self.calculate_rsi(df['close'], period=self.params.get("period_rsi", 14))
-        df['bb_mid'], df['bb_upper'], df['bb_lower'] = calculate_bollinger_bands(df['close'], window=20, num_std=2)
+        df['bb_mid'], df['bb_upper'], df['bb_lower'] = self.calculate_bollinger_bands(df['close'], window=20, num_std=2)
 
         # ATR 14
         df['atr'] = self.calculate_atr_series(df, period=14)
@@ -204,12 +202,10 @@ class MCXSmartStrategy(BaseStrategy):
             return "HOLD", 0.0, {}
 
         # We need indicators.
-        from trading_utils import calculate_bollinger_bands
-
         df = df.copy()
         df['sma_50'] = self.calculate_sma(df['close'], period=50)
         df['rsi'] = self.calculate_rsi(df['close'], period=self.params.get("period_rsi", 14))
-        df['bb_mid'], df['bb_upper'], df['bb_lower'] = calculate_bollinger_bands(df['close'], window=20, num_std=2)
+        df['bb_mid'], df['bb_upper'], df['bb_lower'] = self.calculate_bollinger_bands(df['close'], window=20, num_std=2)
         df['atr'] = self.calculate_atr_series(df, period=14)
         df['atr_ma'] = self.calculate_sma(df['atr'], period=10)
 
