@@ -76,4 +76,4 @@ yarn-error.log*
 #frontend/dist
 
 # Windows NUL file
-nul
+nul*.db

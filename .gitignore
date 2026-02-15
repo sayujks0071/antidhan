@@ -13,3 +13,5 @@ __pycache__/
 *.pyc
 *.log
 reports/
+*.db
+openalgo/db/backups/
