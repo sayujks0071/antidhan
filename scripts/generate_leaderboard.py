@@ -42,7 +42,8 @@ def parse_text_log(filepath):
 
             # Entry Logic (SuperTrend VWAP style)
             # "VWAP Crossover Buy. Price: 123.45, ..."
-            if "VWAP Crossover Buy" in line:
+            # "Signal Buy NIFTY Price: 24013.00"
+            if "VWAP Crossover Buy" in line or "Signal Buy" in line:
                 price_match = re.search(r'Price: ([\d\.]+)', line)
                 if price_match:
                     current_trade = {
@@ -55,7 +56,8 @@ def parse_text_log(filepath):
             # Exit Logic
             # "Trailing Stop Hit at 123.45"
             # "Price crossed below VWAP at 123.45. Exiting."
-            if "Trailing Stop Hit at" in line or "Price crossed below VWAP at" in line:
+            # "Exiting at 24118.00"
+            if "Trailing Stop Hit at" in line or "Price crossed below VWAP at" in line or "Exiting at" in line:
                 if current_trade.get('status') == 'OPEN':
                     price_match = re.search(r'at ([\d\.]+)', line)
                     if price_match:
