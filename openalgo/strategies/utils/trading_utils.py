@@ -230,6 +230,17 @@ def calculate_roc(series, period=10):
     return series.pct_change(periods=period)
 
 
+def calculate_donchian_channel(df, window=20):
+    """
+    Calculate Donchian Channel.
+    Returns: upper, middle, lower
+    """
+    high = df['high'].rolling(window=window).max()
+    low = df['low'].rolling(window=window).min()
+    mid = (high + low) / 2
+    return high, mid, low
+
+
 def calculate_macd(series, fast=12, slow=26, signal=9):
     """
     Calculate MACD, Signal, Hist.

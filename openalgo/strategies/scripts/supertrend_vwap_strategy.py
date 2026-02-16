@@ -80,7 +80,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         # Indicators
         is_above_vwap = last['close'] > last['vwap']
 
-        vol_mean = df['volume'].rolling(20).mean().iloc[-1]
+        vol_mean = self.calculate_sma(df['volume'], 20).iloc[-1]
         vol_std = df['volume'].rolling(20).std().iloc[-1]
         dynamic_threshold = vol_mean + (1.5 * vol_std)
         is_volume_spike = last['volume'] > dynamic_threshold
@@ -149,13 +149,14 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Logic
         df['ema200'] = self.calculate_ema(df['close'], period=200)
+        last = df.iloc[-1]
         is_uptrend = True
         if not pd.isna(last['ema200']):
             is_uptrend = last['close'] > last['ema200']
 
         is_above_vwap = last['close'] > last['vwap']
 
-        vol_mean = df['volume'].rolling(20).mean().iloc[-1]
+        vol_mean = self.calculate_sma(df['volume'], 20).iloc[-1]
         vol_std = df['volume'].rolling(20).std().iloc[-1]
         dynamic_threshold = vol_mean + (1.5 * vol_std)
         is_volume_spike = last['volume'] > dynamic_threshold

@@ -19,19 +19,22 @@ utils_dir = os.path.join(strategies_dir, "utils")
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open
+    from trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_macd
 except ImportError:
     try:
         sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open
+        from utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_macd
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_macd
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
             APIClient = None
             PositionManager = None
             is_market_open = lambda: True
+            calculate_rsi = lambda s, p: pd.Series(0, index=s.index)
+            calculate_atr = lambda d, p: pd.Series(0, index=d.index)
+            calculate_macd = lambda s, f, sl, si: (pd.Series(0, index=s.index), pd.Series(0, index=s.index), pd.Series(0, index=s.index))
 
 # Setup Logging
 logging.basicConfig(
@@ -88,29 +91,22 @@ class MCXStrategy:
 
         df = self.data.copy()
 
-        # MACD (12, 26, 9)
-        # Calculate EMA Fast (12) and EMA Slow (26)
-        ema_fast = df["close"].ewm(span=self.params.get("macd_fast", 12), adjust=False).mean()
-        ema_slow = df["close"].ewm(span=self.params.get("macd_slow", 26), adjust=False).mean()
+        # MACD
+        macd, sig, hist = calculate_macd(
+            df["close"],
+            fast=self.params.get("macd_fast", 12),
+            slow=self.params.get("macd_slow", 26),
+            signal=self.params.get("macd_signal", 9)
+        )
+        df["macd_line"] = macd
+        df["macd_signal"] = sig
+        df["macd_hist"] = hist
 
-        df["macd_line"] = ema_fast - ema_slow
-        df["macd_signal"] = df["macd_line"].ewm(span=self.params.get("macd_signal", 9), adjust=False).mean()
-        df["macd_hist"] = df["macd_line"] - df["macd_signal"]
+        # RSI
+        df["rsi"] = calculate_rsi(df["close"], period=self.params.get("period_rsi", 14))
 
-        # RSI (14)
-        delta = df["close"].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=self.params.get("period_rsi", 14)).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=self.params.get("period_rsi", 14)).mean()
-        rs = gain / loss
-        df["rsi"] = 100 - (100 / (1 + rs))
-
-        # ATR (14)
-        high_low = df["high"] - df["low"]
-        high_close = (df["high"] - df["close"].shift()).abs()
-        low_close = (df["low"] - df["close"].shift()).abs()
-        ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        true_range = ranges.max(axis=1)
-        df["atr"] = true_range.rolling(window=self.params.get("period_atr", 14)).mean()
+        # ATR
+        df["atr"] = calculate_atr(df, period=self.params.get("period_atr", 14))
 
         self.data = df
 

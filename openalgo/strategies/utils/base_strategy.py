@@ -40,6 +40,7 @@ try:
         calculate_rsi,
         calculate_sma,
         calculate_supertrend,
+            calculate_donchian_channel,
         is_market_open,
         normalize_symbol,
     )
@@ -63,6 +64,7 @@ except ImportError:
             calculate_rsi,
             calculate_sma,
             calculate_supertrend,
+            calculate_donchian_channel,
             is_market_open,
             normalize_symbol,
         )
@@ -86,6 +88,7 @@ except ImportError:
             calculate_rsi,
             calculate_sma,
             calculate_supertrend,
+            calculate_donchian_channel,
             is_market_open,
             normalize_symbol,
         )
@@ -503,6 +506,10 @@ class BaseStrategy:
     def calculate_supertrend(self, df, period=10, multiplier=3):
         """Calculate SuperTrend."""
         return calculate_supertrend(df, period, multiplier)
+
+    def calculate_donchian_channel(self, df, window=20):
+        """Calculate Donchian Channel."""
+        return calculate_donchian_channel(df, window)
 
     def analyze_volume_profile(self, df, n_bins=20):
         """Find Point of Control (POC)."""
