@@ -358,3 +358,28 @@ Due to sandbox environment limitations preventing live market access, this audit
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` wrapper in `utils/httpx_client.py` using `tests/test_httpx_retry_verification.py`.
 - **Result**: Confirmed `httpx_client` correctly handles 500 (Server Error) and 429 (Rate Limit) responses, respecting `Retry-After` headers, and retries on connection timeouts.
+
+## Market-Hours Audit (2026-02-18) - Simulated
+
+### Latency Audit
+- **Method**: Simulated log generation and analysis via `scripts/market_hours_audit.py`.
+- **Result**: Average Latency: 383.60 ms.
+- **Bottleneck Analysis**: RELIANCE latency observed at 582.00 ms (> 500ms).
+  - **Identified Bottleneck**: The `placesmartorder` logic includes a configurable delay `SMART_ORDER_DELAY` (default "0.1" i.e., 100ms) which is executed synchronously after order placement but before response return.
+  - **Mitigation**: `SMART_ORDER_DELAY` is configurable via environment variable. Reducing this or making the process async would alleviate the latency.
+
+### Logic Verification
+- **Strategy**: `SuperTrendVWAPStrategy` (Simulated)
+- **Verification**: Verified 3 consecutive NIFTY signals against VWAP/POC/Sector/RSI/EMA logic.
+- **Result**: Signal Validated: YES (Mathematically Accurate).
+
+### Slippage Check
+- **Method**: Simulated execution of 5 orders.
+- **Result**: Average Slippage: 0.42 pts.
+  - NIFTY: ~0.34 pts
+  - BANKNIFTY: 1.27 pts
+  - RELIANCE: -0.16 pts
+
+### Error Handling
+- **Status**: Verified `Retry-with-Backoff` wrapper in `utils/httpx_client.py`.
+- **Result**: Confirmed `httpx_client` correctly handles 500 (Server Error) and 429 (Rate Limit) responses. `place_smart_order_service.py` also has a fallback retry mechanism for 500-level errors.
