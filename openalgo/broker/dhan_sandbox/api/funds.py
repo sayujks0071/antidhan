@@ -64,6 +64,7 @@ def test_auth_token(auth_token):
 def get_margin_data(auth_token):
     """
     Fetch margin (funds) data from Dhan API using the provided auth token.
+    Calculates realized and unrealized M2M from current positions.
 
     Args:
         auth_token (str): Authentication token.
