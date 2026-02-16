@@ -132,7 +132,7 @@ def load_freeze_qty_cache() -> bool:
     Returns:
         True if successful, False otherwise
     """
-    global _freeze_qty_cache, _cache_loaded
+    global _cache_loaded
 
     try:
         _freeze_qty_cache.clear()
@@ -169,8 +169,6 @@ def get_freeze_qty(symbol: str, exchange: str) -> int:
     Returns:
         Freeze quantity (integer)
     """
-    global _cache_loaded
-
     # Ensure cache is loaded
     if not _cache_loaded:
         load_freeze_qty_cache()
@@ -241,8 +239,6 @@ def get_all_freeze_qty(exchange: str = None) -> dict[str, int]:
     Returns:
         Dictionary of symbol -> freeze_qty
     """
-    global _cache_loaded
-
     if not _cache_loaded:
         load_freeze_qty_cache()
 
