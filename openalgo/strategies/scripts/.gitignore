@@ -22,3 +22,4 @@ __pycache__/
 # This ensures the scripts folder exists in git but user strategies are not tracked
 !nse_ma_crossover_strategy.py
 !mcx_aluminium_trend_strategy.py
+!mcx_gold_trend_strategy.py
