@@ -264,14 +264,14 @@ class AIHybridStrategy(BaseStrategy):
         bb_width = last.get('bb_width', 0)
         # Percentile calculation requires history, simplified here using recent distribution
         # Assuming bb_width > mean + std is "Wide"
-        bb_mean = df['bb_width'].rolling(50).mean().iloc[-1]
+        bb_mean = self.calculate_sma(df['bb_width'], 50).iloc[-1]
         if bb_width > bb_mean * 1.2: trending_score += 30 # Wide
         elif bb_width < bb_mean * 0.8: ranging_score += 30 # Squeeze
         else: ranging_score += 15
 
         # 3. Volatility Expansion - 20 pts
         atr = last.get('atr', 0)
-        atr_avg = df['atr'].rolling(20).mean().iloc[-1]
+        atr_avg = self.calculate_sma(df['atr'], 20).iloc[-1]
         if atr > atr_avg * 1.5: trending_score += 20
         else: ranging_score += 20
 
@@ -331,7 +331,7 @@ class AIHybridStrategy(BaseStrategy):
 
         # 5. Volume Surge (12 pts) - Logic adapted from spec
         vol = last.get('volume', 0)
-        vol_avg = df['volume'].rolling(20).mean().iloc[-1]
+        vol_avg = self.calculate_sma(df['volume'], 20).iloc[-1]
         if vol > vol_avg * 1.5:
             score_long += 8
             score_short += 8
@@ -385,7 +385,7 @@ class AIHybridStrategy(BaseStrategy):
 
         # 5. Volume Surge (12 pts)
         vol = last.get('volume', 0)
-        vol_avg = df['volume'].rolling(20).mean().iloc[-1]
+        vol_avg = self.calculate_sma(df['volume'], 20).iloc[-1]
         if vol > vol_avg * 1.5:
             score_long += 12
             score_short += 12
@@ -425,8 +425,7 @@ class AIHybridStrategy(BaseStrategy):
         df['cci'] = self.calculate_cci_local(df)
 
         # 6. Donchian
-        df['donchian_high'] = df['high'].rolling(20).max()
-        df['donchian_low'] = df['low'].rolling(20).min()
+        df['donchian_high'], _, df['donchian_low'] = self.calculate_donchian_channel(df, 20)
 
         # 7. VWMACD
         df['vwmacd_hist'] = self.calculate_vwmacd_local(df)

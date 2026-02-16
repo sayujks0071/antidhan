@@ -19,19 +19,22 @@ utils_dir = os.path.join(strategies_dir, "utils")
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open
+    from trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_ema, calculate_atr
 except ImportError:
     try:
         sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open
+        from utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_ema, calculate_atr
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_ema, calculate_atr
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
             APIClient = None
             PositionManager = None
             is_market_open = lambda: True
+            calculate_rsi = lambda s, p: pd.Series(0, index=s.index)
+            calculate_ema = lambda s, p: pd.Series(0, index=s.index)
+            calculate_atr = lambda d, p: pd.Series(0, index=d.index)
 
 # Setup Logging
 logging.basicConfig(
@@ -89,23 +92,14 @@ class MCXStrategy:
         df = self.data.copy()
 
         # RSI
-        delta = df["close"].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=self.params["period_rsi"]).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=self.params["period_rsi"]).mean()
-        rs = gain / loss
-        df["rsi"] = 100 - (100 / (1 + rs))
+        df["rsi"] = calculate_rsi(df["close"], period=self.params["period_rsi"])
 
         # EMA
-        df["ema_fast"] = df["close"].ewm(span=self.params["period_ema_fast"], adjust=False).mean()
-        df["ema_slow"] = df["close"].ewm(span=self.params["period_ema_slow"], adjust=False).mean()
+        df["ema_fast"] = calculate_ema(df["close"], period=self.params["period_ema_fast"])
+        df["ema_slow"] = calculate_ema(df["close"], period=self.params["period_ema_slow"])
 
         # ATR
-        high_low = df["high"] - df["low"]
-        high_close = (df["high"] - df["close"].shift()).abs()
-        low_close = (df["low"] - df["close"].shift()).abs()
-        ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        true_range = ranges.max(axis=1)
-        df["atr"] = true_range.rolling(window=self.params["period_atr"]).mean()
+        df["atr"] = calculate_atr(df, period=self.params["period_atr"])
 
         self.data = df
 

@@ -116,7 +116,7 @@ class MLMomentumStrategy(BaseStrategy):
             current_price > last['sma50'] and
             sentiment >= 0):
 
-            avg_vol = df['volume'].rolling(20).mean().iloc[-1]
+            avg_vol = self.calculate_sma(df['volume'], 20).iloc[-1]
             if last['volume'] > avg_vol * self.vol_multiplier:
                 # Use Adaptive Sizing
                 qty = self.get_adaptive_quantity(current_price)
@@ -153,7 +153,7 @@ class MLMomentumStrategy(BaseStrategy):
             sentiment >= 0):
 
             # Volume check
-            avg_vol = df['volume'].rolling(20).mean().iloc[-1]
+            avg_vol = self.calculate_sma(df['volume'], 20).iloc[-1]
             if last['volume'] > avg_vol * self.vol_multiplier: # Stricter volume
                 return 'BUY', 1.0, {'roc': last['roc'], 'rsi': last['rsi']}
 

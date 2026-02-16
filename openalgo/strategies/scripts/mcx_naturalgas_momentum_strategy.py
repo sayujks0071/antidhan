@@ -20,19 +20,23 @@ utils_dir = os.path.join(strategies_dir, "utils")
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open
+    from trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_sma, calculate_adx
 except ImportError:
     try:
         sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open
+        from utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_sma, calculate_adx
     except ImportError:
         try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
+            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_sma, calculate_adx
         except ImportError:
             print("Warning: openalgo package not found or imports failed.")
             APIClient = None
             PositionManager = None
             is_market_open = lambda *args: True
+            calculate_rsi = lambda s, p: pd.Series(0, index=s.index)
+            calculate_atr = lambda d, p: pd.Series(0, index=d.index)
+            calculate_sma = lambda s, p: pd.Series(0, index=s.index)
+            calculate_adx = lambda d, p: pd.Series(0, index=d.index)
 
 # Setup Logging
 logging.basicConfig(
@@ -91,55 +95,19 @@ class MCXStrategy:
 
         # Calculate RSI
         period_rsi = self.params.get("period_rsi", 14)
-        delta = df["close"].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period_rsi).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period_rsi).mean()
-        rs = gain / loss
-        df["rsi"] = 100 - (100 / (1 + rs))
+        df["rsi"] = calculate_rsi(df["close"], period=period_rsi)
 
         # Calculate ATR
         period_atr = self.params.get("period_atr", 14)
-        high_low = df["high"] - df["low"]
-        high_close = (df["high"] - df["close"].shift()).abs()
-        low_close = (df["low"] - df["close"].shift()).abs()
-        ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        true_range = ranges.max(axis=1)
-        df["atr"] = true_range.rolling(window=period_atr).mean()
+        df["atr"] = calculate_atr(df, period=period_atr)
 
         # Calculate SMA
-        df["sma_20"] = df["close"].rolling(window=20).mean()
-        df["sma_50"] = df["close"].rolling(window=50).mean()
+        df["sma_20"] = calculate_sma(df["close"], period=20)
+        df["sma_50"] = calculate_sma(df["close"], period=50)
 
         # Calculate ADX
         period_adx = self.params.get("period_adx", 14)
-        plus_dm = df["high"].diff()
-        minus_dm = df["low"].diff()
-        plus_dm = np.where(plus_dm < 0, 0, plus_dm)
-        minus_dm = np.where(minus_dm > 0, 0, minus_dm) # Logic from trading_utils: minus_dm[minus_dm > 0] = 0 (keep negative) -> wait trading_utils keeps positive values for minus_dm if using standard formula?
-        # Standard ADX uses absolute moves. Let's stick to standard calculation here or replicate trading_utils logic if possible.
-        # Let's use standard +DM and -DM logic for clarity:
-        # UpMove = High - PrevHigh
-        # DownMove = PrevLow - Low
-        # if UpMove > DownMove and UpMove > 0 -> +DM = UpMove
-        # if DownMove > UpMove and DownMove > 0 -> -DM = DownMove
-
-        # Re-implementing simplified ADX for standalone script to avoid dependency issues if utils fail,
-        # but since we have pandas, let's do it cleanly.
-
-        df['up_move'] = df['high'] - df['high'].shift(1)
-        df['down_move'] = df['low'].shift(1) - df['low']
-
-        df['plus_dm'] = np.where((df['up_move'] > df['down_move']) & (df['up_move'] > 0), df['up_move'], 0)
-        df['minus_dm'] = np.where((df['down_move'] > df['up_move']) & (df['down_move'] > 0), df['down_move'], 0)
-
-        # Smooth DM and TR
-        # Using Wilder's Smoothing (alpha=1/n) or Simple Rolling Mean? Prompt template used rolling mean for ATR.
-        # We will use Rolling Mean to be consistent with the template's ATR style, though Wilder is standard.
-        df['plus_di'] = 100 * (df['plus_dm'].rolling(window=period_adx).mean() / df['atr'])
-        df['minus_di'] = 100 * (df['minus_dm'].rolling(window=period_adx).mean() / df['atr'])
-
-        df['dx'] = 100 * abs(df['plus_di'] - df['minus_di']) / (df['plus_di'] + df['minus_di'])
-        df['adx'] = df['dx'].rolling(window=period_adx).mean()
+        df["adx"] = calculate_adx(df, period=period_adx)
 
         self.data = df.fillna(0)
 
