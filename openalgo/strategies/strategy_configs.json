@@ -119,7 +119,7 @@
   "MCX_GOLD_TREND": {
     "id": "MCX_GOLD_TREND",
     "name": "MCX Gold Trend Strategy",
-    "description": "MCX Gold trend following strategy using SMA 50/200 and RSI",
+    "description": "MCX Gold trend following strategy using SMA 20/50, RSI and ADX",
     "file_path": "strategies/scripts/mcx_gold_trend_strategy.py",
     "user_id": "system",
     "created_at": "2024-05-22T10:00:00",
@@ -138,8 +138,9 @@
       "usd_inr_volatility": 0.5,
       "period_rsi": 14,
       "period_atr": 14,
-      "fast_ma_period": 50,
-      "slow_ma_period": 200
+      "period_sma_fast": 20,
+      "period_sma_slow": 50,
+      "period_adx": 14
     },
     "is_running": false,
     "is_scheduled": true,
