@@ -7,7 +7,7 @@ Includes Retry-with-Backoff logic for robust error handling.
 import os
 import time
 from functools import wraps
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
@@ -41,21 +41,73 @@ def get_httpx_client() -> httpx.Client:
     return _httpx_client
 
 
-def retry_with_backoff(max_retries: int = 3, backoff_factor: float = 0.5):
+def retry_with_backoff(
+    max_retries: int = 3,
+    backoff_factor: float = 0.5,
+    retry_on_status_codes: Optional[List[int]] = None,
+):
     """
     Decorator to add retry with backoff logic to a function.
 
     Args:
         max_retries: Number of retries on failure (default 3)
         backoff_factor: Factor for exponential backoff (default 0.5)
+        retry_on_status_codes: List of status codes to retry on (default [429, 500, 502, 503, 504])
     """
+    if retry_on_status_codes is None:
+        retry_on_status_codes = [429, 500, 502, 503, 504]
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             last_exception = None
             for attempt in range(max_retries + 1):
                 try:
-                    return func(*args, **kwargs)
+                    result = func(*args, **kwargs)
+
+                    # Check if result is an httpx.Response and has a retryable status code
+                    if isinstance(result, httpx.Response) and result.status_code in retry_on_status_codes:
+                        if attempt < max_retries:
+                            wait_time = backoff_factor * (2**attempt)
+
+                            # Check for Retry-After header
+                            retry_after = result.headers.get("Retry-After")
+                            if retry_after:
+                                try:
+                                    retry_wait = 0.0
+                                    if retry_after.isdigit():
+                                        retry_wait = float(retry_after)
+                                    else:
+                                        # Parse HTTP date
+                                        retry_date = parsedate_to_datetime(retry_after)
+                                        if retry_date:
+                                            # If naive, assume UTC as per HTTP spec
+                                            if retry_date.tzinfo is None:
+                                                retry_date = retry_date.replace(tzinfo=timezone.utc)
+
+                                            now = datetime.now(retry_date.tzinfo)
+                                            retry_wait = (retry_date - now).total_seconds()
+
+                                    # Use the larger of the two, but cap Retry-After at 60s
+                                    if retry_wait > 0:
+                                        capped_retry_wait = min(retry_wait, 60.0)
+                                        wait_time = max(wait_time, capped_retry_wait)
+                                        logger.info(f"Respecting Retry-After header: {retry_wait:.2f}s (capped/used: {wait_time:.2f}s)")
+                                except Exception as e:
+                                    logger.warning(f"Failed to parse Retry-After header '{retry_after}': {e}")
+
+                            logger.warning(
+                                f"Function {func.__name__} returned status {result.status_code}. Retrying in {wait_time:.2f}s..."
+                            )
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            # Retries exhausted, return the error response
+                            return result
+
+                    # If successful or not a retryable status code
+                    return result
+
                 except Exception as e:
                     last_exception = e
                     if attempt < max_retries:
