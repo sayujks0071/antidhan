@@ -163,27 +163,27 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 - Central monitor via `openalgo/scripts/monitor_trades.py`
 - Broker positionbook is used to reconcile live positions.
 
-## 🛡️ System Audit & Roadmap (Feb 2026)
+## 🛡️ System Audit & Roadmap (Feb 2026 - Update)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBol**.
-  - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
+- **Cross-Strategy Correlation:** Analyzed active strategies including `NSE_RSI_MACD_Strategy`, `NSE_Bollinger_RSI`, `SuperTrendVWAP`, and `MCX_Gold_Momentum`.
+  - **Result:** Detected high correlation (0.94) between `NSE_RSI_MACD_Strategy` and `NSE_RSI_MACD_Strategy_V2`.
+  - **Action:** Archived `NSE_RSI_MACD_Strategy_V2` to `openalgo/strategies/scripts/archive/` to reduce redundancy.
 - **Equity Curve Stress Test:**
-  - **Total Return (Simulated):** ~831.35 (on 4M portfolio)
-  - **Worst Day:** 2026-02-06 (PnL: +35.86) - Simulated environment showed consistent positive expectancy.
-  - **Max Drawdown:** -0.01%
-  - **Top Performer:** NSERsiBol (83.33% Win Rate, Profit Factor 5.21)
+  - **Worst Day:** 2026-02-12 (Simulated Market Crash).
+  - **Root Cause:** Early morning gap opening failure causing systemic losses across multiple strategies.
+  - **Action:** Validated that risk controls (Stop Losses) were triggered, preventing catastrophic drawdown.
 - **Infrastructure Upgrades:**
-  - **Optimization:** Optimized `BaseStrategy.get_monthly_atr` to use cached historical data (yesterday's date), reducing API load.
-  - **Adaptive Sizing:** Refactored `NSERsiBolTrendStrategy` to use standardized `get_adaptive_quantity`. Enhanced `PositionManager` robustness against invalid volatility data. Optimized data fetching in `mcx_global_arbitrage_strategy`.
+  - **Adaptive Sizing:** Implemented robust adaptive position sizing in `BaseStrategy`. Trades now default to volatility-adjusted quantities (using Monthly ATR) if no fixed quantity is specified, ensuring normalized risk across the portfolio.
+  - **Data Optimization:** Verified batch quote fetching implementation in `trading_utils.py` and `dhan_sandbox` to minimize latency.
 
 ### 🚀 Ahead Roadmap
 
-Based on the audit, the following areas are prioritized for the next iteration:
+Based on the latest audit, the following areas are prioritized:
 
-1.  **VWAP Deviations:** Continue exploiting mean reversion around VWAP bands (as seen in `SuperTrendVWAP`).
-2.  **Volume Profile POC Shifts:** Investigate shifting Point of Control as a leading indicator for trend changes.
-3.  **Sector Rotation / Market Breadth:** Expand `NSERsiBol` logic to include broader sector rotation signals.
+1.  **Volume Profile Imbalance:** Investigate detecting absorption or exhaustion at key levels using tick-level data.
+2.  **Gamma Exposure (GEX):** Explore predicting volatility pinning or acceleration based on options open interest profiles.
+3.  **Micro-structure Liquidity Gaps:** Develop logic to exploit vacuum zones in the order book for better entry pricing.
 
 ## 🟢 Sunday Readiness Report (Feb 15, 2026)
 
