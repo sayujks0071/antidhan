@@ -324,9 +324,17 @@ def place_smart_order_with_auth(
                 message = response_data.get("message", "Order rejected by broker (no Order ID returned)")
                 error_response = {"status": "error", "message": message}
                 executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+
+            # Map specific broker errors to appropriate HTTP status codes
+            status_code = 200  # Default to 200 for business logic rejection
+            if "Invalid Token" in message:
+                status_code = 401
+            elif "SecurityId Required" in message:
+                status_code = 400
+
                 # Determine status code - if it was a rejection, maybe return 400 or keep 200 with success=False
                 # Returning 200 with success=False is consistent with HTTP level success but business failure
-                return False, error_response, 200
+            return False, error_response, status_code
 
             order_response_data = {"status": "success", "orderid": order_id}
             executor.submit(
@@ -379,7 +387,17 @@ def place_smart_order_with_auth(
         )
         error_response = {"status": "error", "message": message}
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+
+        # Determine status code based on response or error message
         status_code = res.status if res and hasattr(res, "status") else 500
+
+        # If no response object (e.g. validation error in broker module), check message
+        if not res and status_code == 500:
+            if "Invalid Token" in message:
+                status_code = 401
+            elif "SecurityId Required" in message:
+                status_code = 400
+
         return False, error_response, status_code
 
 
