@@ -6,338 +6,196 @@ MCX Natural Gas Momentum Strategy: Uses RSI, ADX, and SMA crossovers to identify
 """
 import os
 import sys
-import time
 import logging
-import argparse
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
 
 # Add repo root to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, "utils")
-sys.path.insert(0, utils_dir)
-
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open
+    from base_strategy import BaseStrategy
 except ImportError:
-    try:
-        sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open
-    except ImportError:
-        try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
-        except ImportError:
-            print("Warning: openalgo package not found or imports failed.")
-            APIClient = None
-            PositionManager = None
-            is_market_open = lambda *args: True
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    strategies_dir = os.path.dirname(script_dir)
+    utils_dir = os.path.join(strategies_dir, "utils")
+    if utils_dir not in sys.path:
+        sys.path.insert(0, utils_dir)
+    from base_strategy import BaseStrategy
 
-# Setup Logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("MCX_NaturalGas_Momentum")
+class MCXNaturalGasMomentumStrategy(BaseStrategy):
+    def __init__(self, symbol, api_key=None, host=None, **kwargs):
+        super().__init__(
+            name=f"MCX_NG_Momentum_{symbol}",
+            symbol=symbol,
+            api_key=api_key,
+            host=host,
+            exchange="MCX",
+            interval="15m",
+            **kwargs
+        )
 
-class MCXStrategy:
-    def __init__(self, symbol, api_key, host, params):
-        self.symbol = symbol
-        self.api_key = api_key
-        self.host = host
-        self.params = params
+        # Strategy Parameters
+        self.period_rsi = int(kwargs.get("period_rsi", 14))
+        self.period_atr = int(kwargs.get("period_atr", 14))
+        self.period_adx = int(kwargs.get("period_adx", 14))
+        self.rsi_buy = float(kwargs.get("rsi_buy", 55))
+        self.rsi_sell = float(kwargs.get("rsi_sell", 45))
+        self.adx_threshold = float(kwargs.get("adx_threshold", 25))
 
-        self.client = APIClient(api_key=self.api_key, host=self.host) if APIClient else None
-        self.pm = PositionManager(symbol) if PositionManager else None
+        # Multi-Factor Parameters
+        self.usd_inr_trend = kwargs.get("usd_inr_trend", "Neutral")
+        self.usd_inr_volatility = float(kwargs.get("usd_inr_volatility", 0.0))
+        self.seasonality_score = int(kwargs.get("seasonality_score", 50))
+        self.global_alignment_score = int(kwargs.get("global_alignment_score", 50))
+
         self.data = pd.DataFrame()
 
-        logger.info(f"Initialized Strategy for {symbol}")
-        logger.info(f"Filters: Seasonality={params.get('seasonality_score', 'N/A')}, USD_Vol={params.get('usd_inr_volatility', 'N/A')}")
+        self.logger.info(f"Initialized Strategy for {symbol}")
+        self.logger.info(f"Filters: Seasonality={self.seasonality_score}, USD_Vol={self.usd_inr_volatility}")
 
-    def fetch_data(self):
-        """Fetch live or historical data from OpenAlgo"""
-        if not self.client:
-            logger.error("API Client not initialized.")
-            return
+    @classmethod
+    def add_arguments(cls, parser):
+        # Strategy Parameters
+        parser.add_argument("--period_rsi", type=int, default=14, help="RSI Period")
+        parser.add_argument("--period_atr", type=int, default=14, help="ATR Period")
+        parser.add_argument("--period_adx", type=int, default=14, help="ADX Period")
+        parser.add_argument("--rsi_buy", type=float, default=55, help="RSI Buy Threshold")
+        parser.add_argument("--rsi_sell", type=float, default=45, help="RSI Sell Threshold")
+        parser.add_argument("--adx_threshold", type=float, default=25, help="ADX Threshold")
 
-        try:
-            logger.info(f"Fetching data for {self.symbol}...")
-            end_date = datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
+        # Multi-Factor Arguments
+        parser.add_argument("--usd_inr_trend", type=str, default="Neutral", help="USD/INR Trend")
+        parser.add_argument("--usd_inr_volatility", type=float, default=0.0, help="USD/INR Volatility %%")
+        parser.add_argument("--seasonality_score", type=int, default=50, help="Seasonality Score (0-100)")
+        parser.add_argument("--global_alignment_score", type=int, default=50, help="Global Alignment Score")
 
-            df = self.client.history(
-                symbol=self.symbol,
-                interval="15m",  # MCX typically uses 5m, 15m, or 1h
-                exchange="MCX",
-                start_date=start_date,
-                end_date=end_date,
-            )
+        # Legacy port argument support
+        parser.add_argument("--port", type=int, help="API Port (Legacy support)")
 
-            if not df.empty and len(df) > 50:
-                self.data = df
-                logger.info(f"Fetched {len(df)} candles.")
-            else:
-                logger.warning(f"Insufficient data for {self.symbol}.")
+    @classmethod
+    def parse_arguments(cls, args):
+        kwargs = super().parse_arguments(args)
+        if hasattr(args, 'period_rsi'): kwargs['period_rsi'] = args.period_rsi
+        if hasattr(args, 'period_atr'): kwargs['period_atr'] = args.period_atr
+        if hasattr(args, 'period_adx'): kwargs['period_adx'] = args.period_adx
+        if hasattr(args, 'rsi_buy'): kwargs['rsi_buy'] = args.rsi_buy
+        if hasattr(args, 'rsi_sell'): kwargs['rsi_sell'] = args.rsi_sell
+        if hasattr(args, 'adx_threshold'): kwargs['adx_threshold'] = args.adx_threshold
 
-        except Exception as e:
-            logger.error(f"Error fetching data: {e}", exc_info=True)
+        if hasattr(args, 'usd_inr_trend'): kwargs['usd_inr_trend'] = args.usd_inr_trend
+        if hasattr(args, 'usd_inr_volatility'): kwargs['usd_inr_volatility'] = args.usd_inr_volatility
+        if hasattr(args, 'seasonality_score'): kwargs['seasonality_score'] = args.seasonality_score
+        if hasattr(args, 'global_alignment_score'): kwargs['global_alignment_score'] = args.global_alignment_score
 
-    def calculate_indicators(self):
-        """Calculate technical indicators"""
-        if self.data.empty:
-            return
+        # Support legacy --port arg by constructing host
+        if hasattr(args, 'port') and args.port:
+            kwargs['host'] = f"http://127.0.0.1:{args.port}"
 
-        df = self.data.copy()
+        return kwargs
 
-        # Calculate RSI
-        period_rsi = self.params.get("period_rsi", 14)
-        delta = df["close"].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period_rsi).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period_rsi).mean()
-        rs = gain / loss
-        df["rsi"] = 100 - (100 / (1 + rs))
-
-        # Calculate ATR
-        period_atr = self.params.get("period_atr", 14)
-        high_low = df["high"] - df["low"]
-        high_close = (df["high"] - df["close"].shift()).abs()
-        low_close = (df["low"] - df["close"].shift()).abs()
-        ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        true_range = ranges.max(axis=1)
-        df["atr"] = true_range.rolling(window=period_atr).mean()
-
-        # Calculate SMA
-        df["sma_20"] = df["close"].rolling(window=20).mean()
-        df["sma_50"] = df["close"].rolling(window=50).mean()
-
-        # Calculate ADX
-        period_adx = self.params.get("period_adx", 14)
-        plus_dm = df["high"].diff()
-        minus_dm = df["low"].diff()
-        plus_dm = np.where(plus_dm < 0, 0, plus_dm)
-        minus_dm = np.where(minus_dm > 0, 0, minus_dm) # Logic from trading_utils: minus_dm[minus_dm > 0] = 0 (keep negative) -> wait trading_utils keeps positive values for minus_dm if using standard formula?
-        # Standard ADX uses absolute moves. Let's stick to standard calculation here or replicate trading_utils logic if possible.
-        # Let's use standard +DM and -DM logic for clarity:
-        # UpMove = High - PrevHigh
-        # DownMove = PrevLow - Low
-        # if UpMove > DownMove and UpMove > 0 -> +DM = UpMove
-        # if DownMove > UpMove and DownMove > 0 -> -DM = DownMove
-
-        # Re-implementing simplified ADX for standalone script to avoid dependency issues if utils fail,
-        # but since we have pandas, let's do it cleanly.
-
-        df['up_move'] = df['high'] - df['high'].shift(1)
-        df['down_move'] = df['low'].shift(1) - df['low']
-
-        df['plus_dm'] = np.where((df['up_move'] > df['down_move']) & (df['up_move'] > 0), df['up_move'], 0)
-        df['minus_dm'] = np.where((df['down_move'] > df['up_move']) & (df['down_move'] > 0), df['down_move'], 0)
-
-        # Smooth DM and TR
-        # Using Wilder's Smoothing (alpha=1/n) or Simple Rolling Mean? Prompt template used rolling mean for ATR.
-        # We will use Rolling Mean to be consistent with the template's ATR style, though Wilder is standard.
-        df['plus_di'] = 100 * (df['plus_dm'].rolling(window=period_adx).mean() / df['atr'])
-        df['minus_di'] = 100 * (df['minus_dm'].rolling(window=period_adx).mean() / df['atr'])
-
-        df['dx'] = 100 * abs(df['plus_di'] - df['minus_di']) / (df['plus_di'] + df['minus_di'])
-        df['adx'] = df['dx'].rolling(window=period_adx).mean()
-
-        self.data = df.fillna(0)
-
-    def check_signals(self):
+    def cycle(self):
         """Check entry and exit conditions"""
-        if self.data.empty or len(self.data) < 50:
+        # Fetch Data
+        df = self.fetch_history(days=10, interval="15m")
+        if df.empty or len(df) < 50:
+            self.logger.warning(f"Insufficient data for {self.symbol}.")
             return
 
-        current = self.data.iloc[-1]
-        prev = self.data.iloc[-2]
+        if not self.check_new_candle(df):
+            return
+
+        self.data = df
+
+        # Calculate Indicators locally
+        df = df.copy()
+        df["rsi"] = self.calculate_rsi(df["close"], period=self.period_rsi)
+        df["atr"] = self.calculate_atr_series(df, period=self.period_atr)
+        df["sma_20"] = self.calculate_sma(df["close"], period=20)
+        df["sma_50"] = self.calculate_sma(df["close"], period=50)
+        df["adx"] = self.calculate_adx_series(df, period=self.period_adx)
+
+        current = df.iloc[-1]
 
         has_position = False
         if self.pm:
             has_position = self.pm.has_position()
 
         # Multi-Factor Checks
-        seasonality_ok = self.params.get("seasonality_score", 50) > 40
-        global_alignment_ok = self.params.get("global_alignment_score", 50) >= 40
-        usd_vol_high = self.params.get("usd_inr_volatility", 0) > 1.0
+        seasonality_ok = self.seasonality_score > 40
+        usd_vol_high = self.usd_inr_volatility > 1.0
 
         # Position sizing adjustment for volatility
-        base_qty = 1 # Futures typically 1 lot
+        base_qty = self.quantity
         if usd_vol_high:
-            logger.warning("⚠️ High USD/INR Volatility: Reducing position size (Simulated - Futures min lot is 1).")
+            self.logger.warning("⚠️ High USD/INR Volatility: Reducing position size (Simulated - Futures min lot is 1).")
             # In real scenario, we might skip trade or hedge. For now, we log.
             # base_qty = max(1, int(base_qty * 0.7))
 
         if not seasonality_ok and not has_position:
-            logger.info("Seasonality Weak: Skipping new entries.")
+            self.logger.info("Seasonality Weak: Skipping new entries.")
             return
-
-        rsi_buy = self.params.get("rsi_buy", 55)
-        rsi_sell = self.params.get("rsi_sell", 45)
-        adx_threshold = self.params.get("adx_threshold", 25)
 
         # Entry Logic
         if not has_position:
             # BUY Entry
             if (current['close'] > current['sma_20'] > current['sma_50']) and \
-               (current['rsi'] > rsi_buy) and \
-               (current['adx'] > adx_threshold):
+               (current['rsi'] > self.rsi_buy) and \
+               (current['adx'] > self.adx_threshold):
 
-                logger.info(f"BUY SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
-                if self.pm:
-                    self.pm.update_position(base_qty, current["close"], "BUY")
+                self.logger.info(f"BUY SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
+                self.execute_trade("BUY", base_qty, current['close'])
 
             # SELL Entry
             elif (current['close'] < current['sma_20'] < current['sma_50']) and \
-                 (current['rsi'] < rsi_sell) and \
-                 (current['adx'] > adx_threshold):
+                 (current['rsi'] < self.rsi_sell) and \
+                 (current['adx'] > self.adx_threshold):
 
-                logger.info(f"SELL SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
-                if self.pm:
-                    self.pm.update_position(base_qty, current["close"], "SELL")
-
+                self.logger.info(f"SELL SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
+                self.execute_trade("SELL", base_qty, current['close'])
 
         # Exit Logic
         elif has_position:
             pos_qty = self.pm.position
-            entry_price = self.pm.entry_price
 
             # BUY Exit
             if pos_qty > 0:
                 if (current['close'] < current['sma_20']) or (current['rsi'] < 40):
-                    logger.info(f"EXIT BUY: Trend Faded (Price < SMA20 or RSI < 40)")
-                    self.pm.update_position(abs(pos_qty), current["close"], "SELL")
+                    self.logger.info(f"EXIT BUY: Trend Faded (Price < SMA20 or RSI < 40)")
+                    self.execute_trade("SELL", abs(pos_qty), current['close'])
 
             # SELL Exit
             elif pos_qty < 0:
                 if (current['close'] > current['sma_20']) or (current['rsi'] > 60):
-                    logger.info(f"EXIT SELL: Trend Faded (Price > SMA20 or RSI > 60)")
-                    self.pm.update_position(abs(pos_qty), current["close"], "BUY")
+                    self.logger.info(f"EXIT SELL: Trend Faded (Price > SMA20 or RSI > 60)")
+                    self.execute_trade("BUY", abs(pos_qty), current['close'])
 
-    def generate_signal(self, df):
+    def get_signal(self, df):
         """Generate signal for backtesting"""
         if df.empty:
             return "HOLD", 0.0, {}
 
-        self.data = df
-        self.calculate_indicators()
+        df = df.copy()
+        df["rsi"] = self.calculate_rsi(df["close"], period=self.period_rsi)
+        df["sma_20"] = self.calculate_sma(df["close"], period=20)
+        df["sma_50"] = self.calculate_sma(df["close"], period=50)
+        df["adx"] = self.calculate_adx_series(df, period=self.period_adx)
 
-        current = self.data.iloc[-1]
-
-        rsi_buy = self.params.get("rsi_buy", 55)
-        rsi_sell = self.params.get("rsi_sell", 45)
-        adx_threshold = self.params.get("adx_threshold", 25)
+        current = df.iloc[-1]
 
         # Signal Logic
         if (current['close'] > current['sma_20'] > current['sma_50']) and \
-           (current['rsi'] > rsi_buy) and \
-           (current['adx'] > adx_threshold):
+           (current['rsi'] > self.rsi_buy) and \
+           (current['adx'] > self.adx_threshold):
             return "BUY", 1.0, {"reason": "Trend_Momentum_Buy", "rsi": current['rsi'], "adx": current['adx']}
 
         elif (current['close'] < current['sma_20'] < current['sma_50']) and \
-             (current['rsi'] < rsi_sell) and \
-             (current['adx'] > adx_threshold):
+             (current['rsi'] < self.rsi_sell) and \
+             (current['adx'] > self.adx_threshold):
             return "SELL", 1.0, {"reason": "Trend_Momentum_Sell", "rsi": current['rsi'], "adx": current['adx']}
 
         return "HOLD", 0.0, {}
 
-    def run(self):
-        logger.info(f"Starting MCX Strategy for {self.symbol}")
-        while True:
-            if not is_market_open("MCX"): # Pass MCX explicitly if the util supports it, or use check logic
-                logger.info("Market is closed. Sleeping...")
-                time.sleep(300)
-                continue
-
-            self.fetch_data()
-            self.calculate_indicators()
-            self.check_signals()
-            time.sleep(900)  # 15 minutes
+# Backtesting alias
+generate_signal = MCXNaturalGasMomentumStrategy.backtest_signal
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="MCX Commodity Strategy")
-    parser.add_argument("--symbol", type=str, help="MCX Symbol (e.g., GOLDM05FEB26FUT)")
-    parser.add_argument("--underlying", type=str, help="Commodity Name (e.g., GOLD, SILVER, NATURALGAS)")
-    parser.add_argument("--port", type=int, default=5001, help="API Port")
-    parser.add_argument("--api_key", type=str, help="API Key")
-
-    # Multi-Factor Arguments
-    parser.add_argument("--usd_inr_trend", type=str, default="Neutral", help="USD/INR Trend")
-    parser.add_argument("--usd_inr_volatility", type=float, default=0.0, help="USD/INR Volatility %%")
-    parser.add_argument("--seasonality_score", type=int, default=50, help="Seasonality Score (0-100)")
-    parser.add_argument("--global_alignment_score", type=int, default=50, help="Global Alignment Score")
-
-    args = parser.parse_args()
-
-    # Strategy Parameters
-    PARAMS = {
-        "period_rsi": 14,
-        "period_atr": 14,
-        "period_adx": 14,
-        "rsi_buy": 55,
-        "rsi_sell": 45,
-        "adx_threshold": 25,
-        "usd_inr_trend": args.usd_inr_trend,
-        "usd_inr_volatility": args.usd_inr_volatility,
-        "seasonality_score": args.seasonality_score,
-        "global_alignment_score": args.global_alignment_score,
-    }
-
-    # Symbol Resolution
-    symbol = args.symbol or os.getenv("SYMBOL")
-
-    # Try to resolve from underlying
-    if not symbol and args.underlying:
-        try:
-            from symbol_resolver import SymbolResolver
-        except ImportError:
-            try:
-                from utils.symbol_resolver import SymbolResolver
-            except ImportError:
-                # Add utils dir to path again just in case
-                sys.path.insert(0, utils_dir)
-                try:
-                    from symbol_resolver import SymbolResolver
-                except ImportError:
-                    SymbolResolver = None
-
-        if SymbolResolver:
-            resolver = SymbolResolver()
-            # Explicitly requesting FUT for MCX
-            res = resolver.resolve({"underlying": args.underlying, "type": "FUT", "exchange": "MCX"})
-            if res:
-                symbol = res
-                logger.info(f"Resolved {args.underlying} -> {symbol}")
-            else:
-                logger.error(f"Could not resolve symbol for {args.underlying}")
-
-    if not symbol:
-        logger.error("Symbol not provided. Use --symbol or --underlying")
-        sys.exit(1)
-
-    api_key = args.api_key or os.getenv("OPENALGO_APIKEY")
-    port = args.port or int(os.getenv("OPENALGO_PORT", 5001))
-    host = f"http://127.0.0.1:{port}"
-
-    strategy = MCXStrategy(symbol, api_key, host, PARAMS)
-    strategy.run()
-
-# Backtesting support
-DEFAULT_PARAMS = {
-    "period_rsi": 14,
-    "period_atr": 14,
-    "period_adx": 14,
-    "rsi_buy": 55,
-    "rsi_sell": 45,
-    "adx_threshold": 25,
-}
-
-def generate_signal(df, client=None, symbol=None, params=None):
-    strat_params = DEFAULT_PARAMS.copy()
-    if params:
-        strat_params.update(params)
-
-    api_key = client.api_key if client and hasattr(client, "api_key") else "BACKTEST"
-    host = client.host if client and hasattr(client, "host") else "http://127.0.0.1:5001"
-
-    strat = MCXStrategy(symbol or "TEST", api_key, host, strat_params)
-    return strat.generate_signal(df)
+    MCXNaturalGasMomentumStrategy.cli()
