@@ -386,5 +386,34 @@
     "is_scheduled": true,
     "schedule_start": "09:00",
     "schedule_stop": "23:30"
+  },
+  "NSE_BOLLINGER_REVERSAL": {
+    "id": "NSE_BOLLINGER_REVERSAL",
+    "name": "NSE Bollinger Reversal",
+    "description": "NSE Equity Mean Reversion Strategy using Bollinger Bands and RSI",
+    "file_path": "strategies/scripts/nse_bollinger_reversal_strategy.py",
+    "user_id": "testuser",
+    "created_at": "2026-02-02T10:00:00",
+    "symbol": "RELIANCE",
+    "schedule_enabled": true,
+    "schedule_days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri"
+    ],
+    "params": {
+      "bb_period": 20,
+      "bb_std": 2.0,
+      "rsi_period": 14,
+      "rsi_oversold": 30.0,
+      "rsi_overbought": 70.0,
+      "quantity": 1
+    },
+    "is_running": false,
+    "is_scheduled": true,
+    "schedule_start": "09:15",
+    "schedule_stop": "15:30"
   }
 }
