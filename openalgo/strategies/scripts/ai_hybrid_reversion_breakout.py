@@ -131,20 +131,11 @@ class AIHybridStrategy(BaseStrategy):
             signal, score = self.check_breakout_entry(df)
 
         if signal != "HOLD" and score >= 80: # High conviction threshold
-            # Sizing
+            # Sizing - Adaptive (Monthly ATR via BaseStrategy)
+            qty = self.get_adaptive_quantity(price, risk_pct=MAX_RISK_PCT, capital=CAPITAL)
+
+            # Sizing (Legacy/Fallback calculation for logging comparison)
             sl_dist = ATR_SL_MULTIPLIER * atr_val
-            risk_amount = CAPITAL * (MAX_RISK_PCT / 100)
-
-            # Volatility Adjustment (from Spec)
-            vol_adj = 1.0
-            if price > 0:
-                atr_pct = (atr_val / price) * 100
-                if atr_pct < 1.0: vol_adj = 1.2
-                elif atr_pct > 2.5: vol_adj = 0.7
-
-            risk_amount *= vol_adj
-
-            qty = max(1, int(risk_amount / sl_dist)) if sl_dist > 0 else self.quantity
 
             self.logger.info(f"Entry Signal: {signal} | Score: {score} | Qty: {qty} | Regime: {self.current_regime}")
             self.execute_trade(signal, qty, price)

@@ -163,27 +163,27 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 - Central monitor via `openalgo/scripts/monitor_trades.py`
 - Broker positionbook is used to reconcile live positions.
 
-## 🛡️ System Audit & Roadmap (Feb 2026)
+## 🛡️ System Audit & Roadmap (Feb 17, 2026)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBol**.
-  - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
+- **Cross-Strategy Correlation:** Analyzed **SuperTrendVWAP**, **AIHybrid**, and **MCXMomentum**.
+  - **Result:** No high correlation (> 70%) found among active strategies. Previously correlated strategies (`TrendPullback`, `ORB`) are no longer active.
 - **Equity Curve Stress Test:**
-  - **Total Return (Simulated):** ~831.35 (on 4M portfolio)
-  - **Worst Day:** 2026-02-06 (PnL: +35.86) - Simulated environment showed consistent positive expectancy.
-  - **Max Drawdown:** -0.01%
-  - **Top Performer:** NSERsiBol (83.33% Win Rate, Profit Factor 5.21)
+  - **Scenario:** Crash (Simulated High Volatility Down Trend).
+  - **Worst Day:** 2026-02-15 (Simulated).
+  - **Max Drawdown:** -0.03% (Resilient).
+  - **Observation:** MCXMomentum showed resilience. SuperTrendVWAP/AIHybrid were inactive in simulated crash (preserving capital).
 - **Infrastructure Upgrades:**
-  - **Optimization:** Optimized `BaseStrategy.get_monthly_atr` to use cached historical data (yesterday's date), reducing API load.
-  - **Adaptive Sizing:** Refactored `NSERsiBolTrendStrategy` to use standardized `get_adaptive_quantity`. Enhanced `PositionManager` robustness against invalid volatility data. Optimized data fetching in `mcx_global_arbitrage_strategy`.
+  - **Smart Caching:** implemented in `APIClient.history` to cache full historical data per symbol/interval and stitch missing ranges, reducing API calls significantly.
+  - **Adaptive Sizing:** Updated `AIHybridStrategy` to use `get_adaptive_quantity` (Monthly ATR) for consistent risk normalization.
 
 ### 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **VWAP Deviations:** Continue exploiting mean reversion around VWAP bands (as seen in `SuperTrendVWAP`).
-2.  **Volume Profile POC Shifts:** Investigate shifting Point of Control as a leading indicator for trend changes.
-3.  **Sector Rotation / Market Breadth:** Expand `NSERsiBol` logic to include broader sector rotation signals.
+1.  **Gap Fill > 0.5%:** Explore fading large gaps (GapFade logic optimization).
+2.  **VIX < 12 Volatility Compression:** Develop breakout strategies specifically for low VIX environments.
+3.  **Sector Rotation Momentum:** Implement sector-based filtering for existing momentum strategies.
 
 ## 🟢 Sunday Readiness Report (Feb 15, 2026)
 

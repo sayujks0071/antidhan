@@ -553,47 +553,15 @@ class APIClient:
         self.quote_cache = {}  # Key: symbol, Value: (timestamp, data)
         self.quote_ttl = 1.0   # 1 second TTL
 
-    @lru_cache(maxsize=128)
-    def history(
-        self,
-        symbol,
-        exchange="NSE",
-        interval="5m",
-        start_date=None,
-        end_date=None,
-        max_retries=3,
-    ):
-        """Fetch historical data with retry logic, exponential backoff, and in-memory caching."""
-        # Check Cache first
-        cache_key = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
-        cached_df = self.cache.get(cache_key)
-        if cached_df is not None and not cached_df.empty:
-            # Only use cache if end_date is in the past (not today)
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            check_date = end_date
-            if isinstance(check_date, datetime):
-                check_date = check_date.strftime("%Y-%m-%d")
-
-            if check_date and check_date < today_str:
-                return cached_df
-
+    def _fetch_history_api(self, symbol, exchange, interval, start_date, end_date, max_retries=3):
+        """Internal method to fetch history from API."""
         url = f"{self.host}/api/v1/history"
-
-        # Ensure dates are serialized for JSON
-        json_start = start_date
-        if isinstance(json_start, datetime):
-            json_start = json_start.strftime("%Y-%m-%d")
-
-        json_end = end_date
-        if isinstance(json_end, datetime):
-            json_end = json_end.strftime("%Y-%m-%d")
-
         payload = {
             "symbol": symbol,
             "exchange": exchange,
-            "interval": interval,  # Fixed: was "resolution"
-            "start_date": json_start,  # Fixed: was "from"
-            "end_date": json_end,  # Fixed: was "to"
+            "interval": interval,
+            "start_date": start_date,
+            "end_date": end_date,
             "apikey": self.api_key,
         }
         try:
@@ -604,45 +572,136 @@ class APIClient:
                 max_retries=max_retries,
                 backoff_factor=1.0,
             )
-
             if response.status_code == 200:
                 data = response.json()
                 if data.get("status") == "success" and "data" in data:
                     df = pd.DataFrame(data["data"])
+
+                    # Robust datetime conversion
                     if "timestamp" in df.columns:
                         df["datetime"] = pd.to_datetime(df["timestamp"], unit="s")
+                    elif "datetime" in df.columns:
+                        df["datetime"] = pd.to_datetime(df["datetime"])
+                    elif not df.empty and isinstance(df.index, pd.DatetimeIndex):
+                        df["datetime"] = df.index.to_series()
+
+                    if "datetime" in df.columns:
+                        if not pd.api.types.is_datetime64_any_dtype(df["datetime"]):
+                             df["datetime"] = pd.to_datetime(df["datetime"])
+
                     required_cols = ["open", "high", "low", "close", "volume"]
                     for col in required_cols:
                         if col not in df.columns:
                             df[col] = 0
-                    logger.debug(
-                        f"Successfully fetched {len(df)} rows for {symbol} on {exchange}"
-                    )
-
-                    # Save to Cache if valid and historical
-                    today_str = datetime.now().strftime("%Y-%m-%d")
-                    check_date = end_date
-                    if isinstance(check_date, datetime):
-                        check_date = check_date.strftime("%Y-%m-%d")
-
-                    if check_date and check_date < today_str and not df.empty:
-                        self.cache.set(cache_key, df)
-
                     return df
                 else:
                     error_msg = data.get("message", "Unknown error")
-                    logger.error(
-                        f"History fetch failed for {symbol}: {error_msg}"
-                    )
+                    logger.error(f"History fetch failed for {symbol}: {error_msg}")
             else:
                 error_text = response.text[:500] if response.text else "(empty)"
-                logger.error(
-                    f"History fetch failed (HTTP {response.status_code}): {error_text}"
-                )
+                logger.error(f"History fetch failed (HTTP {response.status_code}): {error_text}")
         except Exception as e:
             logger.error(f"API Error for {symbol}: {e}")
-
         return pd.DataFrame()
+
+    def history(
+        self,
+        symbol,
+        exchange="NSE",
+        interval="5m",
+        start_date=None,
+        end_date=None,
+        max_retries=3,
+    ):
+        """
+        Fetch historical data with Smart Caching.
+        """
+        # Ensure dates are strings
+        if isinstance(start_date, datetime):
+            start_date = start_date.strftime("%Y-%m-%d")
+        if isinstance(end_date, datetime):
+            end_date = end_date.strftime("%Y-%m-%d")
+
+        today_str = datetime.now().strftime("%Y-%m-%d")
+
+        # 1. Load cached full history for this symbol/interval
+        # Use a generic key for the full accumulated history
+        full_cache_key = f"{symbol}_{exchange}_{interval}_FULL"
+        cached_df = self.cache.get(full_cache_key)
+
+        if cached_df is None:
+            cached_df = pd.DataFrame()
+
+        # 2. Determine missing ranges (up to yesterday)
+        # We only cache data strictly before today to avoid caching incomplete days
+        yesterday_str = (datetime.now() - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+        # Effective cacheable end date is min(requested_end, yesterday)
+        cacheable_end_date = min(end_date, yesterday_str) if end_date else yesterday_str
+
+        if start_date > cacheable_end_date:
+            # Requested range is entirely in future/today or invalid for caching
+            # Just fetch directly and return
+            return self._fetch_history_api(symbol, exchange, interval, start_date, end_date, max_retries)
+
+        # 3. Check what we have in cache
+        # Assumption: cached_df is sorted by datetime
+        if not cached_df.empty:
+            if "datetime" in cached_df.columns:
+                # Ensure cache has correct type (in case loaded from pickle with issues)
+                if not pd.api.types.is_datetime64_any_dtype(cached_df["datetime"]):
+                    cached_df["datetime"] = pd.to_datetime(cached_df["datetime"])
+
+                cached_min = cached_df["datetime"].min().strftime("%Y-%m-%d")
+                cached_max = cached_df["datetime"].max().strftime("%Y-%m-%d")
+
+                if start_date < cached_min:
+                    # Need earlier data
+                    # Fetch from start_date to cached_min (exclusive)
+                    fetch_start = start_date
+                    fetch_end = (pd.to_datetime(cached_min) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+                    if fetch_start <= fetch_end:
+                        new_data = self._fetch_history_api(symbol, exchange, interval, fetch_start, fetch_end, max_retries)
+                        if not new_data.empty:
+                            cached_df = pd.concat([new_data, cached_df]).drop_duplicates(subset=["datetime"]).sort_values("datetime")
+                            self.cache.set(full_cache_key, cached_df)
+
+                if cacheable_end_date > cached_max:
+                    # Need later data
+                    fetch_start = (pd.to_datetime(cached_max) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+                    fetch_end = cacheable_end_date
+                    if fetch_start <= fetch_end:
+                        new_data = self._fetch_history_api(symbol, exchange, interval, fetch_start, fetch_end, max_retries)
+                        if not new_data.empty:
+                            cached_df = pd.concat([cached_df, new_data]).drop_duplicates(subset=["datetime"]).sort_values("datetime")
+                            self.cache.set(full_cache_key, cached_df)
+            else:
+                # Cache invalid format, clear it
+                cached_df = pd.DataFrame()
+
+        if cached_df.empty:
+            # Fetch all cacheable range
+            cached_df = self._fetch_history_api(symbol, exchange, interval, start_date, cacheable_end_date, max_retries)
+            if not cached_df.empty:
+                self.cache.set(full_cache_key, cached_df)
+
+        # 4. Fetch Today's Data (Fresh) if requested
+        result_df = cached_df.copy()
+
+        if end_date >= today_str:
+            fresh_df = self._fetch_history_api(symbol, exchange, interval, today_str, today_str, max_retries)
+            if not fresh_df.empty:
+                result_df = pd.concat([result_df, fresh_df]).drop_duplicates(subset=["datetime"]).sort_values("datetime")
+
+        # 5. Filter result for requested range
+        if not result_df.empty and "datetime" in result_df.columns:
+            start_dt = pd.to_datetime(start_date)
+            # end_dt needs to cover the full day, so we compare date part or add time
+            # Simplest: filter by date >= start and date <= end
+            mask = (result_df["datetime"] >= start_dt) & (result_df["datetime"] <= pd.to_datetime(end_date) + pd.Timedelta(days=1))
+            result_df = result_df.loc[mask]
+
+        return result_df
 
     def get_quote(self, symbol, exchange="NSE", max_retries=3):
         """
