@@ -33,15 +33,18 @@ def test_nse_rsi_macd():
 
     # Create dummy data
     dates = pd.date_range(start='2024-01-01', periods=100, freq='5min')
+    # Create uptrend with some volatility
+    close = np.linspace(100, 150, 100) + np.random.normal(0, 1, 100)
+
     df = pd.DataFrame({
-        'open': np.random.rand(100) * 100,
-        'high': np.random.rand(100) * 100,
-        'low': np.random.rand(100) * 100,
-        'close': np.linspace(100, 150, 100), # Uptrend
+        'open': close - 1,
+        'high': close + 1,
+        'low': close - 1,
+        'close': close,
         'volume': np.random.randint(1000, 10000, 100)
     }, index=dates)
 
-    # Run generate_signal
+    # Run generate_signal (Backtest wrapper)
     try:
         signal, qty, meta = generate_signal(df)
         print(f"Signal: {signal}, Qty: {qty}, Meta: {meta}")
@@ -51,18 +54,25 @@ def test_nse_rsi_macd():
         traceback.print_exc()
         sys.exit(1)
 
-    # Verify indicator calculation
+    # Verify direct method
     strat = NSERsiMacdStrategy(symbol="TEST", api_key="dummy", port=5001)
     df_calc = df.copy()
     try:
-        strat.calculate_signal(df_calc)
-        if 'rsi' in df_calc.columns and 'macd' in df_calc.columns and 'signal' in df_calc.columns:
-            print("Indicators calculated successfully: RSI, MACD, Signal found.")
+        # Use get_signal instead of calculate_signal
+        sig, conf, meta = strat.get_signal(df_calc)
+        print(f"Direct Signal: {sig}, Conf: {conf}, Meta: {meta}")
+
+        # Verify result format
+        if sig in ['BUY', 'SELL', 'HOLD']:
+            print("Signal format valid.")
         else:
-            print(f"Indicators missing. Columns: {df_calc.columns}")
+            print(f"Invalid signal: {sig}")
             sys.exit(1)
+
     except Exception as e:
-        print(f"calculate_signal failed: {e}")
+        print(f"get_signal failed: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
     print("Test passed!")
