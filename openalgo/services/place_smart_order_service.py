@@ -226,60 +226,29 @@ def place_smart_order_with_auth(
 
     # Automatic retry mechanism for 500-level API responses
     # Handles transient server errors by retrying with exponential backoff
-    max_retries = 3
-    retry_delay = 0.5
+    # Now relies on httpx_client implementation for retries
 
     res = None
     response_data = {}
     order_id = None
 
-    for attempt in range(max_retries + 1):
-        try:
-            # Attempt to place order via broker API
-            res, response_data, order_id = broker_module.place_smartorder_api(
-                order_data, auth_token
-            )
+    try:
+        # Attempt to place order via broker API
+        # The broker module uses httpx_client which has built-in retry logic for 500 errors
+        res, response_data, order_id = broker_module.place_smartorder_api(
+            order_data, auth_token
+        )
 
-            # Check status for 500-level errors to retry
-            # Supports both 'status' and 'status_code' attributes
-            status = (
-                res.status
-                if res and hasattr(res, "status")
-                else (res.status_code if res and hasattr(res, "status_code") else None)
-            )
-
-            # If status is >= 500 (Server Error), retry
-            if status and status >= 500:
-                if attempt < max_retries:
-                    wait_time = retry_delay * (2**attempt)
-                    logger.warning(
-                        f"API call failed with status {status}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
-                    )
-                    time.sleep(wait_time)
-                    continue
-
-            # If successful or non-retriable error (e.g. 400), break loop
-            break
-
-        except Exception as e:
-            # Catch exceptions during API call (e.g. network error) and retry
-            if attempt < max_retries:
-                wait_time = retry_delay * (2**attempt)
-                logger.warning(
-                    f"API call raised exception: {e}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
-                )
-                time.sleep(wait_time)
-                continue
-
-            # If all retries failed with exception
-            logger.error(f"Error in broker_module.place_smartorder_api after retries: {e}")
-            traceback.print_exc()
-            error_response = {
-                "status": "error",
-                "message": "Failed to place smart order due to internal error",
-            }
-            executor.submit(async_log_order, "placesmartorder", original_data, error_response)
-            return False, error_response, 500
+    except Exception as e:
+        # Catch exceptions during API call (e.g. network error)
+        logger.error(f"Error in broker_module.place_smartorder_api: {e}")
+        traceback.print_exc()
+        error_response = {
+            "status": "error",
+            "message": "Failed to place smart order due to internal error",
+        }
+        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+        return False, error_response, 500
 
     try:
         # Handle case where position size matches current position
