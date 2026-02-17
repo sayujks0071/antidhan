@@ -269,13 +269,20 @@ class BaseStrategy:
 
             time.sleep(60)
 
-    def execute_trade(self, action, quantity, price=None, urgency="MEDIUM"):
+    def execute_trade(self, action, quantity=None, price=None, urgency="MEDIUM"):
         """
         Execute a trade using SmartOrder and update PositionManager.
+        defaults quantity to adaptive sizing based on monthly ATR if None.
         """
         if not self.smart_order or not self.pm:
             self.logger.warning("SmartOrder or PositionManager not initialized. Cannot execute trade.")
             return None
+
+        # Calculate adaptive quantity if not provided
+        if quantity is None:
+            calc_price = price if price else self.get_current_price()
+            # If get_current_price returns None, default to 0 (PositionManager handles 0 gracefully or returns 0 qty)
+            quantity = self.get_adaptive_quantity(calc_price if calc_price else 0)
 
         self.logger.info(f"Executing {action} {quantity} {self.symbol} @ {price or 'MKT'}")
 
@@ -309,11 +316,11 @@ class BaseStrategy:
             self.logger.error("Trade execution failed (no response from API)")
             return None
 
-    def buy(self, quantity, price=None, urgency="MEDIUM"):
+    def buy(self, quantity=None, price=None, urgency="MEDIUM"):
         """Convenience wrapper for BUY trade."""
         return self.execute_trade("BUY", quantity, price, urgency)
 
-    def sell(self, quantity, price=None, urgency="MEDIUM"):
+    def sell(self, quantity=None, price=None, urgency="MEDIUM"):
         """Convenience wrapper for SELL trade."""
         return self.execute_trade("SELL", quantity, price, urgency)
 

@@ -59,7 +59,8 @@ def parse_logs():
     # Convert dates
     for col in ['entry_time', 'exit_time']:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col])
+            # Use mixed format to handle both YYYY-MM-DD HH:MM:SS and ISO format
+            df[col] = pd.to_datetime(df[col], format='mixed', errors='coerce')
 
     return df
 
