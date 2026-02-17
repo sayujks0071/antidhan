@@ -1,65 +1,84 @@
-import sys
-import os
 import unittest
 from unittest.mock import MagicMock, patch
 import httpx
 import time
+import sys
+import os
 
-# Add path
-current_dir = os.getcwd()
-sys.path.insert(0, os.path.join(current_dir, "openalgo"))
+# Ensure openalgo is in path
+sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
 
-from utils.httpx_client import request, cleanup_httpx_client
+from openalgo.utils.httpx_client import retry_with_backoff
 
 class TestHttpxRetry(unittest.TestCase):
-    def setUp(self):
-        cleanup_httpx_client()
+    def test_retry_on_status_code(self):
+        # Mock a function that returns a 500 response twice, then a 200 response
+        mock_func = MagicMock()
+        response_500 = httpx.Response(500)
+        response_200 = httpx.Response(200)
+        mock_func.side_effect = [response_500, response_500, response_200]
 
-    @patch('httpx.Client.request')
-    def test_retry_on_500(self, mock_request):
-        print("Testing retry on 500...")
-        # Fail twice with 500, succeed on 3rd
-        response_500 = httpx.Response(500, request=httpx.Request("GET", "http://test.com"))
-        response_200 = httpx.Response(200, request=httpx.Request("GET", "http://test.com"))
+        @retry_with_backoff(max_retries=3, backoff_factor=0.01)
+        def decorated_func():
+            return mock_func()
 
-        mock_request.side_effect = [response_500, response_500, response_200]
+        result = decorated_func()
 
-        # Call request with fast backoff for test
-        response = request("GET", "http://test.com", max_retries=3, backoff_factor=0.01)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(mock_func.call_count, 3)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(mock_request.call_count, 3)
-        print("✅ Retry on 500: Passed")
+    def test_retry_exhausted(self):
+        # Mock a function that always returns 500
+        mock_func = MagicMock()
+        response_500 = httpx.Response(500)
+        mock_func.return_value = response_500
 
-    @patch('httpx.Client.request')
-    def test_retry_on_timeout(self, mock_request):
-        print("Testing retry on Timeout...")
-        # Fail twice with Timeout, succeed on 3rd
-        # httpx.RequestError covers TimeoutException
-        mock_request.side_effect = [
-            httpx.ReadTimeout("Timeout", request=httpx.Request("GET", "http://test.com")),
-            httpx.ReadTimeout("Timeout", request=httpx.Request("GET", "http://test.com")),
-            httpx.Response(200, request=httpx.Request("GET", "http://test.com"))
-        ]
+        @retry_with_backoff(max_retries=2, backoff_factor=0.01)
+        def decorated_func():
+            return mock_func()
 
-        response = request("GET", "http://test.com", max_retries=3, backoff_factor=0.01)
+        result = decorated_func()
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(mock_request.call_count, 3)
-        print("✅ Retry on Timeout: Passed")
+        self.assertEqual(result.status_code, 500)
+        self.assertEqual(mock_func.call_count, 3) # Initial + 2 retries
 
-    @patch('httpx.Client.request')
-    def test_failure_after_retries(self, mock_request):
-        print("Testing failure after retries...")
-        # Fail always
-        response_500 = httpx.Response(500, request=httpx.Request("GET", "http://test.com"))
-        mock_request.return_value = response_500
+    def test_retry_on_exception(self):
+        # Mock a function that raises an exception twice, then returns success
+        mock_func = MagicMock()
+        mock_func.side_effect = [httpx.RequestError("Error"), httpx.RequestError("Error"), "Success"]
 
-        response = request("GET", "http://test.com", max_retries=2, backoff_factor=0.01)
+        @retry_with_backoff(max_retries=3, backoff_factor=0.01)
+        def decorated_func():
+            return mock_func()
 
-        self.assertEqual(response.status_code, 500)
-        self.assertEqual(mock_request.call_count, 3) # Initial + 2 retries
-        print("✅ Failure after retries: Passed")
+        result = decorated_func()
+
+        self.assertEqual(result, "Success")
+        self.assertEqual(mock_func.call_count, 3)
+
+    @patch('openalgo.utils.httpx_client.time.sleep')
+    def test_retry_after_header(self, mock_sleep):
+        # Mock a function that returns 429 with Retry-After header
+        mock_func = MagicMock()
+        response_429 = httpx.Response(429, headers={'Retry-After': '2'})
+        response_200 = httpx.Response(200)
+        mock_func.side_effect = [response_429, response_200]
+
+        @retry_with_backoff(max_retries=3, backoff_factor=0.01)
+        def decorated_func():
+            return mock_func()
+
+        result = decorated_func()
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(mock_func.call_count, 2)
+
+        # Verify sleep was called with at least 2 seconds (Retry-After)
+        # Note: The code logic does max(backoff, retry_after)
+        # 1st retry: backoff = 0.01 * 2^0 = 0.01. Retry-After = 2. Sleep = 2.
+        args, _ = mock_sleep.call_args
+        self.assertGreaterEqual(args[0], 2.0)
 
 if __name__ == '__main__':
     unittest.main()

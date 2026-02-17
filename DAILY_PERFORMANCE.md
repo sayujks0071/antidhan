@@ -358,3 +358,25 @@ Due to sandbox environment limitations preventing live market access, this audit
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` wrapper in `utils/httpx_client.py` using `tests/test_httpx_retry_verification.py`.
 - **Result**: Confirmed `httpx_client` correctly handles 500 (Server Error) and 429 (Rate Limit) responses, respecting `Retry-After` headers, and retries on connection timeouts.
+
+## Market-Hours Audit (2026-02-18) - Simulated/Fixes
+
+### Latency Audit
+- **Method**: Attempted live audit via `scripts/market_hours_audit.py`.
+- **Result**: Live logs unavailable (DB not accessible in current environment).
+- **Status**: Not Performed.
+
+### Logic Verification
+- **Strategy**: `SuperTrendVWAPStrategy` (`openalgo/strategies/scripts/supertrend_vwap_strategy.py`)
+- **Verification**: Created `scripts/verify_strategy_logic.py` to test signal generation logic.
+- **Result**: FAILED initially due to `NameError` (undefined `last` variable in `generate_signal`).
+- **Fix**: Corrected the code to define `last` before usage.
+- **Re-Verification**: Signal Validated: YES (Mathematically Accurate).
+
+### Slippage Check
+- **Result**: Cannot calculate slippage without live execution logs.
+
+### Error Handling
+- **Status**: Enhanced `Retry-with-Backoff` wrapper in `openalgo/utils/httpx_client.py`.
+- **Action**: Updated `retry_with_backoff` decorator to handle HTTP status codes (429, 500-504) and respect `Retry-After` headers.
+- **Verification**: Created and passed `tests/test_httpx_retry.py`.
