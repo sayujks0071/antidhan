@@ -230,17 +230,107 @@ def calculate_roc(series, period=10):
     return series.pct_change(periods=period)
 
 
+def calculate_sma(series, period=20):
+    """Calculate Simple Moving Average."""
+    return series.rolling(window=period).mean()
+
+
+def calculate_ema(series, period=20):
+    """Calculate Exponential Moving Average."""
+    return series.ewm(span=period, adjust=False).mean()
+
+
 def calculate_macd(series, fast=12, slow=26, signal=9):
     """
     Calculate MACD, Signal, Hist.
-    Returns: macd, signal, hist (all Series)
+    Returns: macd_line, signal_line, histogram
     """
     exp1 = series.ewm(span=fast, adjust=False).mean()
     exp2 = series.ewm(span=slow, adjust=False).mean()
-    macd = exp1 - exp2
-    sig = macd.ewm(span=signal, adjust=False).mean()
-    hist = macd - sig
-    return macd, sig, hist
+    macd_line = exp1 - exp2
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+    return macd_line, signal_line, histogram
+
+
+def calculate_supertrend(df, period=10, multiplier=3):
+    """
+    Calculate SuperTrend.
+    Returns: supertrend (Series), direction (Series)
+    """
+    # Calculate ATR
+    # Note: calculate_atr in this file returns Series
+    atr = calculate_atr(df, period)
+
+    # Basic Upper and Lower Bands
+    hl2 = (df['high'] + df['low']) / 2
+    basic_upperband = hl2 + (multiplier * atr)
+    basic_lowerband = hl2 - (multiplier * atr)
+
+    # SuperTrend Calculation
+    # We need to iterate because current value depends on previous close and previous band
+    # Using a loop for correctness (vectorized SuperTrend is complex/approximate)
+
+    supertrend = [0] * len(df)
+    direction = [1] * len(df)  # 1: Up, -1: Down
+
+    # Convert to arrays for speed
+    close_arr = df['close'].values
+    bu_arr = basic_upperband.values
+    bl_arr = basic_lowerband.values
+
+    # Initialize first values
+    final_upperband_val = 0
+    final_lowerband_val = 0
+
+    for i in range(1, len(df)):
+        # Upper Band Logic
+        if bu_arr[i] < final_upperband_val or close_arr[i - 1] > final_upperband_val:
+            final_upperband_val = bu_arr[i]
+        else:
+            final_upperband_val = final_upperband_val  # Unchanged
+
+        # Lower Band Logic
+        if bl_arr[i] > final_lowerband_val or close_arr[i - 1] < final_lowerband_val:
+            final_lowerband_val = bl_arr[i]
+        else:
+            final_lowerband_val = final_lowerband_val
+
+        # Trend Direction
+        # If previous trend was UP (1)
+        if direction[i - 1] == 1:
+            if close_arr[i] <= final_lowerband_val:
+                direction[i] = -1
+                supertrend[i] = final_upperband_val
+            else:
+                direction[i] = 1
+                supertrend[i] = final_lowerband_val
+        else:  # Previous trend was DOWN (-1)
+            if close_arr[i] >= final_upperband_val:
+                direction[i] = 1
+                supertrend[i] = final_lowerband_val
+            else:
+                direction[i] = -1
+                supertrend[i] = final_upperband_val
+
+    return pd.Series(supertrend, index=df.index), pd.Series(direction, index=df.index)
+
+
+def calculate_relative_strength(df, index_df, window=10):
+    """
+    Calculate Relative Strength vs Index.
+    Returns: float (Current Stock ROC - Current Index ROC)
+    """
+    if index_df.empty:
+        return 0.0
+    try:
+        # Calculate ROC for both
+        stock_roc = df['close'].pct_change(periods=window).iloc[-1]
+        index_roc = index_df['close'].pct_change(periods=window).iloc[-1]
+        return stock_roc - index_roc
+    except Exception as e:
+        logger.error(f"Relative Strength calculation failed: {e}")
+        return 0.0
 
 
 def calculate_vix_volatility_multiplier(vix, thresholds=None):
@@ -881,120 +971,6 @@ class APIClient:
         return None
 
 
-def calculate_supertrend(df, period=10, multiplier=3):
-    """
-    Calculate SuperTrend.
-    Returns: supertrend (Series), direction (Series)
-    """
-    # Calculate ATR
-    # Note: calculate_atr in this file returns Series
-    atr = calculate_atr(df, period)
-
-    # Basic Upper and Lower Bands
-    hl2 = (df['high'] + df['low']) / 2
-    basic_upperband = hl2 + (multiplier * atr)
-    basic_lowerband = hl2 - (multiplier * atr)
-
-    # SuperTrend Calculation
-    # We need to iterate because current value depends on previous close and previous band
-    # Using a loop for correctness (vectorized SuperTrend is complex/approximate)
-
-    supertrend = [0] * len(df)
-    direction = [1] * len(df)  # 1: Up, -1: Down
-
-    # Convert to arrays for speed
-    close_arr = df['close'].values
-    bu_arr = basic_upperband.values
-    bl_arr = basic_lowerband.values
-
-    # Initialize first values
-    final_upperband_val = 0
-    final_lowerband_val = 0
-
-    for i in range(1, len(df)):
-        # Upper Band Logic
-        if bu_arr[i] < final_upperband_val or close_arr[i - 1] > final_upperband_val:
-            final_upperband_val = bu_arr[i]
-        else:
-            final_upperband_val = final_upperband_val  # Unchanged
-
-        # Lower Band Logic
-        if bl_arr[i] > final_lowerband_val or close_arr[i - 1] < final_lowerband_val:
-            final_lowerband_val = bl_arr[i]
-        else:
-            final_lowerband_val = final_lowerband_val
-
-        # Trend Direction
-        # If previous trend was UP (1)
-        if direction[i - 1] == 1:
-            if close_arr[i] <= final_lowerband_val:
-                direction[i] = -1
-                supertrend[i] = final_upperband_val
-            else:
-                direction[i] = 1
-                supertrend[i] = final_lowerband_val
-        else:  # Previous trend was DOWN (-1)
-            if close_arr[i] >= final_upperband_val:
-                direction[i] = 1
-                supertrend[i] = final_lowerband_val
-            else:
-                direction[i] = -1
-                supertrend[i] = final_upperband_val
-
-    return pd.Series(supertrend, index=df.index), pd.Series(direction, index=df.index)
-
-
-def calculate_sma(series, period=20):
-    """Calculate Simple Moving Average."""
-    return series.rolling(window=period).mean()
-
-
-def calculate_ema(series, period=20):
-    """Calculate Exponential Moving Average."""
-    return series.ewm(span=period, adjust=False).mean()
-
-
-def calculate_macd(series, fast=12, slow=26, signal=9):
-    """
-    Calculate MACD, Signal, Hist.
-    Returns: macd, signal, hist (all Series)
-    """
-    exp1 = series.ewm(span=fast, adjust=False).mean()
-    exp2 = series.ewm(span=slow, adjust=False).mean()
-    macd = exp1 - exp2
-    signal_line = macd.ewm(span=signal, adjust=False).mean()
-    hist = macd - signal_line
-    return macd, signal_line, hist
-
-
-def calculate_relative_strength(df, index_df, window=10):
-    """
-    Calculate Relative Strength vs Index.
-    Returns: float (Current Stock ROC - Current Index ROC)
-    """
-    if index_df.empty:
-        return 0.0
-    try:
-        # Calculate ROC for both
-        stock_roc = df['close'].pct_change(periods=window).iloc[-1]
-        index_roc = index_df['close'].pct_change(periods=window).iloc[-1]
-        return stock_roc - index_roc
-    except Exception as e:
-        logger.error(f"Relative Strength calculation failed: {e}")
-        return 0.0
-
-
-def calculate_macd(series, fast=12, slow=26, signal=9):
-    """
-    Calculate MACD, Signal, Hist.
-    Returns: macd_line, signal_line, histogram
-    """
-    exp1 = series.ewm(span=fast, adjust=False).mean()
-    exp2 = series.ewm(span=slow, adjust=False).mean()
-    macd_line = exp1 - exp2
-    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
-    histogram = macd_line - signal_line
-    return macd_line, signal_line, histogram
 
 
 def safe_float(value, default=0.0):
