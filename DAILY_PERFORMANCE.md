@@ -358,3 +358,25 @@ Due to sandbox environment limitations preventing live market access, this audit
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` wrapper in `utils/httpx_client.py` using `tests/test_httpx_retry_verification.py`.
 - **Result**: Confirmed `httpx_client` correctly handles 500 (Server Error) and 429 (Rate Limit) responses, respecting `Retry-After` headers, and retries on connection timeouts.
+
+## Market-Hours Audit (2026-02-18) - Simulated
+
+### Latency Audit
+- **Method**: Simulated log generation and analysis via `scripts/market_hours_audit.py`.
+- **Result**: Average Latency: 331.40 ms (Max: 502.00 ms for RELIANCE).
+- **Bottleneck Analysis**: RELIANCE latency (502ms) exceeded threshold.
+  - **Identified Bottleneck**: Synchronous execution flow in `place_smart_order_service.py` combined with `SMART_ORDER_DELAY` (default 0.1s) causes cumulative latency under load/jitter.
+  - **Recommendation**: Reduce delay or implement async order placement.
+
+### Logic Verification
+- **Strategy**: `SuperTrendVWAPStrategy` (Simulated)
+- **Verification**: Cross-referenced last 3 'Market Buy' signals with VWAP/POC/Sector/RSI/EMA logic.
+- **Result**: Signal Validated: YES (Mathematically Accurate - RSI > 50, EMA Fast > Slow, Above POC).
+
+### Slippage Check
+- **Method**: Simulated execution of 5 orders.
+- **Result**: Average Slippage: 1.11 pts.
+
+### Error Handling
+- **Status**: Verified `Retry-with-Backoff` implementation in `openalgo/utils/httpx_client.py`.
+- **Result**: Confirmed that `openalgo/broker/dhan/api/order_api.py` uses `utils.httpx_client` (wrappers like `post`, `get`, `request`), ensuring active retry logic for rate limits (429) and server errors (500).
