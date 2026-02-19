@@ -26,7 +26,7 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Smart order delay
-SMART_ORDER_DELAY = os.getenv("SMART_ORDER_DELAY", "0.1")  # Default value, can be overridden by environment variable
+SMART_ORDER_DELAY = os.getenv("SMART_ORDER_DELAY", "0")  # Default value, can be overridden by environment variable
 
 
 def emit_analyzer_error(request_data: dict[str, Any], error_message: str) -> dict[str, Any]:
@@ -325,17 +325,18 @@ def place_smart_order_with_auth(
                 error_response = {"status": "error", "message": message}
                 executor.submit(async_log_order, "placesmartorder", original_data, error_response)
 
-            # Map specific broker errors to appropriate HTTP status codes
-            status_code = 200  # Default to 200 for business logic rejection
-            if "Invalid Token" in message:
-                status_code = 401
-            elif "SecurityId Required" in message:
-                status_code = 400
+                # Map specific broker errors to appropriate HTTP status codes
+                status_code = 200  # Default to 200 for business logic rejection
+                if "Invalid Token" in message:
+                    status_code = 401
+                elif "SecurityId Required" in message:
+                    status_code = 400
 
                 # Determine status code - if it was a rejection, maybe return 400 or keep 200 with success=False
                 # Returning 200 with success=False is consistent with HTTP level success but business failure
-            return False, error_response, status_code
+                return False, error_response, status_code
 
+            # Correctly handle successful order placement
             order_response_data = {"status": "success", "orderid": order_id}
             executor.submit(
                 async_log_order, "placesmartorder", order_request_data, order_response_data
