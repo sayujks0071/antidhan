@@ -42,6 +42,7 @@ try:
         calculate_supertrend,
         is_market_open,
         normalize_symbol,
+        calculate_vix_volatility_multiplier,
     )
 except ImportError:
     # Fallback to absolute import or direct import (for script mode)
@@ -65,6 +66,7 @@ except ImportError:
             calculate_supertrend,
             is_market_open,
             normalize_symbol,
+            calculate_vix_volatility_multiplier,
         )
     except ImportError:
         # If running from a script that didn't set path correctly
@@ -88,6 +90,7 @@ except ImportError:
             calculate_supertrend,
             is_market_open,
             normalize_symbol,
+            calculate_vix_volatility_multiplier,
         )
 
 class BaseStrategy:
@@ -248,6 +251,10 @@ class BaseStrategy:
             fh.setFormatter(formatter)
             self.logger.addHandler(fh)
 
+    def check_market_open(self):
+        """Check if market is open."""
+        return is_market_open(self.exchange.split('_')[0])
+
     def run(self):
         """
         Main execution loop.
@@ -257,7 +264,7 @@ class BaseStrategy:
         while True:
             try:
                 # Use split to handle NSE_INDEX -> NSE
-                if not self.ignore_time and not is_market_open(self.exchange.split('_')[0]):
+                if not self.ignore_time and not self.check_market_open():
                     self.logger.info("Market closed. Sleeping...")
                     time.sleep(60)
                     continue
@@ -379,6 +386,22 @@ class BaseStrategy:
             self.logger.error(f"Failed to fetch history for {target_symbol}: {e}")
             return pd.DataFrame()
 
+    def fetch_and_prepare_data(self, days=30, min_rows=50, exchange=None):
+        """
+        Fetch history with automatic exchange detection and validation.
+        """
+        # Determine exchange if not provided
+        if not exchange:
+            exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper() else "NSE"
+
+        df = self.fetch_history(days=days, exchange=exchange)
+
+        if df.empty or len(df) < min_rows:
+            self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows. Need at least {min_rows}.")
+            return None
+
+        return df
+
     def get_vix(self):
         """Fetch real VIX or default to 15.0."""
         try:
@@ -396,6 +419,10 @@ class BaseStrategy:
         except Exception as e:
             self.logger.warning(f"Could not fetch VIX: {e}. Defaulting to 15.0.")
         return 15.0
+
+    def calculate_vix_volatility_multiplier(self, vix):
+        """Calculate VIX-based volatility multiplier."""
+        return calculate_vix_volatility_multiplier(vix)
 
     def calculate_rsi(self, series, period=14):
         """Calculate Relative Strength Index."""
