@@ -3,7 +3,7 @@ import logging
 import os
 import time
 import time as time_module
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import time as dt_time
 from functools import lru_cache
 from pathlib import Path
@@ -393,12 +393,46 @@ class PositionManager:
 
         return int(qty)
 
-    def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price):
+    def get_monthly_atr(self, client, exchange="NSE"):
+        """Fetch Monthly ATR using client history."""
+        try:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=60)  # Enough for 14 period
+
+            df = client.history(
+                symbol=self.symbol,
+                exchange=exchange,
+                interval="D",
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d"),
+            )
+
+            if not df.empty and len(df) > 15:
+                # Use shared function
+                atrs = calculate_atr(df, period=14)
+                return atrs.iloc[-1]
+        except Exception as e:
+            logger.warning(f"Failed to fetch Monthly ATR for {self.symbol}: {e}")
+        return None
+
+    def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price, client=None, exchange="NSE"):
         """
         Calculate position size based on ATR (Legacy/Intraday).
+        If client is provided, attempts to fetch Monthly ATR for robustness.
         Delegates to calculate_risk_adjusted_quantity.
         """
-        qty = self.calculate_risk_adjusted_quantity(capital, risk_per_trade_pct, atr, price)
+        volatility = atr
+        if client:
+            monthly_atr = self.get_monthly_atr(client, exchange)
+            if monthly_atr and monthly_atr > 0:
+                volatility = monthly_atr
+                logger.info(
+                    f"Using Monthly ATR ({monthly_atr:.2f}) instead of Intraday ATR ({atr:.2f})"
+                )
+
+        qty = self.calculate_risk_adjusted_quantity(
+            capital, risk_per_trade_pct, volatility, price
+        )
         return qty
 
     def calculate_adaptive_quantity_monthly_atr(self, capital, risk_per_trade_pct, monthly_atr, price):
