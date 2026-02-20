@@ -110,45 +110,21 @@ class NSERsiMacdStrategy(BaseStrategy):
 
         # Calculate Indicators
         try:
+            df = df.copy() # Operate on a copy to avoid SettingWithCopyWarning
             df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
             macd, signal_line, _ = self.calculate_macd(df['close'], fast=self.macd_fast, slow=self.macd_slow, signal=self.macd_signal)
             df['macd'] = macd
             df['signal'] = signal_line
             df['adx'] = self.calculate_adx_series(df, period=self.adx_period)
-        except:
-             return 'HOLD', 0.0, {}
+        except Exception as e:
+             # In backtesting, we might want to log this or just return HOLD
+             return 'HOLD', 0.0, {'error': str(e)}
 
-    def check_signals(self, df):
         last = df.iloc[-1]
         prev = df.iloc[-2]
-        current_price = last['close']
-        current_rsi = last['rsi']
-        current_macd = last['macd']
-        current_signal = last['signal']
 
-        self.logger.info(f"Price: {current_price}, RSI: {current_rsi:.2f}, MACD: {current_macd:.2f}, Signal: {current_signal:.2f}")
-
-        # Position management
-        if self.pm and self.pm.has_position():
-            # Exit logic: MACD Crosses Below Signal OR RSI > 70
-            bearish_crossover = (prev['macd'] >= prev['signal']) and (last['macd'] < last['signal'])
-
-            if bearish_crossover or current_rsi > 70:
-                reason = "MACD Cross Under" if bearish_crossover else "RSI Overbought"
-                self.logger.info(f"Exiting position. Reason: {reason}")
-                self.sell(abs(self.pm.position), current_price)
-        else:
-            # Entry logic: Buy if MACD Crosses Above Signal AND RSI > 50
-            bullish_crossover = (prev['macd'] <= prev['signal']) and (last['macd'] > last['signal'])
-
-            if bullish_crossover and current_rsi > 50:
-                qty = self.get_adaptive_quantity(current_price)
-                self.logger.info(f"Entry signal detected (Bullish Trend). Buying {qty} at {current_price}")
-                self.buy(qty, current_price)
-
-    def get_signal(self, df):
-        """Backtesting signal generation"""
-        if df.empty or len(df) < max(self.macd_slow, self.rsi_period) + 5:
+        # Use safe access or default values if indicators are NaN (e.g. at start of DF)
+        if pd.isna(last['macd']) or pd.isna(prev['macd']):
             return 'HOLD', 0.0, {}
 
         bullish_crossover = (prev['macd'] <= prev['signal']) and (last['macd'] > last['signal'])
@@ -161,9 +137,11 @@ class NSERsiMacdStrategy(BaseStrategy):
             'adx': last['adx']
         }
 
+        # Logic: Buy if MACD Crosses Above Signal AND RSI > 50 AND ADX > 25
         if bullish_crossover and last['rsi'] > 50 and last['adx'] > self.adx_threshold:
             return 'BUY', 1.0, details
 
+        # Logic: Sell if MACD Crosses Below Signal OR RSI > 70
         if bearish_crossover or last['rsi'] > 70:
             return 'SELL', 1.0, details
 

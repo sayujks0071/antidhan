@@ -6,23 +6,12 @@ def transform_data(data, token):
     """
     Transforms the OpenAlgo API request structure to Dhan v2 API structure.
 
-    Parameters required by Dhan v2:
-    - dhanClientId (required): string
-    - correlationId: string
-    - transactionType (required): BUY/SELL
-    - exchangeSegment (required): Exchange segment enum
-    - productType (required): Product type enum
-    - orderType (required): Order type enum
-    - validity (required): DAY/IOC
-    - securityId (required): string
-    - quantity (required): int
-    - disclosedQuantity: int
-    - price (required): float
-    - triggerPrice: float (required for SL orders)
-    - afterMarketOrder: boolean
-    - amoTime: string (OPEN/OPEN_30/OPEN_60)
-    - boProfitValue: float
-    - boStopLossValue: float
+    Args:
+        data (dict): OpenAlgo order parameters.
+        token (str): Security ID (Token) for the instrument.
+
+    Returns:
+        dict: The payload formatted for Dhan v2 API.
     """
     # Basic mapping
     transformed = {
