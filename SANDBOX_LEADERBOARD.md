@@ -1,13 +1,12 @@
-# SANDBOX LEADERBOARD (2026-02-14)
+# SANDBOX LEADERBOARD (2026-02-17)
 
 | Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |
 |------|----------|---------------|--------------|----------|--------------|
-| 1 | AdvancedMLMomentum | 1.66 | -241.00 | 60.0% | 5 |
-| 2 | SuperTrendVWAP | 0.91 | -489.00 | 50.0% | 10 |
-| 3 | GapFadeStrategy | 0.35 | -895.00 | 30.0% | 10 |
+| 1 | NSE_RSI_MACD_Strategy | 0.00 | 65.00 | 0.0% | 3 |
 
-## Improvement Suggestions
+## Analysis & Improvements
 
-### GapFadeStrategy
-- **Win Rate**: 30.0% (< 40%)
-- **Suggestion**: Logic Error: Uses `df.iloc[-1]` for `prev_close` which is likely Today's Close during market hours, resulting in 0 gap. Also, fixed 0.5% SL is too tight. Recommending ATR-based SL and explicit date check for Previous Close.
+### NSE_RSI_MACD_Strategy
+- **Win Rate**: 0.0% (< 40%)
+- **Analysis**: Basic MACD crossover in choppy markets generates false signals. RSI alone is insufficient filter.
+- **Improvement**: Add ADX Filter (ADX > 25) to ensure trend strength and inherit from BaseStrategy for robust execution.
