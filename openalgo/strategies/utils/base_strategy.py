@@ -343,26 +343,61 @@ class BaseStrategy:
 
     def fetch_history(self, days=5, symbol=None, exchange=None, interval=None):
         """
-        Fetch historical data with robust error handling.
+        Fetch historical data with optimized caching.
+
+        Splits the request into:
+        1. Historical Data (up to yesterday): Leverages APIClient's FileCache (static data).
+        2. Intraday Data (today): Fetches live data (dynamic).
+
+        This prevents fetching the entire dataset repeatedly, significantly reducing API load.
         """
         target_symbol = symbol or self.symbol
         target_exchange = exchange or self.exchange
         target_interval = interval or self.interval
 
-        start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-        end_date = datetime.now().strftime("%Y-%m-%d")
+        # Split into Historical (up to yesterday) and Intraday (today)
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
+        start_date_obj = today - timedelta(days=days)
+
+        start_date_str = start_date_obj.strftime("%Y-%m-%d")
+        yesterday_str = yesterday.strftime("%Y-%m-%d")
+        today_str = today.strftime("%Y-%m-%d")
 
         try:
-            df = self.client.history(
+            dfs = []
+
+            # 1. Fetch Historical (Cached)
+            # Only if start_date is before today
+            if start_date_obj < today:
+                # Use yesterday as end_date for cacheable history
+                # Ensure we don't fetch if start > yesterday (which is impossible if start < today, unless start=today)
+                if start_date_obj <= yesterday:
+                    df_hist = self.client.history(
+                        symbol=target_symbol,
+                        interval=target_interval,
+                        exchange=target_exchange,
+                        start_date=start_date_str,
+                        end_date=yesterday_str
+                    )
+                    if not df_hist.empty:
+                        dfs.append(df_hist)
+
+            # 2. Fetch Intraday (Live)
+            df_today = self.client.history(
                 symbol=target_symbol,
                 interval=target_interval,
                 exchange=target_exchange,
-                start_date=start_date,
-                end_date=end_date
+                start_date=today_str,
+                end_date=today_str
             )
+            if not df_today.empty:
+                dfs.append(df_today)
 
-            if df.empty:
-                return df
+            if not dfs:
+                return pd.DataFrame()
+
+            df = pd.concat(dfs)
 
             # Standardize datetime
             if "datetime" in df.columns:
@@ -372,7 +407,9 @@ class BaseStrategy:
             else:
                 df["datetime"] = pd.to_datetime(df.index)
 
-            df = df.sort_values("datetime")
+            # Deduplicate by datetime just in case of overlap
+            df = df.drop_duplicates(subset=["datetime"]).sort_values("datetime")
+
             return df
 
         except Exception as e:
