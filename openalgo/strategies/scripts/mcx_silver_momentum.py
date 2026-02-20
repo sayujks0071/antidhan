@@ -10,23 +10,8 @@ import argparse
 import pandas as pd
 import numpy as np
 
-# Add repo root to path
-try:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    strategies_dir = os.path.dirname(current_dir)
-    utils_dir = os.path.join(strategies_dir, "utils")
-    if utils_dir not in sys.path:
-        sys.path.insert(0, utils_dir)
-except Exception:
-    pass
-
-try:
-    from base_strategy import BaseStrategy
-except ImportError:
-    try:
-        from utils.base_strategy import BaseStrategy
-    except ImportError:
-        from openalgo.strategies.utils.base_strategy import BaseStrategy
+# Use strategy_preamble for standardized imports
+from strategy_preamble import BaseStrategy
 
 class MCXSilverMomentumStrategy(BaseStrategy):
     def __init__(self, *args, **kwargs):
