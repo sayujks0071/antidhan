@@ -78,7 +78,8 @@ def exit_position(reason):
 
 def on_ltp_update(data):
     """Callback for LTP updates - check SL/Target"""
-    global position_active, stop_loss, target, entry_price
+    # Note: Global variables are read-only here, so 'global' keyword is not strictly needed
+    # and causes linter warnings if not assigned.
 
     if not position_active:
         return

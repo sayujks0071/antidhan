@@ -35,6 +35,16 @@ cmptmktdata_dict = {}
 snpqtdata_dict = {}
 
 
+def send_message(message_type, payload):
+    """Placeholder for missing function"""
+    logger.error(f"send_message not implemented. Type: {message_type}, Payload: {payload}")
+
+
+def unsubscribe_update(message_type, payload):
+    """Placeholder for missing function"""
+    logger.error(f"unsubscribe_update not implemented. Type: {message_type}, Payload: {payload}")
+
+
 # WebSocket message handlers
 def on_message(ws, message):
     try:

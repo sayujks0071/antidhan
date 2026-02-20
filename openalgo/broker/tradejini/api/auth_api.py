@@ -1,6 +1,7 @@
 import json
 import os
 from urllib.parse import urlencode
+import httpx
 
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
@@ -66,7 +67,7 @@ def authenticate_broker(password=None, twofa=None, twofa_type=None):
         else:
             error_msg = response_data.get("message", "Authentication failed")
             return None, error_msg
-    except requests.exceptions.RequestException as e:
+    except httpx.RequestError as e:
         return None, f"Request failed: {str(e)}"
     except json.JSONDecodeError:
         return None, "Invalid JSON response from server"
