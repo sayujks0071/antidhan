@@ -1217,3 +1217,16 @@ def calculate_adx_di(df, period=14):
     except Exception:
         zero_series = pd.Series(0, index=df.index)
         return zero_series, zero_series, zero_series
+
+
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    """
+    Calculate MACD, Signal, Hist.
+    Returns: macd, signal, hist (all Series)
+    """
+    ema_fast = series.ewm(span=fast, adjust=False).mean()
+    ema_slow = series.ewm(span=slow, adjust=False).mean()
+    macd = ema_fast - ema_slow
+    signal_line = macd.ewm(span=signal, adjust=False).mean()
+    hist = macd - signal_line
+    return macd, signal_line, hist
