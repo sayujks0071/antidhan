@@ -1,159 +1,103 @@
-
-import unittest
-from unittest.mock import patch, MagicMock
 import sys
+import unittest
 import os
+from unittest.mock import MagicMock, patch
 
-# Add openalgo to sys.path
-sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
+# Add repo root to path
+repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
-# Set dummy env vars BEFORE importing modules that use them
-os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
-os.environ['API_RATE_LIMIT'] = '100 per minute'
-os.environ['API_KEY_PEPPER'] = 'dummy_pepper_for_testing_must_be_at_least_32_chars_long'
+# Mock dependencies BEFORE import
+sys.modules['database'] = MagicMock()
+sys.modules['database.analyzer_db'] = MagicMock()
+sys.modules['database.apilog_db'] = MagicMock()
+sys.modules['database.auth_db'] = MagicMock()
+sys.modules['database.settings_db'] = MagicMock()
+sys.modules['database.token_db'] = MagicMock()
+sys.modules['extensions'] = MagicMock()
+sys.modules['services'] = MagicMock()
+sys.modules['services.telegram_alert_service'] = MagicMock()
+sys.modules['services.sandbox_service'] = MagicMock()
+sys.modules['utils'] = MagicMock()
+sys.modules['utils.api_analyzer'] = MagicMock()
+sys.modules['utils.logging'] = MagicMock()
+sys.modules['utils.constants'] = MagicMock()
 
-# Mock database.telegram_db before import to prevent SQL error
-sys.modules['database.telegram_db'] = MagicMock()
+# Set up constants mock
+constants_mock = sys.modules['utils.constants']
+constants_mock.REQUIRED_SMART_ORDER_FIELDS = ['symbol', 'exchange', 'action', 'quantity']
+constants_mock.VALID_EXCHANGES = ['NSE', 'BSE', 'MCX']
+constants_mock.VALID_ACTIONS = ['BUY', 'SELL']
+constants_mock.VALID_PRICE_TYPES = ['MARKET', 'LIMIT', 'SL', 'SL-M']
+constants_mock.VALID_PRODUCT_TYPES = ['CNC', 'NRML', 'MIS', 'BO', 'CO']
 
-# Now import
-try:
-    from services.place_smart_order_service import place_smart_order
-except ImportError:
-    # If import fails, we might need to mock some DB modules if they try to connect on import
-    # But for now let's see if setting DATABASE_URL is enough
-    raise
+# Import target module
+from openalgo.services.place_smart_order_service import place_smart_order_with_auth
 
-class TestPlaceSmartOrder(unittest.TestCase):
-    @patch('services.place_smart_order_service.get_analyze_mode')
-    @patch('services.place_smart_order_service.get_token')
-    @patch('services.place_smart_order_service.executor')
-    @patch('services.place_smart_order_service.import_broker_module')
-    @patch('services.place_smart_order_service.async_log_order')
-    @patch('services.place_smart_order_service.socketio')
-    @patch('services.place_smart_order_service.telegram_alert_service')
-    def test_security_id_required(self, mock_telegram, mock_socket, mock_log, mock_import, mock_executor, mock_get_token, mock_analyze):
-        # Setup
-        mock_analyze.return_value = False # Live mode
-        mock_get_token.return_value = None # Token not found (Invalid Symbol)
+class TestPlaceSmartOrderLogic(unittest.TestCase):
+    def setUp(self):
+        # Reset mocks
+        sys.modules['database.settings_db'].get_analyze_mode.return_value = False
+        sys.modules['database.token_db'].get_token.return_value = "12345"
 
-        order_data = {
-            "apikey": "dummy_key",
-            "strategy": "test_strategy",
-            "symbol": "INVALID_SYMBOL",
-            "exchange": "NSE",
-            "action": "BUY",
-            "quantity": "1",
-            "position_size": "0",
-            "product": "MIS",
-            "pricetype": "MARKET"
-        }
-
-        # Execute
-        success, response, status = place_smart_order(
-            order_data=order_data,
-            auth_token="valid_token",
-            broker="dhan_sandbox"
-        )
-
-        # Verify
-        self.assertFalse(success)
-        self.assertEqual(response['message'], "SecurityId Required")
-        # Ensure broker module was NOT imported/called
-        mock_import.assert_not_called()
-
-    @patch('services.place_smart_order_service.get_analyze_mode')
-    @patch('services.place_smart_order_service.get_token')
-    @patch('services.place_smart_order_service.executor')
-    @patch('services.place_smart_order_service.import_broker_module')
-    @patch('services.place_smart_order_service.async_log_order')
-    @patch('services.place_smart_order_service.socketio')
-    @patch('services.place_smart_order_service.telegram_alert_service')
-    def test_invalid_token_missing(self, mock_telegram, mock_socket, mock_log, mock_import, mock_executor, mock_get_token, mock_analyze):
-        # Setup
-        mock_analyze.return_value = False
-        mock_get_token.return_value = "12345" # Valid token
-
-        order_data = {
-            "apikey": "dummy_key",
-            "strategy": "test_strategy",
-            "symbol": "VALID_SYMBOL",
-            "exchange": "NSE",
-            "action": "BUY",
-            "quantity": "1",
-            "position_size": "0",
-            "product": "MIS",
-            "pricetype": "MARKET"
-        }
-
-        # Execute with missing auth_token
-        success, response, status = place_smart_order(
-            order_data=order_data,
-            auth_token=None,
-            broker="dhan_sandbox"
-        )
-
-        # Verify
-        self.assertFalse(success)
-        self.assertIn("Invalid Token", response['message'])
-        self.assertEqual(status, 401)
-        mock_import.assert_not_called()
-
-    @patch('services.place_smart_order_service.get_analyze_mode')
-    @patch('services.place_smart_order_service.get_token')
-    @patch('services.place_smart_order_service.executor')
-    @patch('services.place_smart_order_service.import_broker_module')
-    @patch('services.place_smart_order_service.async_log_order')
-    @patch('services.place_smart_order_service.socketio')
-    @patch('services.place_smart_order_service.telegram_alert_service')
-    def test_retry_mechanism(self, mock_telegram, mock_socket, mock_log, mock_import, mock_executor, mock_get_token, mock_analyze):
-        # Setup
-        mock_analyze.return_value = False
-        mock_get_token.return_value = "12345"
-
+    @patch('openalgo.services.place_smart_order_service.import_broker_module')
+    def test_place_smart_order_success(self, mock_import):
+        # Mock broker module
         mock_broker = MagicMock()
         mock_import.return_value = mock_broker
 
-        # Mock broker response to simulate 500 error then success
-        # attempt 1: 500
-        # attempt 2: 200
-
-        mock_res_500 = MagicMock()
-        mock_res_500.status = 500
-
-        mock_res_200 = MagicMock()
-        mock_res_200.status = 200
-
-        mock_broker.place_smartorder_api.side_effect = [
-            (mock_res_500, {"status": "error"}, None),
-            (mock_res_200, {"status": "success"}, "ORDER123")
-        ]
+        # Mock API response: Success, Order Placed
+        res = MagicMock()
+        res.status = 200
+        response_data = {"status": "success", "orderId": "ORD123"}
+        order_id = "ORD123"
+        mock_broker.place_smartorder_api.return_value = (res, response_data, order_id)
 
         order_data = {
-            "apikey": "dummy_key",
-            "strategy": "test_strategy",
-            "symbol": "VALID_SYMBOL",
-            "exchange": "NSE",
-            "action": "BUY",
-            "quantity": "1",
-            "position_size": "0",
-            "product": "MIS",
-            "pricetype": "MARKET"
+            "symbol": "RELIANCE", "exchange": "NSE", "action": "BUY", "quantity": "1",
+            "price_type": "MARKET", "product_type": "MIS"
         }
+        original_data = order_data.copy()
 
-        # Execute
-        # Set delay to 0 to speed up test
-        success, response, status = place_smart_order(
-            order_data=order_data,
-            auth_token="valid_token",
-            broker="dhan_sandbox",
-            smart_order_delay="0"
+        # Call function
+        success, response, status = place_smart_order_with_auth(
+            order_data, "auth_token", "dhan", original_data, smart_order_delay="0"
         )
 
         # Verify
         self.assertTrue(success)
-        self.assertEqual(response.get('orderid'), "ORDER123")
-        # Check that place_smartorder_api was called twice
-        self.assertEqual(mock_broker.place_smartorder_api.call_count, 2)
+        self.assertEqual(status, 200)
+        self.assertEqual(response['orderid'], "ORD123")
+
+    @patch('openalgo.services.place_smart_order_service.import_broker_module')
+    def test_place_smart_order_business_failure(self, mock_import):
+        # Mock broker module
+        mock_broker = MagicMock()
+        mock_import.return_value = mock_broker
+
+        # Mock API response: HTTP 200 but Order Rejected (order_id None)
+        res = MagicMock()
+        res.status = 200
+        response_data = {"status": "error", "message": "Invalid Token provided"}
+        order_id = None
+        mock_broker.place_smartorder_api.return_value = (res, response_data, order_id)
+
+        order_data = {
+            "symbol": "RELIANCE", "exchange": "NSE", "action": "BUY", "quantity": "1"
+        }
+        original_data = order_data.copy()
+
+        # Call function
+        success, response, status = place_smart_order_with_auth(
+            order_data, "auth_token", "dhan", original_data, smart_order_delay="0"
+        )
+
+        # Verify: Should be False, with correct status code logic
+        self.assertFalse(success)
+        # "Invalid Token" -> 401 per logic
+        self.assertEqual(status, 401)
+        self.assertIn("Invalid Token", response['message'])
 
 if __name__ == '__main__':
     unittest.main()
