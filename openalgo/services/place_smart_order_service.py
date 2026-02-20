@@ -325,16 +325,16 @@ def place_smart_order_with_auth(
                 error_response = {"status": "error", "message": message}
                 executor.submit(async_log_order, "placesmartorder", original_data, error_response)
 
-            # Map specific broker errors to appropriate HTTP status codes
-            status_code = 200  # Default to 200 for business logic rejection
-            if "Invalid Token" in message:
-                status_code = 401
-            elif "SecurityId Required" in message:
-                status_code = 400
+                # Map specific broker errors to appropriate HTTP status codes
+                status_code = 200  # Default to 200 for business logic rejection
+                if "Invalid Token" in message:
+                    status_code = 401
+                elif "SecurityId Required" in message:
+                    status_code = 400
 
                 # Determine status code - if it was a rejection, maybe return 400 or keep 200 with success=False
                 # Returning 200 with success=False is consistent with HTTP level success but business failure
-            return False, error_response, status_code
+                return False, error_response, status_code
 
             order_response_data = {"status": "success", "orderid": order_id}
             executor.submit(
@@ -359,6 +359,7 @@ def place_smart_order_with_auth(
                     "mode": "live",
                 },
             )
+            return True, order_response_data, 200
 
     except Exception as e:
         logger.error(f"Error processing smart order response: {e}")
