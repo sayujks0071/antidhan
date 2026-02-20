@@ -1,15 +1,14 @@
 # Daily Status Report
 
-## Performance Summary
-- **Top Strategy (Alpha)**: ML_Momentum
-- **Net PnL (Sandbox)**: +22.69% (Trend Regime)
-- **Laggard Strategy**: AI_Hybrid (Deprecated to `retired/`)
+## Performance (Last 7 Days)
+*   **Net PnL**: 2800.00 (Top Strategy: AdvancedMLMomentum)
+*   **Alpha Strategy**: AdvancedMLMomentum (PF: 54.85) -> *Upgraded to V2*
+*   **Laggard Strategy**: AIHybridReversion (PF: 0.80) -> *Retired*
 
-## System Health
-- **Master Contracts**: Verified (All synced)
-- **Infrastructure**: Refactored `trading_utils.py` to include shared indicators (MFI, CCI, VW-MACD, ADX-DI) and removed duplicates.
+## Infrastructure
+*   **Total Master Contracts Synced**: 5 (Test Data)
+*   **Refactoring**: `MCX_Gold_Momentum` refactored to inherit from `BaseStrategy`, improving maintainability and reducing boilerplate.
 
-## Next Week Recommendation
-- **Focus**: Deploy `ML_Momentum_V2` (Advanced ML Momentum V2).
-- **Target Symbols**: `NIFTY` (NSE), `GOLDM` (MCX).
-- **Key Features**: New Volatility Filter, ATR Trailing Stop, and ADX Trend Confirmation.
+## Recommendations
+*   Target **AdvancedMLMomentumV2** on NIFTY/BANKNIFTY for enhanced momentum capture.
+*   Monitor V2 for Volatility Filter effectiveness (min_atr=5.0) to avoid choppy markets.
