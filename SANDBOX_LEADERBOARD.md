@@ -1,12 +1,15 @@
-# SANDBOX LEADERBOARD (2026-02-17)
+# SANDBOX LEADERBOARD (2026-02-20)
 
 | Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |
 |------|----------|---------------|--------------|----------|--------------|
-| 1 | NSE_RSI_MACD_Strategy | 0.00 | 65.00 | 0.0% | 3 |
+| 1 | SuperTrendVWAP | 1.20 | 259.00 | 60.0% | 10 |
+| 2 | AdvancedMLMomentum | 1.20 | 229.00 | 60.0% | 5 |
+| 3 | GapFadeStrategy | 0.54 | 735.00 | 30.0% | 10 |
 
 ## Analysis & Improvements
 
-### NSE_RSI_MACD_Strategy
-- **Win Rate**: 0.0% (< 40%)
-- **Analysis**: Basic MACD crossover in choppy markets generates false signals. RSI alone is insufficient filter.
-- **Improvement**: Add ADX Filter (ADX > 25) to ensure trend strength and inherit from BaseStrategy for robust execution.
+### GapFadeStrategy
+- **Win Rate**: 30.0% (< 40%)
+- **Analysis**: Fading gaps without trend confirmation often leads to losses in strong momentum markets ('Gap and Go').
+- **Improvement**: Add a 'Reversal Candle' check (e.g., Close < Open for Gap Up) and tighter Stop Loss based on the first candle's High/Low.
+- **Action**: Updated `openalgo/strategies/scripts/gap_fade_strategy.py` with ADX trend filter (< 25) and RSI confirmation (> 60 / < 40) to filter out strong trend days.
