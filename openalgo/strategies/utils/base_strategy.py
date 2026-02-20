@@ -443,7 +443,11 @@ class BaseStrategy:
     def get_monthly_atr(self, symbol=None):
         """
         Fetch daily data (30+ days) and calculate ATR for adaptive sizing.
+        Delegates to PositionManager if available to avoid code duplication.
         """
+        if self.pm and not symbol: # PositionManager handles self.symbol
+             return self.pm.get_monthly_atr(self.client, self.exchange) or 0.0
+
         try:
             target_symbol = symbol or self.symbol
             # Ensure we fetch enough data for ATR calculation (e.g. 35 days for 14 period + buffer)

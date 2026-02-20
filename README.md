@@ -166,24 +166,27 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 ## 🛡️ System Audit & Roadmap (Feb 2026)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBol**.
-  - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
+- **Cross-Strategy Correlation:** Analyzed active strategies (`AdvancedML`, `SuperTrendVWAP`, `MCXMomentum`, `NSERsiBol`, `NSERsiMacd`).
+  - **Alert:** High correlation (> 0.7) detected between:
+    - `MCXMomentum` <-> `NSERsiBol` (0.80)
+    - `NSERsiBol` <-> `NSERsiMacd` (0.87)
+    - `NSERsiMacd` <-> `SuperTrendVWAP` (0.88)
+  - **Action:** Retired `NSERsiBol` (moved to `archive/`) due to high correlation and lower risk-adjusted returns compared to `MCXMomentum` and `NSERsiMacd`.
 - **Equity Curve Stress Test:**
-  - **Total Return (Simulated):** ~831.35 (on 4M portfolio)
-  - **Worst Day:** 2026-02-06 (PnL: +35.86) - Simulated environment showed consistent positive expectancy.
-  - **Max Drawdown:** -0.01%
-  - **Top Performer:** NSERsiBol (83.33% Win Rate, Profit Factor 5.21)
+  - **Worst Day:** 2026-02-14 (PnL: -63.59)
+  - **Root Cause:** Systemic failure across multiple strategies (`MCXMomentum`, `AdvancedML`) during the first hour of trading, likely due to unhandled Gap Opening volatility.
+  - **Action Item:** Implement a "No Trade Zone" for the first 15 minutes or enhance Gap logic.
 - **Infrastructure Upgrades:**
-  - **Optimization:** Optimized `BaseStrategy.get_monthly_atr` to use cached historical data (yesterday's date), reducing API load.
-  - **Adaptive Sizing:** Refactored `NSERsiBolTrendStrategy` to use standardized `get_adaptive_quantity`. Enhanced `PositionManager` robustness against invalid volatility data. Optimized data fetching in `mcx_global_arbitrage_strategy`.
+  - **Adaptive Sizing:** Centralized Monthly ATR calculation in `PositionManager` and updated `BaseStrategy` to use it. This ensures all strategies inheriting from `BaseStrategy` (like `SuperTrendVWAP`) automatically use robust volatility measures for sizing.
+  - **Data Optimization:** `APIClient` caching verified; `get_batch_quotes` available for optimization.
 
 ### 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **VWAP Deviations:** Continue exploiting mean reversion around VWAP bands (as seen in `SuperTrendVWAP`).
-2.  **Volume Profile POC Shifts:** Investigate shifting Point of Control as a leading indicator for trend changes.
-3.  **Sector Rotation / Market Breadth:** Expand `NSERsiBol` logic to include broader sector rotation signals.
+1.  **Volume Profile Imbalance:** Explore using Volume Profile Value Area (VA) shifts as a confirmation filter for `SuperTrendVWAP` to reduce false positives in chop.
+2.  **Gamma Exposure (GEX):** Integrate estimated GEX levels to predict market pinning or volatility expansion days, acting as a regime filter for all strategies.
+3.  **Market Microstructure Anomalies:** Investigate order flow imbalance (via `get_depth`) at key levels to detect institutional absorption before reversals.
 
 ## 🟢 Sunday Readiness Report (Feb 15, 2026)
 
