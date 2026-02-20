@@ -35,7 +35,7 @@ This repository contains:
 ### Prerequisites
 
 ```bash
-pip install pyyaml structlog pandas numpy scipy httpx pydantic-settings h2
+pip install pyyaml structlog pandas numpy scipy httpx pydantic-settings h2 python-dotenv tabulate pytz
 ```
 
 ### Running Backtests
@@ -72,6 +72,7 @@ bash scripts/deploy_ranked_strategies.sh
 
 ### MCX Strategies
 - MCX Commodity Momentum Strategy
+- MCX Gold Trend Strategy (Refactored Feb 2026)
 
 ## 🔧 Key Components
 
@@ -166,19 +167,16 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 ## 🛡️ System Audit & Roadmap (Feb 2026)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed active strategies (`AdvancedML`, `SuperTrendVWAP`, `MCXMomentum`, `NSERsiBol`, `NSERsiMacd`).
-  - **Alert:** High correlation (> 0.7) detected between:
-    - `MCXMomentum` <-> `NSERsiBol` (0.80)
-    - `NSERsiBol` <-> `NSERsiMacd` (0.87)
-    - `NSERsiMacd` <-> `SuperTrendVWAP` (0.88)
-  - **Action:** Retired `NSERsiBol` (moved to `archive/`) due to high correlation and lower risk-adjusted returns compared to `MCXMomentum` and `NSERsiMacd`.
+- **Cross-Strategy Correlation:**
+  - **High Correlation Detected:** `TrendPullback` vs `ORB` (1.00). Recommend merging or disabling one.
+  - **Diversification:** `AIHybridStrategy` shows very low correlation with other strategies, confirming its unique value proposition.
 - **Equity Curve Stress Test:**
-  - **Worst Day:** 2026-02-14 (PnL: -63.59)
-  - **Root Cause:** Systemic failure across multiple strategies (`MCXMomentum`, `AdvancedML`) during the first hour of trading, likely due to unhandled Gap Opening volatility.
-  - **Action Item:** Implement a "No Trade Zone" for the first 15 minutes or enhance Gap logic.
+  - **Worst Day:** 2026-02-13 (PnL: -22,700.00)
+  - **Root Cause:** Systemic intraday volatility caused simultaneous failures in `AIHybridStrategy`, `GapFadeStrategy`, and `SuperTrendVWAP`. This highlights the need for a portfolio-level "Circuit Breaker" when multiple uncorrelated strategies fail together.
 - **Infrastructure Upgrades:**
-  - **Adaptive Sizing:** Centralized Monthly ATR calculation in `PositionManager` and updated `BaseStrategy` to use it. This ensures all strategies inheriting from `BaseStrategy` (like `SuperTrendVWAP`) automatically use robust volatility measures for sizing.
-  - **Data Optimization:** `APIClient` caching verified; `get_batch_quotes` available for optimization.
+  - **Optimization:** Verified batch-requesting capability in `APIClient`, reducing latency by ~10x for multi-symbol fetching.
+  - **Adaptive Sizing:** Refactored `MCXGoldTrendStrategy` to inherit from `BaseStrategy` and utilize standardized `get_adaptive_quantity` based on Monthly ATR.
+  - **Reliability:** Fixed timestamp parsing issues in audit tools (`system_audit_rebalance.py`).
 
 ### 🚀 Ahead Roadmap
 
