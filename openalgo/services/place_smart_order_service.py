@@ -332,7 +332,8 @@ def place_smart_order_with_auth(
                 elif "SecurityId Required" in message:
                     status_code = 400
 
-                # Return failure with appropriate status code
+                # Determine status code - if it was a rejection, maybe return 400 or keep 200 with success=False
+                # Returning 200 with success=False is consistent with HTTP level success but business failure
                 return False, error_response, status_code
 
             # If order_id is present, order was successful
@@ -359,6 +360,7 @@ def place_smart_order_with_auth(
                     "mode": "live",
                 },
             )
+            return True, order_response_data, 200
 
     except Exception as e:
         logger.error(f"Error processing smart order response: {e}")
