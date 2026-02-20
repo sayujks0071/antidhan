@@ -4,41 +4,21 @@ NSE RSI Bollinger Trend Strategy
 Strategy for NSE Equities using RSI and Bollinger Bands for Mean Reversion.
 Entry: Buy when Close < Lower Bollinger Band AND RSI < 30 (Oversold).
 Exit: Sell when Close > Upper Bollinger Band OR RSI > 70 (Overbought).
-Refactored to inherit from BaseStrategy (Feb 2026).
+Refactored to inherit from BaseStrategy via strategy_preamble (Feb 2026).
 """
-import os
-import sys
 import logging
-import argparse
-
-# Add project root to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, 'utils')
-if utils_dir not in sys.path:
-    sys.path.insert(0, utils_dir)
-
-try:
-    from base_strategy import BaseStrategy
-    from trading_utils import calculate_rsi, calculate_bollinger_bands, normalize_symbol
-except ImportError:
-    # Fallback if run from different context
-    sys.path.append(os.path.join(os.getcwd(), 'openalgo', 'strategies', 'utils'))
-    from base_strategy import BaseStrategy
-    from trading_utils import calculate_rsi, calculate_bollinger_bands, normalize_symbol
+from strategy_preamble import BaseStrategy
 
 class NSERsiBolTrendStrategy(BaseStrategy):
-    def __init__(self, **kwargs):
-        # Default interval to 5m if not provided
-        if 'interval' not in kwargs:
-            kwargs['interval'] = '5m'
-        super().__init__(**kwargs)
+    def setup(self):
+        """Initialize strategy-specific parameters"""
+        # Set defaults if not provided in kwargs (BaseStrategy sets kwargs as attributes before calling setup)
+        self.rsi_period = int(getattr(self, 'rsi_period', 14))
+        self.bb_period = int(getattr(self, 'bb_period', 20))
+        self.bb_std = float(getattr(self, 'bb_std', 2.0))
 
-        # Strategy parameters
-        self.rsi_period = int(kwargs.get('rsi_period', 14))
-        self.bb_period = int(kwargs.get('bb_period', 20))
-        self.bb_std = float(kwargs.get('bb_std', 2.0))
-        # BaseStrategy uses self.risk from --risk argument (default 1.0)
+        if not self.interval:
+            self.interval = '5m'
 
     @classmethod
     def add_arguments(cls, parser):
@@ -50,11 +30,6 @@ class NSERsiBolTrendStrategy(BaseStrategy):
     @classmethod
     def parse_arguments(cls, args):
         kwargs = super().parse_arguments(args)
-        if hasattr(args, 'rsi_period'): kwargs['rsi_period'] = args.rsi_period
-        if hasattr(args, 'bb_period'): kwargs['bb_period'] = args.bb_period
-        if hasattr(args, 'bb_std'): kwargs['bb_std'] = args.bb_std
-
-        # Handle port argument if present (legacy support)
         if hasattr(args, 'port') and args.port:
             kwargs['host'] = f"http://127.0.0.1:{args.port}"
         return kwargs
@@ -76,6 +51,13 @@ class NSERsiBolTrendStrategy(BaseStrategy):
 
             if df.empty or len(df) < lookback:
                 self.logger.info(f"Waiting for sufficient data ({len(df)}/{lookback})...")
+                return
+
+            # Check for new candle if strictly following cycle logic, but this strategy seems to run on every loop?
+            # BaseStrategy loop runs every 60s. We should check if candle is new to avoid duplicate signals on same candle.
+            # But the original code didn't check. I'll add it for safety if desired, or keep it as is.
+            # Adding check_new_candle is safer.
+            if not self.check_new_candle(df):
                 return
 
             # Calculate indicators
@@ -115,16 +97,17 @@ class NSERsiBolTrendStrategy(BaseStrategy):
         except Exception as e:
             self.logger.error(f"Error in strategy cycle: {e}", exc_info=True)
 
-    def calculate_signal(self, df):
+    def get_signal(self, df):
         """Calculate signal for backtesting support"""
+        # Renamed from calculate_signal to match BaseStrategy interface
         if df.empty or len(df) < max(self.rsi_period, self.bb_period) + 5:
             return 'HOLD', 0.0, {}
 
         # Calculate indicators
         # Use copies or assign to avoid warnings if df is view
         df = df.copy()
-        df['rsi'] = calculate_rsi(df['close'], period=self.rsi_period)
-        sma, upper, lower = calculate_bollinger_bands(df['close'], window=self.bb_period, num_std=self.bb_std)
+        df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
+        sma, upper, lower = self.calculate_bollinger_bands(df['close'], window=self.bb_period, num_std=self.bb_std)
         df['bb_upper'] = upper
         df['bb_lower'] = lower
 
@@ -152,37 +135,7 @@ class NSERsiBolTrendStrategy(BaseStrategy):
 
 # Backtesting support function
 def generate_signal(df, client=None, symbol=None, params=None):
-    """
-    Generate signal for backtesting.
-    """
-    strat_params = {
-        'rsi_period': 14,
-        'bb_period': 20,
-        'bb_std': 2.0
-    }
-    if params:
-        strat_params.update(params)
-
-    # Use BaseStrategy-compatible init
-    strat = NSERsiBolTrendStrategy(
-        symbol=symbol or "TEST",
-        api_key="dummy",
-        host="http://127.0.0.1:5001",
-        **strat_params
-    )
-
-    # Inject client if provided
-    if client:
-        strat.client = client
-
-    # Disable logging for backtest
-    strat.logger.handlers = []
-    strat.logger.addHandler(logging.NullHandler())
-
-    return strat.calculate_signal(df)
-
-def run_strategy():
-    NSERsiBolTrendStrategy.cli()
+    return NSERsiBolTrendStrategy.backtest_signal(df, params)
 
 if __name__ == "__main__":
-    run_strategy()
+    NSERsiBolTrendStrategy.cli()
