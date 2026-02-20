@@ -21,7 +21,8 @@ def parse_text_log(filepath):
         with open(filepath, 'r') as f:
             for line in f:
                 # Parse timestamp
-                match = re.search(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                # Supports [YYYY-MM-DD HH:MM:SS] and YYYY-MM-DD HH:MM:SS
+                match = re.search(r'\[?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]?', line)
                 if not match:
                     continue
 
@@ -31,26 +32,52 @@ def parse_text_log(filepath):
                 except ValueError:
                     continue
 
-                # Entry Logic
-                if "Buy" in line or "BUY" in line:
-                    price_match = re.search(r'Price: ([\d\.]+)', line)
-                    if price_match and not current_trade:
+                # Parse Executing line (simpler format from dummy log)
+                # [2026-02-14 10:00:00] INFO in nse_rsi_macd_strategy: Executing BUY 10 INFY @ 1500.00
+                exec_match = re.search(r'Executing (BUY|SELL) \d+ \w+ @ ([\d\.]+)', line)
+
+                if exec_match:
+                    action = exec_match.group(1)
+                    price = float(exec_match.group(2))
+
+                    if action == "BUY":
+                        # Close previous if open (simplistic assumption for now, or handle stacking)
+                        if current_trade.get('status') == 'OPEN':
+                             # Force close or ignore? Let's ignore new buy for now or treat as independent?
+                             # For simplistic leaderboard, assume 1 position at a time per log file sequence
+                             pass
+
                         current_trade = {
+                            'entry_time': dt,
+                            'entry_price': price,
+                            'direction': 'LONG',
+                            'status': 'OPEN'
+                        }
+                    elif action == "SELL":
+                        if current_trade.get('status') == 'OPEN':
+                            current_trade['exit_time'] = dt
+                            current_trade['exit_price'] = price
+                            current_trade['status'] = 'CLOSED'
+                            current_trade['pnl'] = (price - current_trade['entry_price'])
+                            trades.append(current_trade)
+                            current_trade = {}
+
+                # Legacy Logic (keep for backward compatibility if other logs use it)
+                elif "Entry signal detected" in line:
+                    price_match = re.search(r'Price: ([\d\.]+)', line)
+                    if price_match:
+                         current_trade = {
                             'entry_time': dt,
                             'entry_price': float(price_match.group(1)),
                             'direction': 'LONG',
                             'status': 'OPEN'
                         }
+                elif "Exiting position" in line:
+                     price_match = re.search(r'at ([\d\.]+)', line)
+                     if not price_match:
+                         price_match = re.search(r'Price: ([\d\.]+)', line)
 
-                # Exit Logic
-                if "Trailing Stop Hit" in line or "Exiting" in line or "Stop Loss Hit" in line:
-                    if current_trade.get('status') == 'OPEN':
-                        price_match = re.search(r'at ([\d\.]+)', line)
-                        # Sometimes price might be inferred differently
-                        if not price_match:
-                             price_match = re.search(r'Price: ([\d\.]+)', line)
-
-                        if price_match:
+                     if price_match and current_trade.get('status') == 'OPEN':
                             exit_price = float(price_match.group(1))
                             current_trade['exit_time'] = dt
                             current_trade['exit_price'] = exit_price
@@ -58,6 +85,7 @@ def parse_text_log(filepath):
                             current_trade['pnl'] = (exit_price - current_trade['entry_price'])
                             trades.append(current_trade)
                             current_trade = {}
+
     except Exception as e:
         print(f"Error parsing text log {filepath}: {e}")
 
@@ -79,7 +107,7 @@ def parse_json_log(filepath):
                              try:
                                  item['entry_time'] = datetime.strptime(item['entry_time'], "%Y-%m-%d %H:%M:%S")
                              except:
-                                 pass # Keep as string or ignore? Better to ignore if we can't parse date
+                                 pass
 
                     if 'exit_time' in item and isinstance(item['exit_time'], str):
                          try:
@@ -113,7 +141,15 @@ def scan_logs():
         # Text logs
         for filepath in glob.glob(os.path.join(log_dir, "*.log")):
             trades = parse_text_log(filepath)
-            strategy_name = os.path.basename(filepath).split('_')[0]
+            filename = os.path.basename(filepath)
+
+            # Extract strategy name: StrategyName_Date.log -> StrategyName
+            name_parts = filename.split('_')
+            if len(name_parts) > 1 and re.match(r'\d{4}-\d{2}-\d{2}', name_parts[-1].replace('.log', '')):
+                strategy_name = "_".join(name_parts[:-1])
+            else:
+                strategy_name = filename.replace('.log', '')
+
             for t in trades:
                 t['strategy'] = strategy_name
                 t['source'] = filepath
@@ -122,7 +158,6 @@ def scan_logs():
         # JSON logs
         for filepath in glob.glob(os.path.join(log_dir, "trades_*.json")):
             trades = parse_json_log(filepath)
-            # Strategy name from filename? trades_StrategyName.json
             filename = os.path.basename(filepath)
             strategy_name = filename.replace('trades_', '').replace('.json', '')
             for t in trades:
@@ -216,6 +251,9 @@ def main():
             if strategy == "GapFadeStrategy":
                 markdown_content += "- **Analysis**: Fading gaps without trend confirmation often leads to losses in strong momentum markets ('Gap and Go').\n"
                 markdown_content += "- **Improvement**: Add a 'Reversal Candle' check (e.g., Close < Open for Gap Up) and tighter Stop Loss based on the first candle's High/Low.\n"
+            elif "NSE_RSI_MACD_Strategy" in strategy:
+                markdown_content += "- **Analysis**: Basic MACD crossover in choppy markets generates false signals. RSI alone is insufficient filter.\n"
+                markdown_content += "- **Improvement**: Add ADX Filter (ADX > 25) to ensure trend strength and inherit from BaseStrategy for robust execution.\n"
             else:
                 markdown_content += "- **Suggestion**: Analyze entry conditions. Check log for rejections or stop loss tightness.\n"
 
