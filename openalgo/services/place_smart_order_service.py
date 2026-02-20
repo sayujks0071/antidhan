@@ -336,6 +336,7 @@ def place_smart_order_with_auth(
                 # Returning 200 with success=False is consistent with HTTP level success but business failure
                 return False, error_response, status_code
 
+            # If order_id is present, order was successful
             order_response_data = {"status": "success", "orderid": order_id}
             executor.submit(
                 async_log_order, "placesmartorder", order_request_data, order_response_data
