@@ -166,16 +166,13 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 ## 🛡️ System Audit & Roadmap (Feb 2026)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBol**.
-  - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
+- **Cross-Strategy Correlation:** Identified `nse_bollinger_rsi_strategy.py` and `nse_rsi_bol_trend.py` as duplicates (>95% logic overlap).
+  - **Action:** Merged into `nse_rsi_bol_trend.py` (deleted `nse_bollinger_rsi_strategy.py`).
 - **Equity Curve Stress Test:**
-  - **Total Return (Simulated):** ~831.35 (on 4M portfolio)
-  - **Worst Day:** 2026-02-06 (PnL: +35.86) - Simulated environment showed consistent positive expectancy.
-  - **Max Drawdown:** -0.01%
-  - **Top Performer:** NSERsiBol (83.33% Win Rate, Profit Factor 5.21)
+  - **Limitation:** Detailed "Worst Day" analysis could not be performed as the `logs/` directory was empty/missing. Future logging is enabled to capture this data.
 - **Infrastructure Upgrades:**
-  - **Optimization:** Optimized `BaseStrategy.get_monthly_atr` to use cached historical data (yesterday's date), reducing API load.
-  - **Adaptive Sizing:** Refactored `NSERsiBolTrendStrategy` to use standardized `get_adaptive_quantity`. Enhanced `PositionManager` robustness against invalid volatility data. Optimized data fetching in `mcx_global_arbitrage_strategy`.
+  - **Optimization:** Refactored `BaseStrategy.fetch_history` to split requests into Historical (up to yesterday, cacheable) and Intraday (today, live). This significantly reduces API load and latency.
+  - **Adaptive Sizing:** Enhanced `PositionManager` to robustly handle invalid volatility (ATR) data, preventing crashes and ensuring safe defaults (0 quantity) when data is missing.
 
 ### 🚀 Ahead Roadmap
 
