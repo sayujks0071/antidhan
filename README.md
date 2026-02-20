@@ -182,9 +182,9 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **VWAP Deviations:** Continue exploiting mean reversion around VWAP bands (as seen in `SuperTrendVWAP`).
-2.  **Volume Profile POC Shifts:** Investigate shifting Point of Control as a leading indicator for trend changes.
-3.  **Sector Rotation / Market Breadth:** Expand `NSERsiBol` logic to include broader sector rotation signals.
+1.  **Volume Profile Imbalance:** Explore using Volume Profile Value Area (VA) shifts as a confirmation filter for `SuperTrendVWAP` to reduce false positives in chop.
+2.  **Gamma Exposure (GEX):** Integrate estimated GEX levels to predict market pinning or volatility expansion days, acting as a regime filter for all strategies.
+3.  **Market Microstructure Anomalies:** Investigate order flow imbalance (via `get_depth`) at key levels to detect institutional absorption before reversals.
 
 ## 🟢 Sunday Readiness Report (Feb 15, 2026)
 
