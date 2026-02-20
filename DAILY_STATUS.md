@@ -1,4 +1,4 @@
-# DAILY STATUS REPORT
+# Daily Status Report
 
 ## Performance (Last 7 Days)
 *   **Net PnL**: 2800.00 (Top Strategy: AdvancedMLMomentum)
