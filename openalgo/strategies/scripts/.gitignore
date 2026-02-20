@@ -23,3 +23,4 @@ __pycache__/
 !nse_ma_crossover_strategy.py
 !mcx_aluminium_trend_strategy.py
 !mcx_copper_trend_strategy.py
+!vbt_backtest.py
