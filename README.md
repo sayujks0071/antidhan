@@ -35,7 +35,7 @@ This repository contains:
 ### Prerequisites
 
 ```bash
-pip install pyyaml structlog pandas numpy scipy httpx pydantic-settings h2
+pip install pyyaml structlog pandas numpy scipy httpx pydantic-settings h2 python-dotenv tabulate pytz
 ```
 
 ### Running Backtests
@@ -72,6 +72,7 @@ bash scripts/deploy_ranked_strategies.sh
 
 ### MCX Strategies
 - MCX Commodity Momentum Strategy
+- MCX Gold Trend Strategy (Refactored Feb 2026)
 
 ## 🔧 Key Components
 
@@ -166,24 +167,24 @@ We use a **multi-strategy, multi-asset** approach with broker separation:
 ## 🛡️ System Audit & Roadmap (Feb 2026)
 
 ### Audit Findings
-- **Cross-Strategy Correlation:** Analyzed **AdvancedML**, **SuperTrendVWAP**, **MCXMomentum**, and **NSERsiBol**.
-  - **Result:** No high correlation (> 70%) found among active strategies. Strategies are sufficiently diversified.
+- **Cross-Strategy Correlation:**
+  - **High Correlation Detected:** `TrendPullback` vs `ORB` (1.00). Recommend merging or disabling one.
+  - **Diversification:** `AIHybridStrategy` shows very low correlation with other strategies, confirming its unique value proposition.
 - **Equity Curve Stress Test:**
-  - **Total Return (Simulated):** ~831.35 (on 4M portfolio)
-  - **Worst Day:** 2026-02-06 (PnL: +35.86) - Simulated environment showed consistent positive expectancy.
-  - **Max Drawdown:** -0.01%
-  - **Top Performer:** NSERsiBol (83.33% Win Rate, Profit Factor 5.21)
+  - **Worst Day:** 2026-02-13 (PnL: -22,700.00)
+  - **Root Cause:** Systemic intraday volatility caused simultaneous failures in `AIHybridStrategy`, `GapFadeStrategy`, and `SuperTrendVWAP`. This highlights the need for a portfolio-level "Circuit Breaker" when multiple uncorrelated strategies fail together.
 - **Infrastructure Upgrades:**
-  - **Optimization:** Optimized `BaseStrategy.get_monthly_atr` to use cached historical data (yesterday's date), reducing API load.
-  - **Adaptive Sizing:** Refactored `NSERsiBolTrendStrategy` to use standardized `get_adaptive_quantity`. Enhanced `PositionManager` robustness against invalid volatility data. Optimized data fetching in `mcx_global_arbitrage_strategy`.
+  - **Optimization:** Verified batch-requesting capability in `APIClient`, reducing latency by ~10x for multi-symbol fetching.
+  - **Adaptive Sizing:** Refactored `MCXGoldTrendStrategy` to inherit from `BaseStrategy` and utilize standardized `get_adaptive_quantity` based on Monthly ATR.
+  - **Reliability:** Fixed timestamp parsing issues in audit tools (`system_audit_rebalance.py`).
 
 ### 🚀 Ahead Roadmap
 
 Based on the audit, the following areas are prioritized for the next iteration:
 
-1.  **VWAP Deviations:** Continue exploiting mean reversion around VWAP bands (as seen in `SuperTrendVWAP`).
-2.  **Volume Profile POC Shifts:** Investigate shifting Point of Control as a leading indicator for trend changes.
-3.  **Sector Rotation / Market Breadth:** Expand `NSERsiBol` logic to include broader sector rotation signals.
+1.  **Volume Profile Imbalance:** Explore using Volume Profile Value Area (VA) shifts as a confirmation filter for `SuperTrendVWAP` to reduce false positives in chop.
+2.  **Gamma Exposure (GEX):** Integrate estimated GEX levels to predict market pinning or volatility expansion days, acting as a regime filter for all strategies.
+3.  **Market Microstructure Anomalies:** Investigate order flow imbalance (via `get_depth`) at key levels to detect institutional absorption before reversals.
 
 ## 🟢 Sunday Readiness Report (Feb 15, 2026)
 

@@ -7,6 +7,7 @@ from flask import Blueprint, Response, jsonify, redirect, render_template, reque
 
 from database.auth_db import get_api_key_for_tradingview, get_auth_token
 from database.settings_db import get_analyze_mode
+from database.token_db import get_token
 from limiter import limiter
 from services.close_position_service import close_position
 from services.holdings_service import get_holdings
@@ -519,6 +520,24 @@ def placesmartorder():
         from database.auth_db import get_api_key_for_tradingview
 
         api_key = get_api_key_for_tradingview(login_username)
+
+        # Check if analyze mode is enabled
+        is_analyze_mode = get_analyze_mode()
+
+        # Better Error Handling: Check for Invalid Token early (if not in analyze mode)
+        if not is_analyze_mode and not auth_token:
+            logger.error("Invalid Token: Authentication token is missing or empty")
+            return jsonify({"status": "error", "message": "Invalid Token"}), 401
+
+        # Better Error Handling: Check for SecurityId Required (Token not found) early
+        symbol = data.get("symbol")
+        exchange = data.get("exchange")
+        if symbol and exchange:
+            # Check if SecurityId exists
+            token = get_token(symbol, exchange)
+            if not token:
+                logger.error(f"SecurityId Required: Token not found for {symbol} {exchange}")
+                return jsonify({"status": "error", "message": "SecurityId Required"}), 400
 
         # Delegate to service which handles:
         # 1. Validation (SecurityId Required)

@@ -59,7 +59,7 @@ def parse_logs():
     # Convert dates
     for col in ['entry_time', 'exit_time']:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col])
+            df[col] = pd.to_datetime(df[col], format='mixed', errors='coerce')
 
     return df
 

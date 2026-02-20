@@ -98,7 +98,8 @@ def get_order_book(auth):
         auth (str): Authentication token.
 
     Returns:
-        dict or list: The order book data or error response.
+        list: List of order dictionaries if successful.
+        dict: Error response if failed.
     """
     return get_api_response("/v2/orders", auth)
 
@@ -111,7 +112,8 @@ def get_trade_book(auth):
         auth (str): Authentication token.
 
     Returns:
-        dict or list: The trade book data or error response.
+        list: List of trade dictionaries if successful.
+        dict: Error response if failed.
     """
     return get_api_response("/v2/trades", auth)
 
@@ -124,7 +126,8 @@ def get_positions(auth):
         auth (str): Authentication token.
 
     Returns:
-        dict or list: The positions data or error response.
+        list: List of position dictionaries if successful.
+        dict: Error response if failed.
     """
     return get_api_response("/v2/positions", auth)
 
@@ -137,7 +140,8 @@ def get_holdings(auth):
         auth (str): Authentication token.
 
     Returns:
-        dict or list: The holdings data or error response.
+        list: List of holding dictionaries if successful.
+        dict: Error response if failed.
     """
     return get_api_response("/v2/holdings", auth)
 
