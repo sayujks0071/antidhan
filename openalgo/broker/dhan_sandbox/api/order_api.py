@@ -241,6 +241,7 @@ def place_order_api(data, auth):
 
     # 3. Automatic retry mechanism for 500-level API responses
     # Use the shared request function which includes retry logic for 500/429 errors
+    # NOTE: The 'request' utility automatically retries 500-level errors and 429s up to max_retries.
     res = request(
         "POST",
         url,
@@ -321,6 +322,13 @@ def place_smartorder_api(data, auth):
     # Extract necessary info from data
     symbol = data.get("symbol")
     exchange = data.get("exchange")
+
+    # 2. Error handling for SecurityId Required
+    token = get_token(symbol, exchange)
+    if not token:
+        logger.error(f"SecurityId Required: Token not found for {symbol} {exchange}")
+        return None, {"status": "error", "message": "SecurityId Required"}, None
+
     product = data.get("product")
     position_size = int(data.get("position_size", "0"))
 
