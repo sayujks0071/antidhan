@@ -5,24 +5,11 @@
 SuperTrend VWAP Strategy
 VWAP mean reversion with volume profile analysis, Enhanced Sector RSI Filter, and Dynamic Risk.
 """
-import os
-import sys
 import logging
 import pandas as pd
 
-# Add repo root to path to allow imports (if running as script)
-try:
-    from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
-except ImportError:
-    # Try setting path to find utils
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    strategies_dir = os.path.dirname(script_dir)
-    utils_dir = os.path.join(strategies_dir, 'utils')
-    if utils_dir not in sys.path:
-        sys.path.insert(0, utils_dir)
-    from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol, calculate_vix_volatility_multiplier
+# Simplified Import using strategy_preamble
+from strategy_preamble import BaseStrategy
 
 class SuperTrendVWAPStrategy(BaseStrategy):
     def setup(self):
@@ -38,6 +25,11 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         self.adx_threshold = getattr(self, "adx_threshold", 20)
         self.adx_period = getattr(self, "adx_period", 14)
 
+        # Risk Parameters
+        self.BREAKEVEN_TRIGGER_R = getattr(self, "BREAKEVEN_TRIGGER_R", 1.5)
+        self.ATR_SL_MULTIPLIER = getattr(self, "ATR_SL_MULTIPLIER", 3.0)
+        self.ATR_TP_MULTIPLIER = getattr(self, "ATR_TP_MULTIPLIER", 5.0)
+
         # State
         self.trailing_stop = 0.0
         self.atr = 0.0
@@ -46,12 +38,9 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         """
         Main Strategy Logic Execution Cycle
         """
-        exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper() else "NSE"
-
-        # Increased lookback to 30 days to handle weekends/data gaps better
-        df = self.fetch_history(days=30, exchange=exchange)
-        if df.empty or len(df) < 50:
-            self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows. Need at least 50.")
+        # Fetch and prepare data with automatic exchange detection
+        df = self.fetch_and_prepare_data(days=30, min_rows=50)
+        if df is None:
             return
 
         # Pre-process
@@ -75,7 +64,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Dynamic Deviation based on VIX
         vix = self.get_vix()
-        size_multiplier, dev_threshold = calculate_vix_volatility_multiplier(vix)
+        size_multiplier, dev_threshold = self.calculate_vix_volatility_multiplier(vix)
 
         # Indicators
         is_above_vwap = last['close'] > last['vwap']
@@ -110,9 +99,6 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 self.trailing_stop = 0.0
         else:
             # Entry Logic
-            # Use self.sector (managed by BaseStrategy) instead of self.sector_benchmark
-            # If self.sector is None, check_sector_correlation handles it (defaults to NIFTY BANK or passed value)
-            # BaseStrategy sets self.sector from --sector argument
             sector_bullish = self.check_sector_correlation(self.sector or "NIFTY BANK")
 
             if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
@@ -126,9 +112,10 @@ class SuperTrendVWAPStrategy(BaseStrategy):
                 self.trailing_stop = last['close'] - (sl_mult * self.atr)
 
 
-    def generate_signal(self, df):
+    def get_signal(self, df):
         """
-        Generate signal for backtesting (Legacy Support)
+        Generate signal for backtesting
+        Renamed from generate_signal to match BaseStrategy interface
         """
         if df.empty: return 'HOLD', {}, {}
         df = df.sort_index()
@@ -148,6 +135,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         dev_threshold = 0.03
 
         # Logic
+        last = df.iloc[-1]
         df['ema200'] = self.calculate_ema(df['close'], period=200)
         is_uptrend = True
         if not pd.isna(last['ema200']):
@@ -182,19 +170,8 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         return 'HOLD', 0.0, details
 
 # Module level wrapper for SimpleBacktestEngine
-def generate_signal(df, client=None, symbol=None, params=None):
-    # Pass params as kwargs to __init__ which BaseStrategy handles
-    kwargs = params or {}
-    strat = SuperTrendVWAPStrategy(symbol=symbol or "TEST", quantity=1, api_key="test", host="test", client=client, **kwargs)
-    strat.logger.handlers = []
-    strat.logger.addHandler(logging.NullHandler())
-
-    setattr(strat, 'BREAKEVEN_TRIGGER_R', 1.5)
-    setattr(strat, 'ATR_SL_MULTIPLIER', 3.0)
-    setattr(strat, 'ATR_TP_MULTIPLIER', 5.0)
-
-    action, score, details = strat.generate_signal(df)
-    return action, score, details
+# Replaced with standard BaseStrategy wrapper
+generate_signal = SuperTrendVWAPStrategy.backtest_signal
 
 if __name__ == "__main__":
     SuperTrendVWAPStrategy.cli()

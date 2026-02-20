@@ -1,14 +1,14 @@
+import hashlib
 import json
 import logging
 import os
+import pickle
 import time
 import time as time_module
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import time as dt_time
 from functools import lru_cache
 from pathlib import Path
-import pickle
-import hashlib
 
 import httpx
 import numpy as np
@@ -230,19 +230,6 @@ def calculate_roc(series, period=10):
     return series.pct_change(periods=period)
 
 
-def calculate_macd(series, fast=12, slow=26, signal=9):
-    """
-    Calculate MACD, Signal, Hist.
-    Returns: macd, signal, hist (all Series)
-    """
-    exp1 = series.ewm(span=fast, adjust=False).mean()
-    exp2 = series.ewm(span=slow, adjust=False).mean()
-    macd = exp1 - exp2
-    sig = macd.ewm(span=signal, adjust=False).mean()
-    hist = macd - sig
-    return macd, sig, hist
-
-
 def calculate_vix_volatility_multiplier(vix, thresholds=None):
     """
     Calculate dynamic volatility multiplier based on VIX.
@@ -393,12 +380,46 @@ class PositionManager:
 
         return int(qty)
 
-    def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price):
+    def get_monthly_atr(self, client, exchange="NSE"):
+        """Fetch Monthly ATR using client history."""
+        try:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=60)  # Enough for 14 period
+
+            df = client.history(
+                symbol=self.symbol,
+                exchange=exchange,
+                interval="D",
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d"),
+            )
+
+            if not df.empty and len(df) > 15:
+                # Use shared function
+                atrs = calculate_atr(df, period=14)
+                return atrs.iloc[-1]
+        except Exception as e:
+            logger.warning(f"Failed to fetch Monthly ATR for {self.symbol}: {e}")
+        return None
+
+    def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price, client=None, exchange="NSE"):
         """
         Calculate position size based on ATR (Legacy/Intraday).
+        If client is provided, attempts to fetch Monthly ATR for robustness.
         Delegates to calculate_risk_adjusted_quantity.
         """
-        qty = self.calculate_risk_adjusted_quantity(capital, risk_per_trade_pct, atr, price)
+        volatility = atr
+        if client:
+            monthly_atr = self.get_monthly_atr(client, exchange)
+            if monthly_atr and monthly_atr > 0:
+                volatility = monthly_atr
+                logger.info(
+                    f"Using Monthly ATR ({monthly_atr:.2f}) instead of Intraday ATR ({atr:.2f})"
+                )
+
+        qty = self.calculate_risk_adjusted_quantity(
+            capital, risk_per_trade_pct, volatility, price
+        )
         return qty
 
     def calculate_adaptive_quantity_monthly_atr(self, capital, risk_per_trade_pct, monthly_atr, price):
@@ -954,19 +975,6 @@ def calculate_ema(series, period=20):
     return series.ewm(span=period, adjust=False).mean()
 
 
-def calculate_macd(series, fast=12, slow=26, signal=9):
-    """
-    Calculate MACD, Signal, Hist.
-    Returns: macd, signal, hist (all Series)
-    """
-    exp1 = series.ewm(span=fast, adjust=False).mean()
-    exp2 = series.ewm(span=slow, adjust=False).mean()
-    macd = exp1 - exp2
-    signal_line = macd.ewm(span=signal, adjust=False).mean()
-    hist = macd - signal_line
-    return macd, signal_line, hist
-
-
 def calculate_relative_strength(df, index_df, window=10):
     """
     Calculate Relative Strength vs Index.
@@ -982,19 +990,6 @@ def calculate_relative_strength(df, index_df, window=10):
     except Exception as e:
         logger.error(f"Relative Strength calculation failed: {e}")
         return 0.0
-
-
-def calculate_macd(series, fast=12, slow=26, signal=9):
-    """
-    Calculate MACD, Signal, Hist.
-    Returns: macd_line, signal_line, histogram
-    """
-    exp1 = series.ewm(span=fast, adjust=False).mean()
-    exp2 = series.ewm(span=slow, adjust=False).mean()
-    macd_line = exp1 - exp2
-    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
-    histogram = macd_line - signal_line
-    return macd_line, signal_line, histogram
 
 
 def safe_float(value, default=0.0):
@@ -1150,3 +1145,75 @@ def calculate_straddle_premium(chain, atm_strike):
             break
 
     return ce_ltp + pe_ltp
+
+def calculate_mfi(df, period=14):
+    """Money Flow Index"""
+    # Requires 'high', 'low', 'close', 'volume'
+    typical_price = (df['high'] + df['low'] + df['close']) / 3
+    raw_money_flow = typical_price * df['volume']
+
+    positive_flow = np.where(typical_price > typical_price.shift(1), raw_money_flow, 0)
+    negative_flow = np.where(typical_price < typical_price.shift(1), raw_money_flow, 0)
+
+    positive_mf = pd.Series(positive_flow).rolling(period).sum()
+    negative_mf = pd.Series(negative_flow).rolling(period).sum()
+
+    mfi = 100 - (100 / (1 + (positive_mf / negative_mf)))
+    return mfi.fillna(50)
+
+
+def calculate_cci(df, period=20):
+    """Commodity Channel Index"""
+    tp = (df['high'] + df['low'] + df['close']) / 3
+    sma_tp = tp.rolling(period).mean()
+    mad_tp = tp.rolling(period).apply(lambda x: np.mean(np.abs(x - np.mean(x))), raw=True)
+    cci = (tp - sma_tp) / (0.015 * mad_tp)
+    return cci.fillna(0)
+
+
+def calculate_vwmacd(df, fast=12, slow=26, signal=9):
+    """Volume Weighted MACD (Approximation using EMA of VWAP)"""
+    vwap = (df['close'] * df['volume']).cumsum() / df['volume'].cumsum()
+
+    ema_fast = vwap.ewm(span=fast, adjust=False).mean()
+    ema_slow = vwap.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+    return macd_line, signal_line, histogram
+
+
+def calculate_adx_di(df, period=14):
+    """
+    Calculate ADX, +DI, -DI.
+    Returns: adx, plus_di, minus_di (all Series)
+    """
+    try:
+        # Cleaned up implementation to avoid SettingWithCopyWarning and potential errors
+        plus_dm = df['high'].diff()
+        minus_dm = df['low'].diff()
+
+        # Vectorized modification
+        plus_dm = np.where(plus_dm < 0, 0, plus_dm)
+        minus_dm = np.where(minus_dm > 0, 0, minus_dm)
+
+        tr1 = df['high'] - df['low']
+        tr2 = (df['high'] - df['close'].shift(1)).abs()
+        tr3 = (df['low'] - df['close'].shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+        atr = tr.rolling(period).mean()
+
+        plus_dm_series = pd.Series(plus_dm, index=df.index)
+        minus_dm_series = pd.Series(minus_dm, index=df.index)
+
+        plus_di = 100 * (plus_dm_series.ewm(alpha=1/period).mean() / atr)
+        minus_di = 100 * (minus_dm_series.abs().ewm(alpha=1/period).mean() / atr)
+
+        dx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
+        adx = dx.rolling(period).mean()
+
+        return adx.fillna(0), plus_di.fillna(0), minus_di.fillna(0)
+    except Exception:
+        zero_series = pd.Series(0, index=df.index)
+        return zero_series, zero_series, zero_series
