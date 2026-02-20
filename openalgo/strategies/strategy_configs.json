@@ -27,14 +27,14 @@
     "schedule_start": "09:00",
     "schedule_stop": "23:30"
   },
-  "MCX_NATURALGAS_BREAKOUT": {
-    "id": "MCX_NATURALGAS_BREAKOUT",
-    "name": "MCX Natural Gas Breakout",
-    "description": "Natural Gas Donchian Breakout Strategy with ADX Filter",
-    "file_path": "strategies/scripts/mcx_naturalgas_breakout_strategy.py",
+  "MCX_COPPER_TREND": {
+    "id": "MCX_COPPER_TREND",
+    "name": "MCX Copper Trend Strategy",
+    "description": "MCX Copper trend following strategy using Bollinger Bands, MACD and RSI",
+    "file_path": "strategies/scripts/mcx_copper_trend_strategy.py",
     "user_id": "system",
-    "created_at": "2026-02-18T10:00:00",
-    "underlying": "NATURALGAS",
+    "created_at": "2026-02-18T14:00:00",
+    "underlying": "COPPER",
     "schedule_enabled": true,
     "schedule_days": [
       "mon",
@@ -44,13 +44,16 @@
       "fri"
     ],
     "params": {
+      "period_rsi": 14,
+      "period_bb": 20,
+      "std_dev": 2.0,
+      "period_atr": 14,
+      "macd_fast": 12,
+      "macd_slow": 26,
+      "macd_signal": 9,
       "seasonality_score": 60,
       "global_alignment_score": 55,
-      "usd_inr_volatility": 0.5,
-      "period_donchian": 20,
-      "period_adx": 14,
-      "period_atr": 14,
-      "period_rsi": 14
+      "usd_inr_volatility": 0.5
     },
     "is_running": false,
     "is_scheduled": true,

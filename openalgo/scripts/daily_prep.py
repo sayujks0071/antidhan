@@ -13,7 +13,13 @@ import pandas as pd
 
 # Add repo root to path
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-sys.path.append(repo_root)
+if repo_root not in sys.path:
+    sys.path.append(repo_root)
+
+# Add openalgo directory to path for 'import utils'
+openalgo_dir = os.path.join(repo_root, 'openalgo')
+if openalgo_dir not in sys.path:
+    sys.path.append(openalgo_dir)
 
 from openalgo.strategies.utils.symbol_resolver import SymbolResolver
 from openalgo.strategies.utils.trading_utils import APIClient
@@ -166,6 +172,7 @@ def fetch_instruments():
             {'exchange': 'MCX', 'token': '104', 'symbol': 'SILVERM05FEB26FUT', 'name': 'SILVER', 'expiry': '2026-02-05', 'lot_size': 5, 'instrument_type': 'FUT'},
             {'exchange': 'MCX', 'token': '102', 'symbol': 'CRUDEOIL19FEB26FUT', 'name': 'CRUDEOIL', 'expiry': '2026-02-19', 'lot_size': 100, 'instrument_type': 'FUT'},
             {'exchange': 'MCX', 'token': '103', 'symbol': 'NATURALGAS24FEB26FUT', 'name': 'NATURALGAS', 'expiry': '2026-02-24', 'lot_size': 1250, 'instrument_type': 'FUT'},
+            {'exchange': 'MCX', 'token': '105', 'symbol': 'COPPERM27FEB26FUT', 'name': 'COPPER', 'expiry': '2026-02-27', 'lot_size': 2500, 'instrument_type': 'FUT'},
 
             # NSE Futures
             {'exchange': 'NFO', 'token': '7', 'symbol': 'NIFTY23OCTFUT', 'name': 'NIFTY', 'expiry': monthly_expiry.strftime('%Y-%m-%d'), 'lot_size': 50, 'instrument_type': 'FUT'},
@@ -240,12 +247,12 @@ def validate_symbols():
                 resolved_str = str(resolved)
                 valid_count += 1
 
-            print(f"{strat_id:<25} | {config.get('type'):<8} | {config.get('underlying'):<15} | {resolved_str[:30]:<30} | {status}")
+            print(f"{strat_id:<25} | {config.get('type', ''):<8} | {config.get('underlying', ''):<15} | {resolved_str[:30]:<30} | {status}")
 
         except Exception as e:
             logger.error(f"Error validating {strat_id}: {e}")
             invalid_count += 1
-            print(f"{strat_id:<25} | {config.get('type'):<8} | {config.get('underlying'):<15} | {'ERROR':<30} | 🔴 Error")
+            print(f"{strat_id:<25} | {config.get('type', ''):<8} | {config.get('underlying', ''):<15} | {'ERROR':<30} | 🔴 Error")
 
     print("-" * 95)
     if invalid_count > 0:
