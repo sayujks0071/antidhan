@@ -982,6 +982,19 @@ def calculate_ema(series, period=20):
     return series.ewm(span=period, adjust=False).mean()
 
 
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    """
+    Calculate MACD, Signal, Hist using EMA.
+    Returns: macd_line, signal_line, histogram
+    """
+    ema_fast = series.ewm(span=fast, adjust=False).mean()
+    ema_slow = series.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+    return macd_line, signal_line, histogram
+
+
 def calculate_relative_strength(df, index_df, window=10):
     """
     Calculate Relative Strength vs Index.

@@ -6,24 +6,8 @@ Entry: Buy when MACD Line crosses above Signal Line AND RSI > 50 AND ADX > 25.
 Exit: Sell when MACD Line crosses below Signal Line OR RSI > 70.
 Inherits from BaseStrategy for code reduction.
 """
-import os
-import sys
-import logging
-import pandas as pd
-
-# Add repo root to path to allow imports (if running as script)
-try:
-    from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
-except ImportError:
-    # Try setting path to find utils
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    strategies_dir = os.path.dirname(script_dir)
-    utils_dir = os.path.join(strategies_dir, 'utils')
-    if utils_dir not in sys.path:
-        sys.path.insert(0, utils_dir)
-    from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+import strategy_preamble
+from base_strategy import BaseStrategy
 
 class NSERsiMacdStrategy(BaseStrategy):
     def setup(self):
@@ -39,9 +23,17 @@ class NSERsiMacdStrategy(BaseStrategy):
         self.adx_period = int(getattr(self, 'adx_period', 14))
         self.adx_threshold = int(getattr(self, 'adx_threshold', 25))
 
-    def cycle(self):
+        # Declarative Indicators Configuration for BaseStrategy automation
+        self.indicators = {
+            'rsi': self.rsi_period,
+            'macd': (self.macd_fast, self.macd_slow, self.macd_signal),
+            'adx': self.adx_period
+        }
+
+    def generate_signal(self, df):
         """
-        Main Strategy Logic Execution Cycle
+        Generate signal using pre-calculated indicators.
+        Returns: ('BUY'/'SELL'/'EXIT'/'HOLD', quantity [optional], details [optional])
         """
         # Determine exchange
         exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
@@ -89,10 +81,8 @@ class NSERsiMacdStrategy(BaseStrategy):
 
             if bearish_crossover or current_rsi > 70:
                 reason = "MACD Cross Under" if bearish_crossover else "RSI Overbought"
-                self.logger.info(f"Exiting position. Reason: {reason}")
-                # Use absolute position size for closing
-                current_pos = abs(self.pm.position) if hasattr(self.pm, 'position') else self.quantity
-                self.execute_trade('SELL', current_pos, current_price)
+                self.logger.info(f"Signal: EXIT. Reason: {reason}")
+                return "EXIT"
         else:
             # Entry Logic: Buy if MACD Crosses Above Signal AND RSI > 50 AND ADX > 25
             bullish_crossover = (prev['macd'] <= prev['signal']) and (last['macd'] > last['signal'])
@@ -111,7 +101,8 @@ class NSERsiMacdStrategy(BaseStrategy):
 
     def get_signal(self, df):
         """
-        Generate signal for backtesting
+        Backtesting signal generation (Optional, can rely on generate_signal if compatible)
+        But keeping for legacy compatibility if needed.
         """
         if df.empty or len(df) < max(self.macd_slow, self.rsi_period, self.adx_period) + 5:
             return 'HOLD', 0.0, {}
