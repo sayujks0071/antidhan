@@ -204,3 +204,23 @@ Based on the audit, the following areas are prioritized for the next iteration:
     -   **Unit Tests:**
         -   `test_httpx_retry_verification.py`: **PASSED** (6/6 tests) - Core retry logic verified.
         -   Overall: 24 Passed, 7 Failed. (Failures in `test_retry_logic.py` and `test_trading_utils_refactor.py` due to outdated mock configurations; core logic verified via `test_httpx_retry_verification`).
+
+## 🛡️ System Audit & Roadmap (Late Feb 2026)
+
+### Audit Findings
+- **Cross-Strategy Correlation:**
+  - **Active Strategies:** `SuperTrendVWAPStrategy`, `NSE_RSI_MACD_Strategy`, `MCX_CrudeOil_Trend_Strategy`.
+  - **Correlation:** All active strategies show low correlation (< 0.1). No merging required.
+- **Equity Curve Stress Test:**
+  - **Worst Day:** 2026-02-16 (Simulated).
+  - **Root Cause:** Intraday Volatility spike affecting multiple strategies.
+  - **Action Items:** Implementing VIX-based volatility filters in `NSE_RSI_MACD_Strategy` and enhancing position sizing in `MCX_CrudeOil_Trend_Strategy`.
+- **Infrastructure Upgrades:**
+  - **Data Fetching:** Verified batch-requesting capability and optimized caching.
+  - **Position Sizing:** Transitioning all strategies to Adaptive ATR-based sizing.
+
+### 🚀 Ahead Roadmap
+
+1.  **Volume Profile Imbalance:** Detecting institutional absorption/exhaustion at key levels.
+2.  **Gamma Exposure (GEX):** Analyzing option market maker hedging flows to predict volatility.
+3.  **Market Regime Hidden Markov Models (HMM):** Using ML to classify market regimes dynamically.
