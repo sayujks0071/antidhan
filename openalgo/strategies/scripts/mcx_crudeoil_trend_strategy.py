@@ -118,6 +118,22 @@ class MCXStrategy:
 
         # Position sizing adjustment for volatility
         base_qty = 1
+        if self.pm:
+            # Use Adaptive Sizing (Monthly ATR favored)
+            try:
+                base_qty = self.pm.calculate_adaptive_quantity(
+                    capital=500000,
+                    risk_per_trade_pct=1.0,
+                    atr=current["atr"],
+                    price=current["close"],
+                    client=self.client,
+                    exchange="MCX"
+                )
+                logger.info(f"Adaptive Quantity Calculated: {base_qty}")
+            except Exception as e:
+                logger.error(f"Adaptive sizing failed: {e}. Defaulting to 1.")
+                base_qty = 1
+
         if usd_vol_high:
             logger.warning("⚠️ High USD/INR Volatility: Reducing position size by 30%.")
             base_qty = max(1, int(base_qty * 0.7)) # Valid only if base > 1, but keeps logic

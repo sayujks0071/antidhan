@@ -46,6 +46,45 @@ def test_ml_v2():
         import traceback
         traceback.print_exc()
 
+def test_nse_rsi_macd():
+    print("Testing NSE RSI MACD Strategy...")
+    try:
+        from openalgo.strategies.scripts.nse_rsi_macd_strategy import NSERsiMacdStrategy
+        df = pd.DataFrame({
+            'close': np.linspace(100, 200, 100),
+            'high': np.linspace(105, 205, 100),
+            'low': np.linspace(95, 195, 100),
+            'open': np.linspace(100, 200, 100),
+            'volume': np.random.rand(100) * 1000
+        })
+        # Use backtest_signal classmethod wrapper
+        signal = NSERsiMacdStrategy.backtest_signal(df)
+        print(f"NSE RSI MACD Signal: {signal}")
+    except Exception as e:
+        print(f"NSE RSI MACD Failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+def test_mcx_crudeoil():
+    print("Testing MCX Crude Oil Strategy...")
+    try:
+        from openalgo.strategies.scripts.mcx_crudeoil_trend_strategy import generate_signal
+        df = pd.DataFrame({
+            'close': np.linspace(100, 200, 100),
+            'high': np.linspace(105, 205, 100),
+            'low': np.linspace(95, 195, 100),
+            'open': np.linspace(100, 200, 100),
+            'volume': np.random.rand(100) * 1000
+        })
+        signal = generate_signal(df)
+        print(f"MCX Crude Oil Signal: {signal}")
+    except Exception as e:
+        print(f"MCX Crude Oil Failed: {e}")
+        import traceback
+        traceback.print_exc()
+
 if __name__ == "__main__":
     test_mcx()
     test_ml_v2()
+    test_nse_rsi_macd()
+    test_mcx_crudeoil()
