@@ -331,11 +331,145 @@ class BaseStrategy:
             return float(quote['ltp'])
         return None
 
+    def calculate_indicators(self, df):
+        """
+        Helper to calculate common indicators if defined in self.indicators configuration.
+        """
+        if not hasattr(self, 'indicators'):
+            return df
+
+        try:
+            if 'rsi' in self.indicators:
+                period = self.indicators['rsi']
+                df['rsi'] = self.calculate_rsi(df['close'], period=period)
+
+            if 'macd' in self.indicators:
+                fast, slow, signal = self.indicators['macd']
+                macd, signal_line, _ = self.calculate_macd(df['close'], fast, slow, signal)
+                df['macd'] = macd
+                df['signal'] = signal_line
+
+            if 'sma' in self.indicators:
+                periods = self.indicators['sma']
+                if isinstance(periods, int): periods = [periods]
+                for p in periods:
+                    df[f'sma_{p}'] = self.calculate_sma(df['close'], period=p)
+
+            if 'ema' in self.indicators:
+                periods = self.indicators['ema']
+                if isinstance(periods, int): periods = [periods]
+                for p in periods:
+                    df[f'ema_{p}'] = self.calculate_ema(df['close'], period=p)
+
+            if 'adx' in self.indicators:
+                period = self.indicators['adx']
+                df['adx'] = self.calculate_adx_series(df, period=period)
+
+            if 'supertrend' in self.indicators:
+                period, multiplier = self.indicators['supertrend']
+                st, direction = self.calculate_supertrend(df, period, multiplier)
+                df['supertrend'] = st
+                df['st_dir'] = direction
+
+            if 'bollinger' in self.indicators:
+                window, std = self.indicators['bollinger']
+                sma, upper, lower = self.calculate_bollinger_bands(df['close'], window, std)
+                df['upper_band'] = upper
+                df['lower_band'] = lower
+
+            if 'atr' in self.indicators:
+                period = self.indicators['atr']
+                df['atr'] = self.calculate_atr_series(df, period=period)
+
+        except Exception as e:
+            self.logger.error(f"Error calculating indicators: {e}")
+
+        return df
+
+    def default_cycle(self):
+        """
+        Default cycle implementation that automates:
+        1. Fetching Data
+        2. Calculating Indicators
+        3. Generating Signal (via generate_signal or get_signal)
+        4. Executing Trade
+        """
+        # Fetch Data
+        exchange = self.exchange
+        # Auto-detect NSE_INDEX for indices if default exchange is NSE
+        if exchange == "NSE" and ("NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper()):
+             exchange = "NSE_INDEX"
+
+        df = self.fetch_history(days=5, interval=self.interval, exchange=exchange)
+
+        if df.empty or len(df) < 50:
+             return
+
+        # Calculate Indicators
+        df = self.calculate_indicators(df)
+
+        # Generate Signal
+        # Try generate_signal first, then fallback to get_signal (backtest interface)
+        signal = "HOLD"
+        qty = self.quantity
+        details = {}
+
+        try:
+            if hasattr(self, 'generate_signal'):
+                 result = self.generate_signal(df)
+            else:
+                 # Fallback to standard get_signal
+                 result = self.get_signal(df)
+
+            if isinstance(result, tuple):
+                if len(result) == 3:
+                    signal, confidence, details = result
+                elif len(result) == 2:
+                    signal, qty = result
+            elif isinstance(result, str):
+                signal = result
+
+        except NotImplementedError:
+             self.logger.error("Strategy must implement either cycle(), generate_signal(df) or get_signal(df)")
+             return
+        except Exception as e:
+             self.logger.error(f"Error in signal generation: {e}")
+             return
+
+        current_price = df['close'].iloc[-1]
+
+        # Position Management
+        if signal == "BUY":
+            if not self.pm or not self.pm.has_position():
+                self.buy(qty, current_price)
+            elif self.pm and self.pm.position < 0:
+                 # Close Short and Buy
+                 self.buy(abs(self.pm.position) + qty, current_price)
+
+        elif signal == "SELL":
+             if not self.pm or not self.pm.has_position():
+                 self.sell(qty, current_price)
+             elif self.pm and self.pm.position > 0:
+                 # Close Long and Sell
+                 self.sell(abs(self.pm.position) + qty, current_price)
+
+        elif signal == "EXIT":
+            if self.pm and self.pm.has_position():
+                action = "SELL" if self.pm.position > 0 else "BUY"
+                self.execute_trade(action, abs(self.pm.position), current_price)
+
     def cycle(self):
         """
         Override this method to implement strategy logic per cycle.
         """
-        raise NotImplementedError("Strategy must implement cycle() method")
+        self.default_cycle()
+
+    def generate_signal(self, df):
+        """
+        Optional: Implement this for use with default_cycle.
+        Returns: ('BUY'/'SELL'/'EXIT'/'HOLD', quantity, details) or just Signal String.
+        """
+        raise NotImplementedError
 
     def get_signal(self, df):
         """
