@@ -481,5 +481,34 @@
     "is_scheduled": true,
     "schedule_start": "09:00",
     "schedule_stop": "23:30"
+  },
+  "NSE_EMA_CROSSOVER_RSI": {
+    "id": "NSE_EMA_CROSSOVER_RSI",
+    "name": "NSE EMA Crossover RSI",
+    "description": "NSE Trend Following Strategy using EMA (9/21) Crossover and RSI (14)",
+    "file_path": "strategies/scripts/nse_ema_crossover_rsi.py",
+    "user_id": "testuser",
+    "created_at": "2026-03-01T10:00:00",
+    "symbol": "NIFTY",
+    "schedule_enabled": true,
+    "schedule_days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri"
+    ],
+    "params": {
+      "fast_ema": 9,
+      "slow_ema": 21,
+      "rsi_period": 14,
+      "rsi_buy": 50.0,
+      "rsi_sell": 40.0,
+      "quantity": 1
+    },
+    "is_running": false,
+    "is_scheduled": true,
+    "schedule_start": "09:15",
+    "schedule_stop": "15:30"
   }
 }
