@@ -4,24 +4,8 @@ MCX Gold Trend Strategy
 MCX Commodity trading strategy with SMA (20/50), RSI, and ADX analysis
 Inherits from BaseStrategy for consistent infrastructure usage.
 """
-import os
-import sys
-import logging
-import pandas as pd
-from datetime import datetime, timedelta
-
-# Add repo root to path
-try:
-    from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
-except ImportError:
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    strategies_dir = os.path.dirname(script_dir)
-    utils_dir = os.path.join(strategies_dir, "utils")
-    if utils_dir not in sys.path:
-        sys.path.insert(0, utils_dir)
-    from base_strategy import BaseStrategy
-    from trading_utils import normalize_symbol
+import strategy_preamble
+from base_strategy import BaseStrategy
 
 class MCXGoldTrendStrategy(BaseStrategy):
     def setup(self):
@@ -37,26 +21,34 @@ class MCXGoldTrendStrategy(BaseStrategy):
         self.usd_inr_volatility = getattr(self, "usd_inr_volatility", 0.0)
         self.global_alignment_score = getattr(self, "global_alignment_score", 50)
 
-    def cycle(self):
+        # Default interval for MCX Gold
+        if self.interval == "5m":
+            self.interval = "15m"
+
+        # Default exchange for MCX Gold
+        if self.exchange == "NSE":
+            self.exchange = "MCX"
+
+        # Declarative Indicators
+        self.indicators = {
+            'rsi': self.period_rsi,
+            'atr': self.period_atr,
+            'sma': [self.period_sma_fast, self.period_sma_slow],
+            'adx': self.period_adx
+        }
+
+    def generate_signal(self, df):
         """
-        Main Strategy Logic Execution Cycle
+        Generate signal using pre-calculated indicators.
         """
-        # Fetch Data using BaseStrategy's robust method
-        # MCX typically uses 15m or 1h. Defaulting to 15m as per original script.
-        df = self.fetch_history(days=5, interval="15m", exchange="MCX")
-
-        if df.empty or len(df) < 50:
-            self.logger.warning(f"Insufficient data for {self.symbol}.")
-            return
-
-        # Calculate Indicators
-        df['rsi'] = self.calculate_rsi(df['close'], self.period_rsi)
-        df['atr'] = self.calculate_atr_series(df, self.period_atr) # Series needed for targets
-        df['sma_fast'] = self.calculate_sma(df['close'], self.period_sma_fast)
-        df['sma_slow'] = self.calculate_sma(df['close'], self.period_sma_slow)
-        df['adx'] = self.calculate_adx_series(df, self.period_adx)
-
         current = df.iloc[-1]
+
+        # Map indicators
+        sma_fast = current[f'sma_{self.period_sma_fast}']
+        sma_slow = current[f'sma_{self.period_sma_slow}']
+        rsi = current['rsi']
+        adx = current['adx']
+        atr_val = current['atr']
 
         # Position Management
         has_position = False
@@ -69,11 +61,11 @@ class MCXGoldTrendStrategy(BaseStrategy):
 
         if not seasonality_ok and not has_position:
             self.logger.info("Seasonality Weak: Skipping new entries.")
-            return
+            return "HOLD"
 
         # Entry Logic
-        buy_signal = (current["sma_fast"] > current["sma_slow"]) and (current["rsi"] > 50) and (current["adx"] > 25)
-        sell_signal = (current["sma_fast"] < current["sma_slow"]) and (current["rsi"] < 50) and (current["adx"] > 25)
+        buy_signal = (sma_fast > sma_slow) and (rsi > 50) and (adx > 25)
+        sell_signal = (sma_fast < sma_slow) and (rsi < 50) and (adx > 25)
 
         if not has_position:
             if buy_signal or sell_signal:
@@ -86,14 +78,13 @@ class MCXGoldTrendStrategy(BaseStrategy):
                     qty = max(1, int(qty * 0.7))
 
                 action = "BUY" if buy_signal else "SELL"
-                self.logger.info(f"{action} SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}, ADX={current['adx']:.2f}")
-                self.execute_trade(action, qty, current['close'])
+                self.logger.info(f"{action} SIGNAL: Price={current['close']}, RSI={rsi:.2f}, ADX={adx:.2f}")
+                return action, qty
 
         # Exit Logic
         elif has_position:
             pos_qty = self.pm.position
             entry_price = self.pm.entry_price
-            atr_val = current["atr"]
 
             # Target/Stop
             target = 2.0 * atr_val
@@ -109,7 +100,7 @@ class MCXGoldTrendStrategy(BaseStrategy):
                 elif (current["close"] <= entry_price - stop):
                     exit_signal = True
                     reason = "Stop Loss Hit"
-                elif (current["sma_fast"] < current["sma_slow"]): # Trend Reversal
+                elif (sma_fast < sma_slow): # Trend Reversal
                     exit_signal = True
                     reason = "Trend Reversal"
             elif pos_qty < 0: # Short
@@ -119,37 +110,15 @@ class MCXGoldTrendStrategy(BaseStrategy):
                 elif (current["close"] >= entry_price + stop):
                     exit_signal = True
                     reason = "Stop Loss Hit"
-                elif (current["sma_fast"] > current["sma_slow"]): # Trend Reversal
+                elif (sma_fast > sma_slow): # Trend Reversal
                     exit_signal = True
                     reason = "Trend Reversal"
 
             if exit_signal:
                 self.logger.info(f"EXIT: {reason}")
-                action = "SELL" if pos_qty > 0 else "BUY"
-                self.execute_trade(action, abs(pos_qty), current["close"])
+                return "EXIT"
 
-    def get_signal(self, df):
-        """Generate signal for backtesting"""
-        if df.empty:
-            return "HOLD", 0.0, {}
-
-        # Use helper methods to calculate indicators on the fly
-        df['rsi'] = self.calculate_rsi(df['close'], self.period_rsi)
-        df['sma_fast'] = self.calculate_sma(df['close'], self.period_sma_fast)
-        df['sma_slow'] = self.calculate_sma(df['close'], self.period_sma_slow)
-        df['adx'] = self.calculate_adx_series(df, self.period_adx)
-
-        current = df.iloc[-1]
-
-        buy_signal = (current["sma_fast"] > current["sma_slow"]) and (current["rsi"] > 50) and (current["adx"] > 25)
-        sell_signal = (current["sma_fast"] < current["sma_slow"]) and (current["rsi"] < 50) and (current["adx"] > 25)
-
-        if buy_signal:
-            return "BUY", 1.0, {"reason": "Trend Long"}
-        elif sell_signal:
-            return "SELL", 1.0, {"reason": "Trend Short"}
-
-        return "HOLD", 0.0, {}
+        return "HOLD"
 
     @classmethod
     def add_arguments(cls, parser):

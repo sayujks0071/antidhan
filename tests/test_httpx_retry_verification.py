@@ -1,6 +1,6 @@
 
 import unittest
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, patch
 import time
 import httpx
 from datetime import datetime, timezone, timedelta
@@ -8,7 +8,7 @@ from email.utils import format_datetime
 
 # Mocking modules to ensure test runs in restricted environments
 import sys
-sys.modules['utils'] = MagicMock()
+# We only mock utils.logging, not utils itself, so we can import utils.httpx_client
 sys.modules['utils.logging'] = MagicMock()
 
 # Now we can import the module under test
@@ -19,9 +19,11 @@ sys.modules['utils.logging'] = MagicMock()
 # Otherwise I'll use a trick to load it
 
 import os
-sys.path.append(os.getcwd())
+# Add openalgo to path so we can import utils
+sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
+
 try:
-    from openalgo.utils.httpx_client import request, get_httpx_client, _create_http_client
+    from utils.httpx_client import request, get_httpx_client, _create_http_client
 except ImportError:
     # If openalgo package is not recognized, try adding openalgo to path
     sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
@@ -32,10 +34,12 @@ class TestHttpxRetryVerification(unittest.TestCase):
 
     def setUp(self):
         # Reset the global client before each test
-        from openalgo.utils import httpx_client
-        httpx_client._httpx_client = None
+        # We need to access the module variable, not just import it
+        # Since we imported from utils.httpx_client, we need to find where it is defined
+        # Or mock get_httpx_client to return a fresh client
+        pass
 
-    @patch('openalgo.utils.httpx_client.get_httpx_client')
+    @patch('utils.httpx_client.get_httpx_client')
     @patch('time.sleep') # Mock sleep to speed up tests
     def test_retry_on_500_error(self, mock_sleep, mock_get_client):
         """Verify that the client retries on 500 status code."""
@@ -55,7 +59,7 @@ class TestHttpxRetryVerification(unittest.TestCase):
         # Verify backoff calls
         self.assertEqual(mock_sleep.call_count, 2)
 
-    @patch('openalgo.utils.httpx_client.get_httpx_client')
+    @patch('utils.httpx_client.get_httpx_client')
     @patch('time.sleep')
     def test_retry_on_429_error(self, mock_sleep, mock_get_client):
         """Verify that the client retries on 429 status code."""
@@ -74,7 +78,7 @@ class TestHttpxRetryVerification(unittest.TestCase):
         self.assertEqual(mock_client_instance.request.call_count, 2)
         self.assertEqual(mock_sleep.call_count, 1)
 
-    @patch('openalgo.utils.httpx_client.get_httpx_client')
+    @patch('utils.httpx_client.get_httpx_client')
     @patch('time.sleep')
     def test_retry_after_header_seconds(self, mock_sleep, mock_get_client):
         """Verify that the client respects Retry-After header (seconds)."""
@@ -95,7 +99,7 @@ class TestHttpxRetryVerification(unittest.TestCase):
         # So it should sleep for 2.0 seconds
         mock_sleep.assert_called_with(2.0)
 
-    @patch('openalgo.utils.httpx_client.get_httpx_client')
+    @patch('utils.httpx_client.get_httpx_client')
     @patch('time.sleep')
     def test_retry_after_header_date(self, mock_sleep, mock_get_client):
         """Verify that the client respects Retry-After header (HTTP Date)."""
@@ -120,7 +124,7 @@ class TestHttpxRetryVerification(unittest.TestCase):
         # Should be roughly 5 seconds (give or take a bit for execution time)
         self.assertTrue(0 < args[0] <= 60)
 
-    @patch('openalgo.utils.httpx_client.get_httpx_client')
+    @patch('utils.httpx_client.get_httpx_client')
     @patch('time.sleep')
     def test_retry_on_request_error(self, mock_sleep, mock_get_client):
         """Verify that the client retries on httpx.RequestError (e.g. timeout)."""
@@ -140,7 +144,7 @@ class TestHttpxRetryVerification(unittest.TestCase):
         self.assertEqual(mock_client_instance.request.call_count, 3)
         self.assertEqual(mock_sleep.call_count, 2)
 
-    @patch('openalgo.utils.httpx_client.get_httpx_client')
+    @patch('utils.httpx_client.get_httpx_client')
     @patch('time.sleep')
     def test_max_retries_exceeded(self, mock_sleep, mock_get_client):
         """Verify that the client gives up after max retries."""
