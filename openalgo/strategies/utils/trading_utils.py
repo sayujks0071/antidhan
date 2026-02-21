@@ -1171,6 +1171,19 @@ def calculate_cci(df, period=20):
     return cci.fillna(0)
 
 
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    """
+    Calculate MACD, Signal, Hist.
+    Returns: macd, signal, hist (all Series)
+    """
+    ema_fast = series.ewm(span=fast, adjust=False).mean()
+    ema_slow = series.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+    return macd_line, signal_line, histogram
+
+
 def calculate_vwmacd(df, fast=12, slow=26, signal=9):
     """Volume Weighted MACD (Approximation using EMA of VWAP)"""
     vwap = (df['close'] * df['volume']).cumsum() / df['volume'].cumsum()
