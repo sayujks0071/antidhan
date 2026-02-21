@@ -19,10 +19,10 @@ def get_client_id(api_key=None):
     Get Dhan Sandbox client ID from BROKER_API_KEY or database.
 
     Args:
-        api_key: OpenAlgo API key (optional)
+        api_key (str, optional): OpenAlgo API key. Defaults to None.
 
     Returns:
-        Client ID string or None
+        str: Client ID string, or None if not found.
     """
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
 
@@ -46,12 +46,14 @@ def calculate_single_margin(position_data, auth, client_id):
     Calculate margin for a single position using Dhan Sandbox API.
 
     Args:
-        position_data: Transformed position data in Dhan Sandbox format
-        auth: Authentication token
-        client_id: Dhan Sandbox client ID
+        position_data (dict): Transformed position data in Dhan Sandbox format.
+        auth (str): Authentication token.
+        client_id (str): Dhan Sandbox client ID.
 
     Returns:
-        Tuple of (response, parsed_response_data)
+        tuple: (response, parsed_response_data)
+               - response: The HTTP response object (or mock object on failure).
+               - parsed_response_data (dict): Parsed and standardized margin data.
     """
     AUTH_TOKEN = auth
 
