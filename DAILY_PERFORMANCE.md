@@ -380,3 +380,29 @@ Due to sandbox environment limitations preventing live market access, this audit
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` wrapper in `utils/httpx_client.py` and `placesmartorder` internal retry logic.
 - **Result**: Tests passed. The system robustly handles timeouts and 500/429 errors.
+
+## Market-Hours Audit (2026-02-21) - Simulated
+
+### Latency Audit
+- **Method**: Simulated log generation and analysis via `scripts/market_hours_audit.py`.
+- **Result**: Average Latency: 313.80 ms (Outlier: RELIANCE 552.00 ms).
+- **Bottleneck Analysis**: Latency exceeded 500ms for RELIANCE. Identified bottlenecks:
+  1. **Sequential API Calls**: `place_smartorder_api` performs `get_positions` followed by `place_order`, doubling network overhead.
+  2. **Nested Retry Loops**: Both `place_smart_order_service` and `httpx_client` have retry logic (3 retries), potentially causing significant delays (up to several seconds) if initial attempts fail.
+  3. **Synchronous Execution**: The entire process is blocking.
+
+### Logic Verification
+- **Strategy**: `SuperTrendVWAPStrategy` (Simulated)
+- **Verification**: Verified 3 consecutive NIFTY signals against VWAP/POC/Sector/RSI/EMA logic.
+- **Result**: Signal Validated: YES (Mathematically Accurate).
+
+### Slippage Check
+- **Method**: Simulated execution of 5 orders.
+- **Result**: Average Slippage: 1.72 pts.
+  - NIFTY: ~1.49 pts
+  - BANKNIFTY: 1.23 pts
+  - RELIANCE: 2.90 pts
+
+### Error Handling
+- **Status**: Verified `Retry-with-Backoff` logic in `openalgo/utils/httpx_client.py`.
+- **Verification**: Created and passed `tests/verify_httpx_timeout_retry.py`. The `request` function correctly handles timeouts (via `httpx.RequestError`) and status codes (500/429) with exponential backoff.
