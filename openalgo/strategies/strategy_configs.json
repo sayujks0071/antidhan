@@ -364,6 +364,39 @@
     "schedule_start": "09:00",
     "schedule_stop": "23:30"
   },
+  "MCX_LEAD_TREND": {
+    "id": "MCX_LEAD_TREND",
+    "name": "MCX Lead Trend Strategy",
+    "description": "MCX Lead trend following strategy using EMA, ADX and RSI",
+    "file_path": "strategies/scripts/mcx_lead_trend_strategy.py",
+    "user_id": "system",
+    "created_at": "2026-02-18T16:00:00",
+    "underlying": "LEAD",
+    "schedule_enabled": true,
+    "schedule_days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri"
+    ],
+    "params": {
+      "period_rsi": 14,
+      "period_ema": 50,
+      "period_adx": 14,
+      "period_atr": 14,
+      "rsi_buy": 55,
+      "rsi_sell": 45,
+      "adx_threshold": 25,
+      "seasonality_score": 60,
+      "global_alignment_score": 55,
+      "usd_inr_volatility": 0.5
+    },
+    "is_running": false,
+    "is_scheduled": true,
+    "schedule_start": "09:00",
+    "schedule_stop": "23:30"
+  },
   "MCX_SILVER_MIC_TREND": {
     "id": "MCX_SILVER_MIC_TREND",
     "name": "MCX Silver MIC Trend",
