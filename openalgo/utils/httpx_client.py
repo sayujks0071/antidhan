@@ -166,6 +166,20 @@ def request(
 
             return response
 
+        except httpx.TimeoutException as e:
+            last_exception = e
+            if attempt < max_retries:
+                wait_time = backoff_factor * (2**attempt)
+                logger.warning(
+                    f"Request to {url} timed out: {e}. Retrying in {wait_time}s..."
+                )
+                time.sleep(wait_time)
+            else:
+                logger.error(
+                    f"Request to {url} timed out after {max_retries} retries: {e}"
+                )
+                raise last_exception
+
         except httpx.RequestError as e:
             last_exception = e
             if attempt < max_retries:
