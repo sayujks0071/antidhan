@@ -4,37 +4,13 @@ NSE RSI MACD Strategy V2
 Enhanced with ATR Trailing Stop.
 Inherits from BaseStrategy.
 """
-import os
-import sys
+import strategy_preamble
+from base_strategy import BaseStrategy
+from trading_utils import calculate_rsi, calculate_macd, calculate_atr
 import argparse
 import logging
 import pandas as pd
 from datetime import datetime
-
-# Add project root to path
-try:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    strategies_dir = os.path.dirname(current_dir)
-    openalgo_root = os.path.dirname(strategies_dir)
-    if strategies_dir not in sys.path:
-        sys.path.insert(0, strategies_dir)
-    if openalgo_root not in sys.path:
-        sys.path.insert(0, openalgo_root)
-except Exception:
-    pass
-
-try:
-    from utils.base_strategy import BaseStrategy
-    from utils.trading_utils import calculate_rsi, calculate_macd, calculate_atr
-except ImportError:
-    try:
-        from strategies.utils.base_strategy import BaseStrategy
-        from strategies.utils.trading_utils import calculate_rsi, calculate_macd, calculate_atr
-    except ImportError:
-        # Fallback
-        sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
-        from strategies.utils.base_strategy import BaseStrategy
-        from strategies.utils.trading_utils import calculate_rsi, calculate_macd, calculate_atr
 
 class NSERsiMacdStrategyV2(BaseStrategy):
     def __init__(self, **kwargs):
@@ -131,6 +107,10 @@ class NSERsiMacdStrategyV2(BaseStrategy):
         parser.add_argument('--atr_period', type=int, default=14, help='ATR Period')
         parser.add_argument('--atr_multiplier', type=float, default=2.0, help='ATR Multiplier for Stop')
 
+    def get_signal(self, df):
+        """Backtesting interface"""
+        return generate_signal(df)
+
 # Backtesting support
 def generate_signal(df, client=None, symbol=None, params=None):
     strat_params = {
@@ -144,14 +124,9 @@ def generate_signal(df, client=None, symbol=None, params=None):
     if params:
         strat_params.update(params)
 
-    # Import locally to avoid top-level issues during test loading
-    try:
-        from strategies.utils.trading_utils import calculate_rsi, calculate_macd, calculate_atr
-    except ImportError:
-         try:
-             from utils.trading_utils import calculate_rsi, calculate_macd, calculate_atr
-         except ImportError:
-             from openalgo.strategies.utils.trading_utils import calculate_rsi, calculate_macd, calculate_atr
+    # Use standard imports now available via strategy_preamble logic if run in this env,
+    # but generate_signal might be imported by a test runner.
+    # We'll assume the environment is set up or fallback to safe import.
 
     rsi = calculate_rsi(df['close'], period=strat_params['rsi_period'])
     macd, signal, _ = calculate_macd(df['close'], fast=strat_params['macd_fast'], slow=strat_params['macd_slow'], signal=strat_params['macd_signal'])
