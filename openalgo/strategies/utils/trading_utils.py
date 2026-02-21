@@ -138,6 +138,16 @@ def calculate_rsi(series, period=14):
     return 100 - (100 / (1 + rs))
 
 
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    """Calculate MACD, Signal, Hist."""
+    exp1 = series.ewm(span=fast, adjust=False).mean()
+    exp2 = series.ewm(span=slow, adjust=False).mean()
+    macd = exp1 - exp2
+    signal_line = macd.ewm(span=signal, adjust=False).mean()
+    histogram = macd - signal_line
+    return macd, signal_line, histogram
+
+
 def calculate_atr(df, period=14):
     """Calculate Average True Range (Returns Series)."""
     high = df['high']
