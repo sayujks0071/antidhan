@@ -5,6 +5,7 @@ import pickle
 import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import httpx
 import jwt
@@ -515,15 +516,15 @@ class BrokerData:
                     except Exception as e:
                         logger.error(f"Error fetching intraday data: {str(e)}")
                 else:
-                    # For multiple days, split into chunks
+                    # For multiple days, split into chunks and fetch in parallel
                     date_chunks = self._get_intraday_chunks(start_date, end_date)
 
-                    for chunk_start, chunk_end in date_chunks:
+                    def fetch_chunk(chunk_start, chunk_end):
                         # Skip if both dates are non-trading days
                         if not self._is_trading_day(chunk_start) and not self._is_trading_day(
                             chunk_end
                         ):
-                            continue
+                            return []
 
                         # Get time range for each day
                         from_time, _ = self._get_intraday_time_range(chunk_start)
@@ -555,10 +556,12 @@ class BrokerData:
                             closes = response.get("close", [])
                             volumes = response.get("volume", [])
                             openinterest = response.get("open_interest", [])
+
+                            chunk_candles = []
                             for i in range(len(timestamps)):
                                 # Convert UTC timestamp to IST
                                 ist_timestamp = self._convert_timestamp_to_ist(timestamps[i])
-                                all_candles.append(
+                                chunk_candles.append(
                                     {
                                         "timestamp": ist_timestamp,
                                         "open": float(opens[i]) if opens[i] else 0,
@@ -569,11 +572,28 @@ class BrokerData:
                                         "oi": int(float(openinterest[i])) if openinterest[i] else 0,
                                     }
                                 )
+                            return chunk_candles
+
                         except Exception as e:
                             logger.error(
                                 f"Error fetching chunk {chunk_start} to {chunk_end}: {str(e)}"
                             )
-                            continue
+                            return []
+
+                    # Use ThreadPoolExecutor for parallel fetching
+                    with ThreadPoolExecutor(max_workers=5) as executor:
+                        future_to_chunk = {
+                            executor.submit(fetch_chunk, start, end): (start, end)
+                            for start, end in date_chunks
+                        }
+
+                        for future in as_completed(future_to_chunk):
+                            chunk_data = future.result()
+                            if chunk_data:
+                                all_candles.extend(chunk_data)
+
+                        # Note: Order of results from as_completed is not guaranteed,
+                        # but we sort by timestamp explicitly below before returning.
 
             # For daily timeframe, check if today's date is within the range
             if interval == "D":

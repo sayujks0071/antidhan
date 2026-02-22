@@ -284,6 +284,10 @@ class PositionManager:
         self.entry_price = 0.0
         self.pnl = 0.0
 
+        # Adaptive Sizing Cache
+        self.cached_monthly_atr = None
+        self.last_atr_update = None
+
         self.load_state()
 
     def load_state(self):
@@ -381,8 +385,14 @@ class PositionManager:
         return int(qty)
 
     def get_monthly_atr(self, client, exchange="NSE"):
-        """Fetch Monthly ATR using client history."""
+        """Fetch Monthly ATR using client history with daily caching."""
         try:
+            today = datetime.now().date()
+
+            # Check Cache
+            if self.cached_monthly_atr is not None and self.last_atr_update == today:
+                return self.cached_monthly_atr
+
             end_date = datetime.now()
             start_date = end_date - timedelta(days=60)  # Enough for 14 period
 
@@ -397,9 +407,22 @@ class PositionManager:
             if not df.empty and len(df) > 15:
                 # Use shared function
                 atrs = calculate_atr(df, period=14)
-                return atrs.iloc[-1]
+                atr = atrs.iloc[-1]
+
+                # Update Cache
+                self.cached_monthly_atr = atr
+                self.last_atr_update = today
+                logger.info(f"Updated Monthly ATR Cache for {self.symbol}: {atr:.2f}")
+
+                return atr
         except Exception as e:
             logger.warning(f"Failed to fetch Monthly ATR for {self.symbol}: {e}")
+
+        # Return stale cache if available on failure
+        if self.cached_monthly_atr is not None:
+             logger.warning(f"Using stale ATR cache for {self.symbol}: {self.cached_monthly_atr:.2f}")
+             return self.cached_monthly_atr
+
         return None
 
     def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price, client=None, exchange="NSE"):

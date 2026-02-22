@@ -66,6 +66,11 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         vix = self.get_vix()
         size_multiplier, dev_threshold = self.calculate_vix_volatility_multiplier(vix)
 
+        # Extreme VIX Filter (Circuit Breaker)
+        if vix > 35:
+            self.logger.warning(f"Extreme VIX ({vix:.2f}) detected! Skipping entry.")
+            return
+
         # Indicators
         is_above_vwap = last['close'] > last['vwap']
 
