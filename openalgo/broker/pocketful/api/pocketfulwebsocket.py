@@ -177,6 +177,54 @@ def get_ws_connection_status():
     return ws_connected
 
 
+def send_message(message_type, packet):
+    """
+    Send subscription message to websocket
+    """
+    global websock
+    if not websock:
+        logger.error("WebSocket not connected")
+        return
+
+    # Map message type to 'm' field
+    # Guessing mapping based on context
+    m_map = {
+        "OrderUpdateMessage": "order_update",
+        "TradeUpdateMessage": "trade_update"
+    }
+    m_val = m_map.get(message_type, message_type.lower())
+
+    sub_packet = {"a": "subscribe", "v": packet, "m": m_val}
+    try:
+        websock.send(json.dumps(sub_packet))
+        logger.info(f"Sent subscription for {message_type}: {packet}")
+    except Exception as e:
+        logger.error(f"Error sending message: {e}")
+
+
+def unsubscribe_update(message_type, packet):
+    """
+    Send unsubscription message to websocket
+    """
+    global websock
+    if not websock:
+        logger.error("WebSocket not connected")
+        return
+
+    m_map = {
+        "OrderUpdateMessage": "order_update",
+        "TradeUpdateMessage": "trade_update"
+    }
+    m_val = m_map.get(message_type, message_type.lower())
+
+    sub_packet = {"a": "unsubscribe", "v": packet, "m": m_val}
+    try:
+        websock.send(json.dumps(sub_packet))
+        logger.info(f"Sent unsubscription for {message_type}: {packet}")
+    except Exception as e:
+        logger.error(f"Error sending message: {e}")
+
+
 class PocketfulSocket:
     base_url = "https://trade.pocketful.in"
 
