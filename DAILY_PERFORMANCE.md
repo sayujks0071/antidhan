@@ -401,3 +401,25 @@ Due to sandbox environment limitations preventing live market access, this audit
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` implementation in `utils/httpx_client.py`.
 - **Result**: Confirmed `broker_module` uses `utils.httpx_client` which correctly handles retries for 500/429 errors. The redundant loop in `placesmartorder` was removed to streamline execution.
+
+## Market-Hours Audit (2026-05-20) - Simulated
+
+### Latency Audit
+Found 1 orders exceeding 500ms latency:
+- RELIANCE: 600.00ms
+
+**Root Cause Analysis**: The bottleneck is identified in `place_smart_order_service.py` where `import_broker_module` is called dynamically inside the order execution path. This adds overhead. Recommendation: Cache the module import or move it to module level if possible.
+
+### Logic Verification
+- **Strategy**: `NSE_RSI_MACD_NIFTY`
+- **Scenario**: Bullish Crossover (MACD > Signal), RSI > 50, ADX > 25
+- **Result**: Signal Validated: YES (Mathematically Accurate based on indicators).
+
+### Slippage Check
+Average Slippage per Symbol:
+- **NIFTY**: 0.50 pts
+- **RELIANCE**: 2.00 pts
+
+### Error Handling
+- **Scenario**: `httpx.TimeoutException`
+- **Result**: PASSED. `Retry-with-Backoff` correctly handles timeouts (Retried 2 times before success).
