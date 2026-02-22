@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import pickle
 import time
 import time as time_module
@@ -16,6 +17,30 @@ import pandas as pd
 import pytz
 
 from utils import httpx_client
+
+def resolve_api_key(api_key=None):
+    """Resolve API Key from argument, environment, or database."""
+    if api_key:
+        return api_key
+
+    # 1. Try environment variables
+    key = os.getenv('OPENALGO_APIKEY') or os.getenv('OPENALGO_API_KEY')
+    if key:
+        return key
+
+    # 2. Try database
+    try:
+        # Dynamic import to avoid circular dependency or import errors if database not available
+        # Ensure project root is in path if needed (though usually handled by caller)
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        from database.auth_db import get_first_available_api_key
+        key = get_first_available_api_key()
+        if key:
+            return key
+    except Exception:
+        pass
+
+    return None
 
 # Configure logging
 try:
@@ -567,8 +592,8 @@ class APIClient:
     Fallback API Client using httpx if openalgo package is missing.
     """
 
-    def __init__(self, api_key, host="http://127.0.0.1:5000"):
-        self.api_key = api_key
+    def __init__(self, api_key=None, host="http://127.0.0.1:5000"):
+        self.api_key = resolve_api_key(api_key)
         self.host = host.rstrip("/")
         self.cache = FileCache()
         self.quote_cache = {}  # Key: symbol, Value: (timestamp, data)

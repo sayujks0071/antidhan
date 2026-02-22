@@ -8,19 +8,25 @@ import strategy_preamble
 from base_strategy import BaseStrategy
 
 class MCXGoldTrendStrategy(BaseStrategy):
+    parameters = {
+        "period_rsi": 14,
+        "period_atr": 14,
+        "period_sma_fast": 20,
+        "period_sma_slow": 50,
+        "period_adx": 14,
+        "seasonality_score": 50,
+        "usd_inr_volatility": 0.0,
+        "global_alignment_score": 50
+    }
+
+    indicators = {
+        'rsi': 'period_rsi',
+        'atr': 'period_atr',
+        'sma': ['period_sma_fast', 'period_sma_slow'],
+        'adx': 'period_adx'
+    }
+
     def setup(self):
-        # Default Parameters
-        self.period_rsi = getattr(self, "period_rsi", 14)
-        self.period_atr = getattr(self, "period_atr", 14)
-        self.period_sma_fast = getattr(self, "period_sma_fast", 20)
-        self.period_sma_slow = getattr(self, "period_sma_slow", 50)
-        self.period_adx = getattr(self, "period_adx", 14)
-
-        # Multi-Factor Parameters
-        self.seasonality_score = getattr(self, "seasonality_score", 50)
-        self.usd_inr_volatility = getattr(self, "usd_inr_volatility", 0.0)
-        self.global_alignment_score = getattr(self, "global_alignment_score", 50)
-
         # Default interval for MCX Gold
         if self.interval == "5m":
             self.interval = "15m"
@@ -28,14 +34,6 @@ class MCXGoldTrendStrategy(BaseStrategy):
         # Default exchange for MCX Gold
         if self.exchange == "NSE":
             self.exchange = "MCX"
-
-        # Declarative Indicators
-        self.indicators = {
-            'rsi': self.period_rsi,
-            'atr': self.period_atr,
-            'sma': [self.period_sma_fast, self.period_sma_slow],
-            'adx': self.period_adx
-        }
 
     def generate_signal(self, df):
         """
@@ -119,14 +117,6 @@ class MCXGoldTrendStrategy(BaseStrategy):
                 return "EXIT"
 
         return "HOLD"
-
-    @classmethod
-    def add_arguments(cls, parser):
-        parser.add_argument("--usd_inr_volatility", type=float, default=0.0, help="USD/INR Volatility %%")
-        parser.add_argument("--seasonality_score", type=int, default=50, help="Seasonality Score (0-100)")
-        parser.add_argument("--global_alignment_score", type=int, default=50, help="Global Alignment Score")
-        parser.add_argument("--period_rsi", type=int, default=14, help="RSI Period")
-        parser.add_argument("--period_atr", type=int, default=14, help="ATR Period")
 
 if __name__ == "__main__":
     MCXGoldTrendStrategy.cli()
