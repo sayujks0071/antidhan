@@ -122,7 +122,6 @@ class BrokerData:
 
     def _convert_to_dhan_request(self, symbol, exchange):
         """Convert symbol and exchange to Dhan format"""
-        br_symbol = get_br_symbol(symbol, exchange)
         # Extract security ID and determine exchange segment
         # This needs to be implemented based on your symbol mapping logic
         security_id = get_token(symbol, exchange)  # This should be mapped to Dhan's security ID
