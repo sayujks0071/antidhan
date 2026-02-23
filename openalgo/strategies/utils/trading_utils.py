@@ -380,6 +380,7 @@ class PositionManager:
 
         return int(qty)
 
+    @lru_cache(maxsize=128)
     def get_monthly_atr(self, client, exchange="NSE"):
         """Fetch Monthly ATR using client history."""
         try:
