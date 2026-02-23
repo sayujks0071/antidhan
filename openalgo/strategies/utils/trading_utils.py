@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import pickle
 import time
 import time as time_module
@@ -16,6 +17,47 @@ import pandas as pd
 import pytz
 
 from utils import httpx_client
+
+def resolve_api_key(api_key=None):
+    """
+    Resolve API Key from multiple sources:
+    1. Argument (if provided)
+    2. Environment Variable (OPENALGO_APIKEY)
+    3. Database (First available key)
+    """
+    if api_key:
+        return api_key
+
+    # 1. Try environment variables
+    key = os.getenv('OPENALGO_APIKEY') or os.getenv('OPENALGO_API_KEY')
+    if key:
+        return key
+
+    # 2. Try database
+    try:
+        # Check if project root is in path, if not add it
+        # Assume standard structure: openalgo/strategies/utils/trading_utils.py
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        strategies_dir = os.path.dirname(current_dir)
+        openalgo_root = os.path.dirname(strategies_dir)
+
+        if openalgo_root not in sys.path:
+            sys.path.insert(0, openalgo_root)
+
+        # This requires 'database' to be importable
+        from database.auth_db import get_first_available_api_key
+        key = get_first_available_api_key()
+        if key:
+            return key
+    except ImportError:
+        # Database module not available or path issue
+        pass
+    except Exception as e:
+        # Log error but don't fail, return None
+        print(f"Warning: Failed to fetch API key from DB: {e}")
+        pass
+
+    return None
 
 # Configure logging
 try:
