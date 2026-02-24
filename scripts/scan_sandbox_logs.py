@@ -41,10 +41,7 @@ def parse_text_log(filepath):
                     price = float(exec_match.group(2))
 
                     if action == "BUY":
-                        # Close previous if open (simplistic assumption for now, or handle stacking)
                         if current_trade.get('status') == 'OPEN':
-                             # Force close or ignore? Let's ignore new buy for now or treat as independent?
-                             # For simplistic leaderboard, assume 1 position at a time per log file sequence
                              pass
 
                         current_trade = {
@@ -61,6 +58,36 @@ def parse_text_log(filepath):
                             current_trade['pnl'] = (price - current_trade['entry_price'])
                             trades.append(current_trade)
                             current_trade = {}
+
+                # Check for "Signal Buy" / "Signal Sell" format (Mock Logs)
+                # 2026-02-24 10:00:00 INFO GapFadeStrategy: Signal Buy NIFTY Price: 24004.00
+                elif "Signal Buy" in line or "Signal Sell" in line:
+                    price_match = re.search(r'Price: ([\d\.]+)', line)
+                    if price_match:
+                        current_trade = {
+                            'entry_time': dt,
+                            'entry_price': float(price_match.group(1)),
+                            'direction': 'LONG' if "Signal Buy" in line else "SHORT",
+                            'status': 'OPEN'
+                        }
+
+                # Check for "Exiting at" format (Mock Logs)
+                # 2026-02-24 10:30:00 INFO GapFadeStrategy: Exiting at 24093.00
+                elif "Exiting at" in line:
+                    price_match = re.search(r'at ([\d\.]+)', line)
+                    if price_match and current_trade.get('status') == 'OPEN':
+                        exit_price = float(price_match.group(1))
+                        current_trade['exit_time'] = dt
+                        current_trade['exit_price'] = exit_price
+                        current_trade['status'] = 'CLOSED'
+                        # Calculate PnL based on direction
+                        if current_trade.get('direction') == 'LONG':
+                            current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+                        else: # SHORT
+                            current_trade['pnl'] = (current_trade['entry_price'] - exit_price)
+
+                        trades.append(current_trade)
+                        current_trade = {}
 
                 # Legacy Logic (keep for backward compatibility if other logs use it)
                 elif "Entry signal detected" in line:
