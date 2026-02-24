@@ -35,33 +35,9 @@ class NSERsiMacdStrategy(BaseStrategy):
         Generate signal using pre-calculated indicators.
         Returns: ('BUY'/'SELL'/'EXIT'/'HOLD', quantity [optional], details [optional])
         """
-        # Determine exchange
-        exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
-
-        # VIX Filter (Equity Curve Protection)
-        vix = self.get_vix()
-        size_multiplier, _ = self.calculate_vix_volatility_multiplier(vix)
-
-        if vix > 35:
-            self.logger.warning(f"Extreme VIX ({vix:.2f}) detected! Skipping entry.")
-            return
-
-        # Fetch historical data (enough for indicators)
-        df = self.fetch_history(days=5, exchange=exchange)
-        if df.empty or len(df) < max(self.macd_slow, self.rsi_period, self.adx_period) + 5:
-            self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows.")
-            return
-
-        # Calculate Indicators
-        try:
-            df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
-            macd, signal_line, _ = self.calculate_macd(df['close'], fast=self.macd_fast, slow=self.macd_slow, signal=self.macd_signal)
-            df['macd'] = macd
-            df['signal'] = signal_line
-            df['adx'] = self.calculate_adx_series(df, period=self.adx_period)
-        except Exception as e:
-            self.logger.error(f"Indicator calculation failed: {e}")
-            return
+        # Indicators are pre-calculated by BaseStrategy.default_cycle because self.indicators is set
+        if df.empty or 'macd' not in df.columns:
+            return "HOLD"
 
         last = df.iloc[-1]
         prev = df.iloc[-2]
@@ -73,6 +49,14 @@ class NSERsiMacdStrategy(BaseStrategy):
         current_adx = last['adx']
 
         self.logger.info(f"Price: {current_price:.2f}, RSI: {current_rsi:.2f}, MACD: {current_macd:.2f}, Signal: {current_signal:.2f}, ADX: {current_adx:.2f}")
+
+        # VIX Filter (Equity Curve Protection)
+        vix = self.get_vix()
+        size_multiplier, _ = self.calculate_vix_volatility_multiplier(vix)
+
+        if vix > 35:
+            self.logger.warning(f"Extreme VIX ({vix:.2f}) detected! Skipping entry.")
+            return "HOLD"
 
         # Position Management
         if self.pm and self.pm.has_position():
@@ -97,48 +81,10 @@ class NSERsiMacdStrategy(BaseStrategy):
                     pass
 
                 self.logger.info(f"Entry signal detected (Bullish Trend + Strong ADX). Buying {qty} (VIX Mult: {size_multiplier}) at {current_price}")
-                self.execute_trade('BUY', qty, current_price)
+                # Return tuple to specify quantity
+                return "BUY", qty
 
-    def get_signal(self, df):
-        """
-        Backtesting signal generation (Optional, can rely on generate_signal if compatible)
-        But keeping for legacy compatibility if needed.
-        """
-        if df.empty or len(df) < max(self.macd_slow, self.rsi_period, self.adx_period) + 5:
-            return 'HOLD', 0.0, {}
-
-        # Calculate Indicators
-        try:
-            df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
-            macd, signal_line, _ = self.calculate_macd(df['close'], fast=self.macd_fast, slow=self.macd_slow, signal=self.macd_signal)
-            df['macd'] = macd
-            df['signal'] = signal_line
-            df['adx'] = self.calculate_adx_series(df, period=self.adx_period)
-
-            last = df.iloc[-1]
-            prev = df.iloc[-2]
-
-            bullish_crossover = (prev['macd'] <= prev['signal']) and (last['macd'] > last['signal'])
-            bearish_crossover = (prev['macd'] >= prev['signal']) and (last['macd'] < last['signal'])
-
-            details = {
-                'close': last['close'],
-                'rsi': last['rsi'],
-                'macd': last['macd'],
-                'adx': last['adx']
-            }
-
-            if bullish_crossover and last['rsi'] > 50 and last['adx'] > self.adx_threshold:
-                return 'BUY', 1.0, details
-
-            if bearish_crossover or last['rsi'] > 70:
-                return 'SELL', 1.0, details
-
-            return 'HOLD', 0.0, details
-
-        except:
-             return 'HOLD', 0.0, {}
-
+        return "HOLD"
 
 if __name__ == "__main__":
     NSERsiMacdStrategy.cli()
