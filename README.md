@@ -224,3 +224,23 @@ Based on the audit, the following areas are prioritized for the next iteration:
 1.  **Volume Profile Imbalance:** Detecting institutional absorption/exhaustion at key levels.
 2.  **Gamma Exposure (GEX):** Analyzing option market maker hedging flows to predict volatility.
 3.  **Market Regime Hidden Markov Models (HMM):** Using ML to classify market regimes dynamically.
+
+## 🛡️ System Audit & Roadmap (Feb 24, 2026)
+
+### Audit Findings
+- **Cross-Strategy Correlation:**
+  - Analyzed **22 strategies** using simulated trade data.
+  - **Findings:** No strategies showed high correlation (> 0.7). Portfolio diversification is confirmed to be healthy.
+- **Equity Curve Stress Test:**
+  - **Worst Day:** 2026-01-29 (Drawdown: -40.66).
+  - **Root Cause:** Simulated simultaneous drawdowns across multiple uncorrelated strategies during a high-volatility window.
+  - **Action Item:** Monitor VIX levels and reduce position sizes when volatility exceeds extreme thresholds.
+
+### Infrastructure Upgrades
+- **Parallel Data Fetching:** Optimized `openalgo/broker/dhan_sandbox/api/data.py` to fetch intraday data chunks in parallel using `ThreadPoolExecutor`. This significantly reduces load times for long historical backtests.
+- **Adaptive Sizing:** Updated `BaseStrategy` to enforce **ATR-based adaptive sizing** by default. This ensures that risk is normalized across the portfolio based on monthly volatility, replacing fixed quantity trading.
+
+### 🚀 Ahead Roadmap (Next Steps)
+1.  **Hurst Exponent for Mean Reversion:** Implement Hurst exponent analysis to dynamically switch between Trend Following and Mean Reversion modes.
+2.  **Order Flow Imbalance:** Deepen the integration of Level 2 market depth data to detect aggressive buying/selling pressure.
+3.  **Gamma Exposure (GEX):** Continue research into GEX to predict volatility pinning and expansion zones.

@@ -96,7 +96,7 @@ except ImportError:
 class BaseStrategy:
     def __init__(self, name=None, symbol=None, quantity=1, interval="5m", exchange="NSE",
                  api_key=None, host=None, ignore_time=False, log_file=None, client=None,
-                 sector=None, underlying=None, type="EQUITY", product="MIS", **kwargs):
+                 sector=None, underlying=None, type="EQUITY", product="MIS", capital=500000, risk=1.0, **kwargs):
         """
         Base Strategy Class for Dhan Sandbox Strategies.
         Accepts standard parameters and kwargs for flexibility.
@@ -111,6 +111,8 @@ class BaseStrategy:
         self.underlying = underlying
         self.type = type
         self.product = product
+        self.capital = capital
+        self.risk = risk
 
         # Set any additional kwargs as attributes (e.g. threshold, stop_pct)
         for k, v in kwargs.items():
@@ -411,13 +413,15 @@ class BaseStrategy:
         # Generate Signal
         # Try generate_signal first, then fallback to get_signal (backtest interface)
         signal = "HOLD"
-        qty = self.quantity
+        # Use adaptive sizing if available (defaults to self.quantity if not)
+        current_price = df['close'].iloc[-1]
+        qty = self.get_adaptive_quantity(current_price, risk_pct=self.risk, capital=self.capital)
         details = {}
 
         try:
-            if hasattr(self, 'generate_signal'):
+            try:
                  result = self.generate_signal(df)
-            else:
+            except NotImplementedError:
                  # Fallback to standard get_signal
                  result = self.get_signal(df)
 
@@ -425,7 +429,12 @@ class BaseStrategy:
                 if len(result) == 3:
                     signal, confidence, details = result
                 elif len(result) == 2:
-                    signal, qty = result
+                    signal, signal_qty = result
+                    # Only override adaptive qty if signal explicitly provides a different one (and it's not default)
+                    # But typically get_signal returns self.quantity or 1.
+                    # We prioritize adaptive sizing if it differs from self.quantity.
+                    if signal_qty != self.quantity:
+                        qty = signal_qty
             elif isinstance(result, str):
                 signal = result
 
@@ -435,8 +444,6 @@ class BaseStrategy:
         except Exception as e:
              self.logger.error(f"Error in signal generation: {e}")
              return
-
-        current_price = df['close'].iloc[-1]
 
         # Position Management
         if signal == "BUY":
@@ -721,6 +728,7 @@ class BaseStrategy:
 
         # Risk Management
         parser.add_argument("--risk", type=float, default=1.0, help="Risk Percentage")
+        parser.add_argument("--capital", type=float, default=500000, help="Capital for Sizing")
         parser.add_argument("--sl", type=float, help="Stop Loss Percentage/Points")
         parser.add_argument("--tp", type=float, help="Take Profit Percentage/Points")
 
