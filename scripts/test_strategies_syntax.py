@@ -8,6 +8,7 @@ sys.path.insert(0, os.getcwd())
 # Ensure openalgo/strategies/utils is in path for base_strategy import
 sys.path.insert(0, os.path.join(os.getcwd(), 'openalgo'))
 sys.path.insert(0, os.path.join(os.getcwd(), 'openalgo', 'strategies', 'utils'))
+sys.path.insert(0, os.path.join(os.getcwd(), 'openalgo', 'strategies', 'scripts'))
 
 def test_mcx():
     print("Testing MCX Strategy...")
@@ -88,3 +89,24 @@ if __name__ == "__main__":
     test_ml_v2()
     test_nse_rsi_macd()
     test_mcx_crudeoil()
+
+def test_gap_fade():
+    print("Testing Gap Fade Strategy...")
+    try:
+        from openalgo.strategies.scripts.gap_fade_strategy import generate_signal
+        df = pd.DataFrame({
+            'close': np.linspace(100, 200, 100),
+            'high': np.linspace(105, 205, 100),
+            'low': np.linspace(95, 195, 100),
+            'open': np.linspace(100, 200, 100),
+            'volume': np.random.rand(100) * 1000
+        })
+        signal = generate_signal(df)
+        print(f"Gap Fade Signal: {signal}")
+    except Exception as e:
+        print(f"Gap Fade Failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    test_gap_fade()
