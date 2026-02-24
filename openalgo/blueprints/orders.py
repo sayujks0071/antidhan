@@ -527,7 +527,15 @@ def placesmartorder():
         # Better Error Handling: Check for Invalid Token early (if not in analyze mode)
         if not is_analyze_mode and not auth_token:
             logger.error("Invalid Token: Authentication token is missing or empty")
-            return jsonify({"status": "error", "message": "Invalid Token"}), 401
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": "Invalid Token: Authentication token is missing or empty",
+                    }
+                ),
+                401,
+            )
 
         # Better Error Handling: Check for SecurityId Required (Token not found) early
         symbol = data.get("symbol")
@@ -537,7 +545,15 @@ def placesmartorder():
             token = get_token(symbol, exchange)
             if not token:
                 logger.error(f"SecurityId Required: Token not found for {symbol} {exchange}")
-                return jsonify({"status": "error", "message": "SecurityId Required"}), 400
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "message": f"SecurityId Required: Token not found for {symbol} {exchange}",
+                        }
+                    ),
+                    400,
+                )
 
         # Delegate to service which handles:
         # 1. Validation (SecurityId Required)

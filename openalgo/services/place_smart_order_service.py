@@ -125,7 +125,10 @@ def validate_smart_order(order_data: dict[str, Any]) -> tuple[bool, str | None]:
                 f"SecurityId Required: Token not found for {order_data['symbol']} {order_data['exchange']}"
             )
             # Return error immediately if token not found (avoids broker call)
-            return False, "SecurityId Required"
+            return (
+                False,
+                f"SecurityId Required: Token not found for {order_data['symbol']} {order_data['exchange']}",
+            )
 
     return True, None
 
