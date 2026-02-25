@@ -96,7 +96,7 @@ except ImportError:
 class BaseStrategy:
     def __init__(self, name=None, symbol=None, quantity=1, interval="5m", exchange="NSE",
                  api_key=None, host=None, ignore_time=False, log_file=None, client=None,
-                 sector=None, underlying=None, type="EQUITY", product="MIS", **kwargs):
+                 sector=None, underlying=None, type="EQUITY", product="MIS", adaptive=True, **kwargs):
         """
         Base Strategy Class for Dhan Sandbox Strategies.
         Accepts standard parameters and kwargs for flexibility.
@@ -111,6 +111,7 @@ class BaseStrategy:
         self.underlying = underlying
         self.type = type
         self.product = product
+        self.adaptive = adaptive
 
         # Set any additional kwargs as attributes (e.g. threshold, stop_pct)
         for k, v in kwargs.items():
@@ -408,6 +409,8 @@ class BaseStrategy:
         # Calculate Indicators
         df = self.calculate_indicators(df)
 
+        current_price = df['close'].iloc[-1]
+
         # Generate Signal
         # Try generate_signal first, then fallback to get_signal (backtest interface)
         signal = "HOLD"
@@ -436,7 +439,13 @@ class BaseStrategy:
              self.logger.error(f"Error in signal generation: {e}")
              return
 
-        current_price = df['close'].iloc[-1]
+        # Adaptive Sizing Logic (Overrides default qty for Entries)
+        if self.adaptive and signal in ["BUY", "SELL"]:
+            adaptive_qty = self.get_adaptive_quantity(current_price)
+            if adaptive_qty > 0:
+                # Use adaptive quantity, but respect if strategy explicitly requested a different valid quantity?
+                # For now, we prioritize adaptive sizing as per system audit requirement.
+                qty = adaptive_qty
 
         # Position Management
         if signal == "BUY":
@@ -723,6 +732,11 @@ class BaseStrategy:
         parser.add_argument("--risk", type=float, default=1.0, help="Risk Percentage")
         parser.add_argument("--sl", type=float, help="Stop Loss Percentage/Points")
         parser.add_argument("--tp", type=float, help="Take Profit Percentage/Points")
+
+        # Adaptive Sizing
+        parser.add_argument("--adaptive", action="store_true", help="Enable Adaptive Sizing")
+        parser.add_argument("--no-adaptive", action="store_false", dest="adaptive", help="Disable Adaptive Sizing")
+        parser.set_defaults(adaptive=True)
 
         return parser
 
