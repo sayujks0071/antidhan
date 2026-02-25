@@ -63,7 +63,7 @@ def parse_text_log(filepath):
                             current_trade = {}
 
                 # Legacy Logic (keep for backward compatibility if other logs use it)
-                elif "Entry signal detected" in line:
+                elif "Entry signal detected" in line or "Signal Buy" in line:
                     price_match = re.search(r'Price: ([\d\.]+)', line)
                     if price_match:
                          current_trade = {
@@ -72,7 +72,7 @@ def parse_text_log(filepath):
                             'direction': 'LONG',
                             'status': 'OPEN'
                         }
-                elif "Exiting position" in line:
+                elif "Exiting position" in line or "Exiting at" in line:
                      price_match = re.search(r'at ([\d\.]+)', line)
                      if not price_match:
                          price_match = re.search(r'Price: ([\d\.]+)', line)
