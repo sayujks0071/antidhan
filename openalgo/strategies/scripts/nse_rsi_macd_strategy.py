@@ -42,8 +42,7 @@ class NSERsiMacdStrategy(BaseStrategy):
         vix = self.get_vix()
         size_multiplier, _ = self.calculate_vix_volatility_multiplier(vix)
 
-        if vix > 35:
-            self.logger.warning(f"Extreme VIX ({vix:.2f}) detected! Skipping entry.")
+        if not self.check_market_volatility(vix, threshold=35):
             return
 
         # Fetch historical data (enough for indicators)

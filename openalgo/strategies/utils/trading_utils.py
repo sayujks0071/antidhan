@@ -265,6 +265,21 @@ def calculate_vix_volatility_multiplier(vix, thresholds=None):
         return thresholds['default']['multiplier'], thresholds['default']['dev_threshold']
 
 
+def check_market_volatility(vix, threshold=35.0):
+    """
+    Check if market volatility (VIX) is within safe limits.
+    Returns True if safe (VIX < threshold), False otherwise.
+    """
+    if vix is None:
+        return True
+
+    if vix > threshold:
+        logger.warning(f"Extreme VIX ({vix:.2f}) detected! Market unsafe.")
+        return False
+
+    return True
+
+
 class PositionManager:
     """
     Persistent position manager to track trades and prevent duplicate orders.
