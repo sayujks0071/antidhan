@@ -112,9 +112,15 @@ class BaseStrategy:
         self.type = type
         self.product = product
 
-        # Set any additional kwargs as attributes (e.g. threshold, stop_pct)
+        # 1. Initialize from class-level params if available (Default values)
+        if hasattr(self, 'params') and isinstance(self.params, dict):
+            for k, v in self.params.items():
+                setattr(self, k, v)
+
+        # 2. Override/Set from kwargs (CLI arguments)
         for k, v in kwargs.items():
-            setattr(self, k, v)
+            if v is not None:
+                setattr(self, k, v)
 
         self.last_candle_time = None
 
@@ -728,8 +734,29 @@ class BaseStrategy:
 
     @classmethod
     def add_arguments(cls, parser):
-        """Hook for subclasses to add arguments."""
-        pass
+        """
+        Hook for subclasses to add arguments.
+        Automatically adds arguments from 'params' dictionary if defined in the subclass.
+        """
+        if hasattr(cls, 'params') and isinstance(cls.params, dict):
+            for k, v in cls.params.items():
+                # Avoid adding duplicates if already added by standard parser
+                existing_args = [a.dest for a in parser._actions]
+                if k in existing_args:
+                    continue
+
+                # Determine type from default value
+                if isinstance(v, bool):
+                    if v is False:
+                        parser.add_argument(f"--{k}", action="store_true", help=f"Parameter {k} (default: {v})")
+                    else:
+                         parser.add_argument(f"--{k}", action="store_false", help=f"Parameter {k} (default: {v})")
+                elif isinstance(v, int):
+                    parser.add_argument(f"--{k}", type=int, default=v, help=f"Parameter {k} (default: {v})")
+                elif isinstance(v, float):
+                     parser.add_argument(f"--{k}", type=float, default=v, help=f"Parameter {k} (default: {v})")
+                else:
+                    parser.add_argument(f"--{k}", type=str, default=v, help=f"Parameter {k} (default: {v})")
 
     @classmethod
     def parse_arguments(cls, args):
@@ -793,6 +820,11 @@ class BaseStrategy:
              print(f"Error instantiating strategy: {e}")
              import traceback
              traceback.print_exc()
+
+    @classmethod
+    def start(cls):
+        """Alias for cli() to provide a cleaner entry point."""
+        cls.cli()
 
     @classmethod
     def backtest_signal(cls, df, params=None):
