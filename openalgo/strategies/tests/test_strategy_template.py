@@ -21,11 +21,11 @@ if utils_dir not in sys.path:
 # Import the module to be tested
 # We wrap this in try-except or just import, assuming path is correct
 try:
-    from strategy_template import YourStrategy, generate_signal, ATR_SL_MULTIPLIER, ATR_TP_MULTIPLIER
+    from strategy_template import StrategyTemplate, generate_signal, ATR_SL_MULTIPLIER, ATR_TP_MULTIPLIER
 except ImportError:
     # Fallback if running from root
     sys.path.append('openalgo/strategies/scripts')
-    from strategy_template import YourStrategy, generate_signal, ATR_SL_MULTIPLIER, ATR_TP_MULTIPLIER
+    from strategy_template import StrategyTemplate, generate_signal, ATR_SL_MULTIPLIER, ATR_TP_MULTIPLIER
 
 class TestStrategyTemplate:
     def setup_method(self):
@@ -51,10 +51,10 @@ class TestStrategyTemplate:
             with patch('strategy_template.PositionManager') as MockPM:
                 # We also need to mock os.getenv to avoid missing API key warning/error
                 with patch.dict(os.environ, {'OPENALGO_API_KEY': 'dummy'}):
-                    strategy = YourStrategy(symbol='TEST', api_key='dummy')
+                    strategy = StrategyTemplate(symbol='TEST', api_key='dummy')
                     assert strategy.symbol == 'TEST'
                     assert strategy.quantity == 10
-                    assert strategy.name == 'StrategyName_TEST'
+                    assert strategy.name == 'StrategyTemplate_TEST'
 
     def test_generate_signal_structure(self):
         action, score, details = generate_signal(self.df)
