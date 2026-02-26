@@ -613,7 +613,7 @@ def close_position():
         # 2. Auth checks (Invalid Token) - returns 401 if auth_token is missing/invalid
         # 3. Automatic retry mechanism for 500-level errors (including 502, 503, 504)
         success, response_data, status_code = place_smart_order(
-            order_data=order_data,
+            order_data=data,
             api_key=api_key,
             auth_token=auth_token,
             broker=broker_name,
