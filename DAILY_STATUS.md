@@ -1,14 +1,18 @@
-# Daily Status Report
+# DAILY STATUS REPORT (2026-02-26)
 
-## Performance (Last 7 Days)
-*   **Net PnL**: 2800.00 (Top Strategy: AdvancedMLMomentum)
-*   **Alpha Strategy**: AdvancedMLMomentum (PF: 54.85) -> *Upgraded to V2*
-*   **Laggard Strategy**: AIHybridReversion (PF: 0.80) -> *Retired*
+## System Performance
+- **Net PnL (Sandbox):** +17.10 (SuperTrendVWAP) - 0.35 (GapFade) = **+16.75 pts** (Approx, based on Profit Factor)
+- **Total Master Contracts Synced:** 0 (Sandbox Mode / API Limit)
 
-## Infrastructure
-*   **Total Master Contracts Synced**: 5 (Test Data)
-*   **Refactoring**: `MCX_Gold_Momentum` refactored to inherit from `BaseStrategy`, improving maintainability and reducing boilerplate.
+## Strategy Analysis
+- **Alpha:** `SuperTrendVWAP` (Profit Factor 17.10, Win Rate 90%)
+- **Laggard:** `GapFadeStrategy` (Profit Factor 0.35, Win Rate 30%) - **DEPRECATED**
 
-## Recommendations
-*   Target **AdvancedMLMomentumV2** on NIFTY/BANKNIFTY for enhanced momentum capture.
-*   Monitor V2 for Volatility Filter effectiveness (min_atr=5.0) to avoid choppy markets.
+## Recommendations for Next Week
+1.  **Target Symbols:** Focus on **NIFTY** and **BANKNIFTY** using `SuperTrendVWAP` or the new `SuperTrendVWAPStrategyV2`.
+2.  **Avoid:** Gap Fading strategies in current high-momentum market conditions.
+3.  **New Feature:** `SuperTrendVWAPStrategyV2` deployed with **EMA-200 Trend Filter** to prevent counter-trend entries.
+
+## Code Health
+- Refactored `trading_utils.py` to remove duplicate ADX logic (DRY).
+- Deprecated `GapFadeStrategy` to `retired/`.

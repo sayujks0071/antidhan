@@ -163,36 +163,13 @@ def calculate_bollinger_bands(series, window=20, num_std=2):
 
 
 def calculate_adx(df, period=14):
-    """Calculate ADX (Returns Series)."""
+    """
+    Calculate ADX (Returns Series).
+    Wraps calculate_adx_di to avoid duplication.
+    """
     try:
-        # Cleaned up implementation to avoid SettingWithCopyWarning and potential errors
-        plus_dm = df['high'].diff()
-        minus_dm = df['low'].diff()
-
-        # Vectorized modification
-        plus_dm = np.where(plus_dm < 0, 0, plus_dm)
-        # If low goes UP (diff > 0), then downward movement is 0.
-        # If low goes DOWN (diff < 0), then downward movement is negative.
-        # BaseStrategy used: minus_dm[minus_dm > 0] = 0.
-        # This keeps negative values (downward moves).
-        minus_dm = np.where(minus_dm > 0, 0, minus_dm)
-
-        tr1 = df['high'] - df['low']
-        tr2 = (df['high'] - df['close'].shift(1)).abs()
-        tr3 = (df['low'] - df['close'].shift(1)).abs()
-        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-
-        atr = tr.rolling(period).mean()
-
-        plus_dm_series = pd.Series(plus_dm, index=df.index)
-        minus_dm_series = pd.Series(minus_dm, index=df.index)
-
-        plus_di = 100 * (plus_dm_series.ewm(alpha=1/period).mean() / atr)
-        minus_di = 100 * (minus_dm_series.abs().ewm(alpha=1/period).mean() / atr)
-
-        dx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
-        adx = dx.rolling(period).mean()
-        return adx.fillna(0)
+        adx, _, _ = calculate_adx_di(df, period)
+        return adx
     except Exception:
         return pd.Series(0, index=df.index)
 
