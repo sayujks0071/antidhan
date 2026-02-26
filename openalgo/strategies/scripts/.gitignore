@@ -24,3 +24,4 @@ __pycache__/
 !mcx_aluminium_trend_strategy.py
 !mcx_copper_trend_strategy.py
 !nifty_smart_trend_oi.py
+!vbt_single_strategy.py
