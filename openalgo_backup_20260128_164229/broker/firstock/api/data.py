@@ -2,10 +2,9 @@ import json
 import os
 import pandas as pd
 from datetime import datetime, timedelta
-from database.token_db import get_token, get_br_symbol, get_symbol
+from database.token_db import get_br_symbol
 import traceback
 import time
-import httpx
 from utils.logging import get_logger
 from utils.httpx_client import get_httpx_client
 
@@ -233,7 +232,7 @@ class BrokerData:
                 return self._process_quotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_quotes_batch(self, symbols: list) -> list:

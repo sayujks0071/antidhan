@@ -21,7 +21,7 @@ strategy_id = 'delta_neutral_iron_condor_nifty_20260123131614'
 
 if strategy_id in configs:
     cfg = configs[strategy_id]
-    print(f"✅ Strategy found in configs")
+    print("✅ Strategy found in configs")
     print(f"   ID: {strategy_id}")
     print(f"   Name: {cfg.get('name')}")
     print(f"   File: {cfg.get('file_path')}")
@@ -38,15 +38,15 @@ if strategy_id in configs:
     else:
         print(f"   ❌ File missing: {file_path}")
 else:
-    print(f"❌ Strategy NOT found in configs")
+    print("❌ Strategy NOT found in configs")
 
 if strategy_id in env_data:
     if 'OPENALGO_APIKEY' in env_data[strategy_id]:
-        print(f"✅ API Key is set")
+        print("✅ API Key is set")
     else:
-        print(f"❌ API Key missing")
+        print("❌ API Key missing")
 else:
-    print(f"❌ Strategy NOT found in env file")
+    print("❌ Strategy NOT found in env file")
 
 print()
 print("=" * 80)

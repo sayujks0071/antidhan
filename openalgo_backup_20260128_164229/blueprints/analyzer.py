@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, jsonify, request, session, flash, redirect, url_for, Response
+from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for, Response
 from database.analyzer_db import AnalyzerLog, db_session
 from utils.session import check_session_validity
-from sqlalchemy import func, desc
+from sqlalchemy import func
 from utils.api_analyzer import get_analyzer_stats
 import json
 from datetime import datetime, timedelta

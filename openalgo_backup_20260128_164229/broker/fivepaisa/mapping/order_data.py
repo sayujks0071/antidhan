@@ -1,7 +1,6 @@
-import json
 import re
 from datetime import datetime, timedelta
-from database.token_db import get_symbol, get_oa_symbol 
+from database.token_db import get_symbol
 from broker.fivepaisa.mapping.transform_data import reverse_map_exchange
 from utils.logging import get_logger
 

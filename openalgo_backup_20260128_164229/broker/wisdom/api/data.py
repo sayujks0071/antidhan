@@ -1,16 +1,12 @@
 import json
-import os
-import urllib.parse
-from database.token_db import get_br_symbol, get_oa_symbol, get_brexchange
+from database.token_db import get_br_symbol
 from broker.wisdom.database.master_contract_db import SymToken, db_session
 from flask import session  
 import pandas as pd
 from datetime import datetime, timedelta
 from utils.httpx_client import get_httpx_client
-from database.auth_db import get_feed_token
 from broker.wisdom.baseurl import MARKET_DATA_URL
 from broker.wisdom.api.auth_api import get_feed_token as refresh_feed_token
-import pytz
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -300,7 +296,7 @@ class BrokerData:
                 return self._process_multiquotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_multiquotes_batch(self, symbols: list) -> list:
@@ -718,7 +714,7 @@ class BrokerData:
             dict: Market depth data
         """
         try:
-            logger.debug(f"=== Starting Market Depth Request ===")
+            logger.debug("=== Starting Market Depth Request ===")
             logger.debug(f"Symbol: {symbol}, Exchange: {exchange}")
             
             # Get feed token and user ID for request

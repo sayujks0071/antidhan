@@ -18,7 +18,7 @@ import json
 import argparse
 import logging
 import time as time_module
-from datetime import datetime, time
+from datetime import datetime
 from pathlib import Path
 import math
 from urllib import error as urllib_error
@@ -54,7 +54,6 @@ from production_strategy_config import (
     SEGMENT_CONFIGS,
     STRATEGY_PARAMS,
     SESSION_CONFIG,
-    FILTER_CONFIG,
 )
 
 # Import Trading Utils

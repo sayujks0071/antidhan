@@ -2,7 +2,6 @@
 WebSocket implementation for Groww using minimal NATS authentication
 """
 
-import json
 import logging
 import ssl
 import certifi
@@ -10,7 +9,6 @@ import websocket
 import threading
 import time
 import requests
-import os
 import base64
 from typing import Dict, Any, Optional, Callable
 
@@ -104,7 +102,7 @@ class GrowwNATSWebSocket:
             )
 
             # Log CONNECT details for debugging
-            logger.info(f"CONNECT details:")
+            logger.info("CONNECT details:")
             logger.info(f"  JWT Token length: {len(self.socket_token) if self.socket_token else 0}")
             logger.info(f"  Has nkey: {bool(nkey)}")
             logger.info(f"  Has signature: {bool(sig)}")
@@ -409,13 +407,13 @@ class GrowwNATSWebSocket:
                         logger.info(f"📥 Market data message received: {msg_size} bytes")
                         # Check specifically for exchange and type
                         if '/ld/eq/nse/price' in msg_text:
-                            logger.info(f"   ✅ NSE LTP message detected")
+                            logger.info("   ✅ NSE LTP message detected")
                         elif '/ld/eq/nse/book' in msg_text:
-                            logger.info(f"   ✅ NSE DEPTH message detected")
+                            logger.info("   ✅ NSE DEPTH message detected")
                         elif '/ld/eq/bse/price' in msg_text:
-                            logger.info(f"   🔴 BSE LTP message detected!")
+                            logger.info("   🔴 BSE LTP message detected!")
                         elif '/ld/eq/bse/book' in msg_text:
-                            logger.info(f"   🔴 BSE DEPTH message detected!")
+                            logger.info("   🔴 BSE DEPTH message detected!")
                         logger.info(f"   First 100 chars: {msg_text[:100]}")
                     # Also check for any BSE-related content
                     elif 'bse' in msg_text.lower() or '532540' in msg_text:
@@ -426,9 +424,9 @@ class GrowwNATSWebSocket:
                         logger.info(f"📈 Possible F&O message detected: {msg_size} bytes")
                         logger.info(f"   Content preview: {msg_text[:200]}")
                         if '/ld/fo/nse/book' in msg_text:
-                            logger.info(f"   ✅ NFO DEPTH message confirmed!")
+                            logger.info("   ✅ NFO DEPTH message confirmed!")
                         elif '/ld/fo/nse/price' in msg_text:
-                            logger.info(f"   ✅ NFO LTP message confirmed!")
+                            logger.info("   ✅ NFO LTP message confirmed!")
                     # Log ANY message if we're monitoring BSE
                     elif hasattr(self, 'monitoring_bse') and self.monitoring_bse:
                         logger.info(f"🔍 Message after BSE sub: {msg_size} bytes, starts with: {msg_text[:30]}")
@@ -689,7 +687,7 @@ class GrowwNATSWebSocket:
 
             # Send a PING to flush ALL subscriptions (similar to official SDK's flush)
             # This ensures the server processes the subscription before continuing
-            logger.info(f"Sending PING to flush subscription")
+            logger.info("Sending PING to flush subscription")
             self.ws.send(self.nats_protocol.create_ping())
 
             # Wait briefly for PONG to ensure subscription is processed
@@ -714,7 +712,7 @@ class GrowwNATSWebSocket:
 
         # Enhanced logging for BSE subscriptions
         if 'BSE' in exchange.upper():
-            logger.info(f"🔴 BSE LTP Subscription Request:")
+            logger.info("🔴 BSE LTP Subscription Request:")
             logger.info(f"   Exchange: {exchange}")
             logger.info(f"   Segment: {segment}")
             logger.info(f"   Token: {token}")
@@ -758,7 +756,7 @@ class GrowwNATSWebSocket:
                 logger.info(f"🔴 BSE subscription sent for {symbol}, waiting for market data MSG...")
                 logger.info(f"   Subscription key: {sub_key}")
                 logger.info(f"   Active SIDs: {list(self.nats_sids.keys())}")
-                logger.warning(f"⚠️ NOTE: Monitoring ALL messages after BSE subscription...")
+                logger.warning("⚠️ NOTE: Monitoring ALL messages after BSE subscription...")
                 # Set flag to monitor messages
                 self.monitoring_bse = True
 
@@ -792,7 +790,7 @@ class GrowwNATSWebSocket:
 
         # Enhanced logging for BSE depth subscriptions
         if 'BSE' in exchange.upper():
-            logger.info(f"🔴 BSE DEPTH Subscription Request:")
+            logger.info("🔴 BSE DEPTH Subscription Request:")
             logger.info(f"   Exchange: {exchange}")
             logger.info(f"   Segment: {segment}")
             logger.info(f"   Token: {token}")
@@ -825,7 +823,7 @@ class GrowwNATSWebSocket:
                 logger.info(f"📈 F&O DEPTH subscription sent for {symbol}")
                 logger.info(f"   Exchange: {exchange}, Segment: {segment}")
                 logger.info(f"   Topic subscribed: {self.subscriptions[sub_key]}")
-                logger.info(f"   Monitoring for F&O depth messages...")
+                logger.info("   Monitoring for F&O depth messages...")
                 self.monitoring_fo = True
 
         return sub_key

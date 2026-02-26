@@ -1,10 +1,7 @@
 import json
 import os
-from tokenize import Token
-import httpx
-from database.auth_db import get_auth_token
-from database.token_db import get_token , get_br_symbol, get_symbol
-from broker.ibulls.mapping.transform_data import transform_data , map_product_type, reverse_map_product_type, transform_modify_order_data
+from database.token_db import get_token , get_br_symbol
+from broker.ibulls.mapping.transform_data import transform_data , map_product_type, transform_modify_order_data
 from utils.httpx_client import get_httpx_client
 from broker.ibulls.baseurl import INTERACTIVE_URL
 from utils.logging import get_logger
@@ -200,13 +197,13 @@ def place_smartorder_api(data: dict, auth: str) -> tuple:
             current_net_qty_str = get_open_position(symbol, exchange, mapped_product, AUTH_TOKEN)
             current_position = int(current_net_qty_str or 0)
             
-            logger.info(f"=== SMART ORDER ANALYSIS ===")
+            logger.info("=== SMART ORDER ANALYSIS ===")
             logger.info(f"Symbol: {symbol}, Exchange: {exchange}, Product: {product}")
             logger.info(f"Mapped Product: {mapped_product}")
             logger.info(f"Current NetQty from position book: {current_net_qty_str}")
             logger.info(f"Current Position (parsed): {current_position}")
             logger.info(f"Target Position Size: {position_size}")
-            logger.info(f"=== END ANALYSIS ===")
+            logger.info("=== END ANALYSIS ===")
             
         except Exception as e:
             error_msg = f"Failed to fetch current position for {symbol}"

@@ -42,18 +42,18 @@ def test_nifty_call_greeks():
         "exchange": "NFO"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         result = response.json()
         print(json.dumps(result, indent=2))
 
         if result.get('status') == 'success':
-            print(f"\n📊 Greeks Summary:")
+            print("\n📊 Greeks Summary:")
             print(f"   Delta: {result['greeks']['delta']}")
             print(f"   Gamma: {result['greeks']['gamma']}")
             print(f"   Theta: {result['greeks']['theta']}")
@@ -78,18 +78,18 @@ def test_banknifty_put_greeks():
         "exchange": "NFO"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         result = response.json()
         print(json.dumps(result, indent=2))
 
         if result.get('status') == 'success':
-            print(f"\n📊 Greeks Summary:")
+            print("\n📊 Greeks Summary:")
             print(f"   Delta: {result['greeks']['delta']} (Put delta is negative)")
             print(f"   Theta: {result['greeks']['theta']} (Time decay)")
             print(f"   Days to Expiry: {result['days_to_expiry']}")
@@ -113,13 +113,13 @@ def test_custom_interest_rate():
         "interest_rate": 7.0  # Custom interest rate
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         result = response.json()
         print(json.dumps(result, indent=2))
 
@@ -145,13 +145,13 @@ def test_sensex_option_greeks():
         "exchange": "BFO"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         result = response.json()
         print(json.dumps(result, indent=2))
 
@@ -173,18 +173,18 @@ def test_currency_option_greeks():
         "exchange": "CDS"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         result = response.json()
         print(json.dumps(result, indent=2))
 
         if result.get('status') == 'success':
-            print(f"\n💱 Currency Option:")
+            print("\n💱 Currency Option:")
             print(f"   Spot: {result['spot_price']}")
             print(f"   Strike: {result['strike']}")
 
@@ -206,13 +206,13 @@ def test_commodity_option_greeks():
         "exchange": "MCX"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         result = response.json()
         print(json.dumps(result, indent=2))
 
@@ -235,7 +235,7 @@ def test_mcx_custom_expiry_time():
         "expiry_time": "17:00"  # Gold expires at 5:00 PM, not default 23:30
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
     print("\n⚠️  Note: Gold expires at 17:00 (5 PM), not the default 23:30")
     print("   Using custom expiry_time for accurate Greeks calculation")
@@ -243,12 +243,12 @@ def test_mcx_custom_expiry_time():
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         result = response.json()
         print(json.dumps(result, indent=2))
 
         if result.get('status') == 'success':
-            print(f"\n📊 MCX Commodity Greeks:")
+            print("\n📊 MCX Commodity Greeks:")
             print(f"   Days to Expiry: {result['days_to_expiry']}")
             print(f"   Theta: {result['greeks']['theta']} (Time decay)")
             print(f"   Delta: {result['greeks']['delta']}")
@@ -271,13 +271,13 @@ def test_equity_option_greeks():
         "exchange": "NFO"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         result = response.json()
         print(json.dumps(result, indent=2))
 
@@ -299,13 +299,13 @@ def test_invalid_symbol_format():
         "exchange": "NFO"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -325,13 +325,13 @@ def test_expired_option():
         "exchange": "NFO"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -379,7 +379,7 @@ def test_compare_call_put_greeks():
             print(f"   IV: {put_result['implied_volatility']}%")
 
         if call_result.get('status') == 'success' and put_result.get('status') == 'success':
-            print(f"\n✓ Put-Call Parity Check:")
+            print("\n✓ Put-Call Parity Check:")
             print(f"   Gamma should be equal: {call_result['greeks']['gamma']:.6f} vs {put_result['greeks']['gamma']:.6f}")
             print(f"   IV should be similar: {call_result['implied_volatility']:.2f}% vs {put_result['implied_volatility']:.2f}%")
 

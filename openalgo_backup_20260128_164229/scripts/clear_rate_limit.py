@@ -4,9 +4,6 @@ Clear rate limits by restarting the Flask server.
 Rate limits are stored in memory and reset on server restart.
 """
 import subprocess
-import sys
-import os
-from pathlib import Path
 
 print("=" * 80)
 print("RATE LIMIT CLEARANCE TOOL")

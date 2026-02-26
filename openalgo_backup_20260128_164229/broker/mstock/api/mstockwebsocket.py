@@ -29,7 +29,7 @@ class MstockWebSocket:
         # Try BROKER_API_SECRET first (used in REST API), fallback to BROKER_API_KEY
         self.api_key = os.getenv('BROKER_API_SECRET') or os.getenv('BROKER_API_KEY')
         self.ws_url = f"{self.WS_URL}?API_KEY={self.api_key}&ACCESS_TOKEN={self.auth_token}"
-        logger.debug(f"WebSocket URL constructed (masked): wss://ws.mstock.trade?API_KEY=***&ACCESS_TOKEN=***")
+        logger.debug("WebSocket URL constructed (masked): wss://ws.mstock.trade?API_KEY=***&ACCESS_TOKEN=***")
 
         # Streaming mode variables
         self.websocket = None
@@ -56,7 +56,7 @@ class MstockWebSocket:
         try:
             # Handle LTP mode packet (51 bytes)
             if len(data) == 51:
-                logger.debug(f"Parsing 51-byte LTP packet (mode 1)")
+                logger.debug("Parsing 51-byte LTP packet (mode 1)")
                 # Parse LTP packet structure:
                 # Byte 0: subscription mode
                 # Byte 1: exchange type
@@ -95,7 +95,7 @@ class MstockWebSocket:
 
             # Handle Quote mode packet (123 bytes)
             elif len(data) == 123:
-                logger.debug(f"Parsing 123-byte Quote packet (mode 2)")
+                logger.debug("Parsing 123-byte Quote packet (mode 2)")
                 # Parse Quote packet structure (mode 2):
                 # Byte 0: subscription mode
                 # Byte 1: exchange type
@@ -144,7 +144,7 @@ class MstockWebSocket:
             # Check if data has the 4-byte header or is just the 379-byte packet
             elif len(data) == 379:
                 # Direct packet without header
-                logger.debug(f"Parsing 379-byte packet (no header)")
+                logger.debug("Parsing 379-byte packet (no header)")
                 packet = data
             elif len(data) >= 383:
                 # Parse header (4 bytes) + packet
@@ -278,7 +278,7 @@ class MstockWebSocket:
                                 if quote:
                                     return quote
                                 else:
-                                    logger.warning(f"Failed to parse binary packet, waiting for next message...")
+                                    logger.warning("Failed to parse binary packet, waiting for next message...")
                             else:
                                 logger.debug(f"Received non-quote binary data ({len(response)} bytes), waiting for quote data...")
                         elif isinstance(response, str):
@@ -308,7 +308,7 @@ class MstockWebSocket:
             return None
         except websockets.exceptions.InvalidStatusCode as e:
             logger.error(f"WebSocket connection rejected with status {e.status_code}: {str(e)}")
-            logger.error(f"Check if API_KEY and ACCESS_TOKEN are valid")
+            logger.error("Check if API_KEY and ACCESS_TOKEN are valid")
             return None
         except Exception as e:
             logger.error(f"WebSocket error: {str(e)}")

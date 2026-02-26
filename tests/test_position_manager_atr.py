@@ -8,7 +8,7 @@ import os
 # Add openalgo directory to path
 sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
 
-from strategies.utils.trading_utils import PositionManager, calculate_atr
+from strategies.utils.trading_utils import PositionManager
 
 class TestPositionManagerATR(unittest.TestCase):
     def setUp(self):

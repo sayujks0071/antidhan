@@ -8,12 +8,11 @@ for POST requests.
 
 import requests
 import sys
-import json
 
 def test_tradingview_csrf(base_url="http://127.0.0.1:5000"):
     """Test TradingView CSRF protection"""
     print(f"\n{'='*60}")
-    print(f"Testing TradingView CSRF Protection")
+    print("Testing TradingView CSRF Protection")
     print(f"Server: {base_url}")
     print(f"{'='*60}\n")
     
@@ -77,7 +76,7 @@ def test_tradingview_csrf(base_url="http://127.0.0.1:5000"):
                 print("✗ FAIL: JavaScript missing CSRF token implementation")
                 results.append(False)
         else:
-            print(f"✗ FAIL: Could not load JavaScript file")
+            print("✗ FAIL: Could not load JavaScript file")
             results.append(False)
     except Exception as e:
         print(f"✗ FAIL: Error checking JavaScript: {e}")

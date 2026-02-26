@@ -1,4 +1,4 @@
-from flask_restx import Namespace, Resource, fields
+from flask_restx import Namespace, Resource
 from flask import request, jsonify, make_response
 from limiter import limiter
 import os
@@ -34,7 +34,7 @@ class PlaceOrder(Resource):
             
             return make_response(jsonify(response_data), status_code)
             
-        except Exception as e:
+        except Exception:
             logger.exception("An unexpected error occurred in PlaceOrder endpoint.")
             error_response = {
                 'status': 'error',

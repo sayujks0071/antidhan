@@ -3,10 +3,8 @@ import json
 import os
 import logging
 import traceback
-from database.auth_db import get_auth_token
-from database.token_db import get_token, get_br_symbol, get_oa_symbol
-from ..mapping.transform_data import transform_data, map_product_type, reverse_map_product_type, transform_modify_order_data
-from ..mapping.order_data import transform_tradebook_data, transform_holdings_data, map_trade_data
+from database.token_db import get_token, get_oa_symbol
+from ..mapping.transform_data import transform_data, map_product_type, transform_modify_order_data
 
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
@@ -1241,7 +1239,7 @@ def cancel_order(orderid, auth):
         logger.debug(f"cancel_order - Query parameters: {params}")
         
         # Make API request
-        logger.debug(f"cancel_order - Making API request to /api/oms/cancel-order")
+        logger.debug("cancel_order - Making API request to /api/oms/cancel-order")
         response = get_api_response(
             "/api/oms/cancel-order",
             auth=auth,
@@ -1252,7 +1250,7 @@ def cancel_order(orderid, auth):
         
         # Handle response
         if response["s"] == "ok":
-            logger.debug(f"cancel_order - Order cancelled successfully")
+            logger.debug("cancel_order - Order cancelled successfully")
             return {
                 "stat": "Ok",
                 "data": {
@@ -1288,7 +1286,7 @@ def cancel_all_orders_api(data, auth):
         tuple: (list of canceled orders, list of failed cancellations)
     """
     try:
-        logger.debug(f"cancel_all_orders_api - Getting order book")
+        logger.debug("cancel_all_orders_api - Getting order book")
         order_book_response = get_order_book(auth)
         logger.debug(f"cancel_all_orders_api - Order book response: {order_book_response}")
         
@@ -1410,7 +1408,7 @@ def modify_order(data, auth):
             return {"stat": "Not_Ok", "data": {"msg": error_msg}}, 400
         
         # Make API request
-        logger.debug(f"modify_order - Making API request to /api/oms/modify-order")
+        logger.debug("modify_order - Making API request to /api/oms/modify-order")
         response = get_api_response(
             "/api/oms/modify-order",
             auth=auth,
@@ -1421,7 +1419,7 @@ def modify_order(data, auth):
         
         # Handle different response formats
         if response["s"] == "ok":
-            logger.debug(f"modify_order - Order modified successfully")
+            logger.debug("modify_order - Order modified successfully")
             return {
                 "stat": "Ok",
                 "data": {

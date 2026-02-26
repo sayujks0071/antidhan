@@ -5,7 +5,6 @@
 #When brokers stop supporting market orders, this converts MARKET orders to LIMIT orders
 #with a price buffer based on configurable protection percentages.
 
-from typing import Optional
 from utils.logging import get_logger
 
 logger = get_logger(__name__)

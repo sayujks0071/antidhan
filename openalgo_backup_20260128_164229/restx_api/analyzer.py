@@ -3,7 +3,6 @@ from flask import request, jsonify, make_response
 from marshmallow import ValidationError
 from limiter import limiter
 import os
-import traceback
 
 from restx_api.account_schema import AnalyzerSchema, AnalyzerToggleSchema
 from services.analyzer_service import get_analyzer_status, toggle_analyzer_mode
@@ -48,7 +47,7 @@ class AnalyzerStatus(Resource):
             
             return make_response(jsonify(response_data), status_code)
 
-        except Exception as e:
+        except Exception:
             logger.exception("An unexpected error occurred in Analyzer status endpoint.")
             error_message = 'An unexpected error occurred'
             error_response = {'status': 'error', 'message': error_message}
@@ -83,7 +82,7 @@ class AnalyzerToggle(Resource):
             
             return make_response(jsonify(response_data), status_code)
 
-        except Exception as e:
+        except Exception:
             logger.exception("An unexpected error occurred in Analyzer toggle endpoint.")
             error_message = 'An unexpected error occurred'
             error_response = {'status': 'error', 'message': error_message}

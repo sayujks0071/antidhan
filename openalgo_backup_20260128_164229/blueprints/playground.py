@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, session, current_app
+from flask import Blueprint, render_template, jsonify, session, current_app
 import json
 from collections import OrderedDict
 import os

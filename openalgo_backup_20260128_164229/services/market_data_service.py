@@ -7,9 +7,8 @@ import threading
 import time
 from typing import Dict, List, Any, Optional, Callable, Set
 from collections import defaultdict
-from datetime import datetime
 from utils.logging import get_logger
-from .websocket_service import register_market_data_callback, get_websocket_connection
+from .websocket_service import register_market_data_callback
 
 # Initialize logger
 logger = get_logger(__name__)

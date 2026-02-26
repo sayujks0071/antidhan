@@ -1,13 +1,9 @@
-import json
-import os
 import time
-import httpx
 from utils.httpx_client import get_httpx_client
-from database.token_db import get_token, get_br_symbol, get_oa_symbol
+from database.token_db import get_token
 import pandas as pd
 from datetime import datetime, timedelta
 import urllib.parse
-import numpy as np
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -101,7 +97,7 @@ class BrokerData:
             logger.debug(f"Using instrument key: {token}")
             return token
 
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error getting instrument key for {symbol} on {exchange}")
             raise
 
@@ -242,7 +238,7 @@ class BrokerData:
                 'oi': int(oi_value) if oi_value else 0
             }
             
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error fetching quotes for {symbol} on {exchange}")
             raise
 
@@ -285,7 +281,7 @@ class BrokerData:
                 return self._process_quotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_quotes_batch(self, symbols: list) -> list:
@@ -544,7 +540,7 @@ class BrokerData:
             
             return df
             
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error fetching historical data for {symbol} on {exchange}")
             raise
 
@@ -687,7 +683,7 @@ class BrokerData:
                                         last_close == quotes_close and
                                         last_volume == quotes_volume):
                                         is_stale = True
-                                        logger.warning(f"Quotes data appears stale (identical to last candle). Skipping today's candle to avoid duplicates.")
+                                        logger.warning("Quotes data appears stale (identical to last candle). Skipping today's candle to avoid duplicates.")
                                         logger.warning(f"Last candle: O={last_open}, H={last_high}, L={last_low}, C={last_close}, V={last_volume}")
                                         logger.warning(f"Quotes data: O={quotes_open}, H={quotes_high}, L={quotes_low}, C={quotes_close}, V={quotes_volume}")
 
@@ -958,7 +954,7 @@ class BrokerData:
                 'volume': ohlc_data.get('volume', quote.get('volume', 0))
             }
             
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error fetching market depth for {symbol} on {exchange}")
             raise
 

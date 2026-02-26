@@ -1,10 +1,8 @@
 import os
 import glob
 import json
-import re
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 import sys
 
 # Ensure we can import tabulate
@@ -126,7 +124,7 @@ def analyze_correlation(df):
         print("\n[!] High Correlation Detected (> 0.7):")
         for s1, s2, val in high_corr_pairs:
             print(f"  - {s1} <-> {s2}: {val:.2f}")
-            print(f"    Recommendation: Merge or disable the one with lower performance.")
+            print("    Recommendation: Merge or disable the one with lower performance.")
     else:
         print("\n[OK] No high correlation detected between strategies.")
 

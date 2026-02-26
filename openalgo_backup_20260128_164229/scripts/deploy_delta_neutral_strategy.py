@@ -141,7 +141,7 @@ def main():
     print("\n" + "=" * 80)
     print("Deployment complete!")
     print("=" * 80)
-    print(f"Strategy: Delta Neutral Iron Condor NIFTY")
+    print("Strategy: Delta Neutral Iron Condor NIFTY")
     print(f"Access dashboard: {base_url}/python")
     print("=" * 80)
 

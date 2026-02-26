@@ -1,7 +1,7 @@
 import importlib
 import traceback
-from typing import Tuple, Dict, Any, Optional, List, Union
-from database.auth_db import get_auth_token_broker, Auth, db_session, verify_api_key
+from typing import Tuple, Dict, Any, Optional
+from database.auth_db import get_auth_token_broker, Auth, verify_api_key
 from database.token_db import get_token
 from utils.constants import VALID_EXCHANGES
 from utils.logging import get_logger

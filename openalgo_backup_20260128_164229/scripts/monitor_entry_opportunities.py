@@ -5,14 +5,13 @@ Continuously monitors MCX strategy logs and identifies potential entry signals
 Uses Clawdbot AI for entry opportunity analysis
 """
 import os
-import sys
 import time
 import json
 import subprocess
 import logging
 import re
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 from collections import defaultdict
 
@@ -77,7 +76,7 @@ class EntryOpportunityMonitor:
         # Try to find log file matching strategy name
         log_patterns = [
             f"{strategy_name}*.log",
-            f"mcx_*.log",
+            "mcx_*.log",
             "*.log"
         ]
         
@@ -274,7 +273,7 @@ Format as JSON with: opportunities (array), risk_assessment, recommendations"""
                 
                 if buy_signals:
                     latest_buy = buy_signals[-1]
-                    print(f"   🟢 BUY Signal:")
+                    print("   🟢 BUY Signal:")
                     print(f"      Strategy: {latest_buy['strategy']}")
                     if latest_buy.get('score'):
                         print(f"      Score: {latest_buy['score']}")
@@ -284,7 +283,7 @@ Format as JSON with: opportunities (array), risk_assessment, recommendations"""
                 
                 if sell_signals:
                     latest_sell = sell_signals[-1]
-                    print(f"   🔴 SELL Signal:")
+                    print("   🔴 SELL Signal:")
                     print(f"      Strategy: {latest_sell['strategy']}")
                     if latest_sell.get('score'):
                         print(f"      Score: {latest_sell['score']}")
@@ -379,7 +378,7 @@ Format as JSON with: opportunities (array), risk_assessment, recommendations"""
                     ]
                     
                     if high_quality_signals:
-                        alert_msg = f"High-quality entry signals detected:\n"
+                        alert_msg = "High-quality entry signals detected:\n"
                         for signal in high_quality_signals[-5:]:
                             alert_msg += f"{signal['action']} {signal['symbol']} (Score: {signal['score']}, Strategy: {signal['strategy']})\n"
                         self.send_clawdbot_alert(alert_msg, priority="info")

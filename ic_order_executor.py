@@ -4,7 +4,11 @@ Atomic IC wave executor with fill verification.
 CLI: python3 ic_order_executor.py --wave 1 [--expiry 06MAR26] [--lots 12]
 Outputs JSON: {"ok": true/false, "reason": "...", "lots": 12, ...}
 """
-import time, json, requests, sys, argparse
+import time
+import json
+import requests
+import sys
+import argparse
 from ic_config import OPENALGO_KEY, OPENALGO_URL, LOT_SIZE, SPAN_PER_LOT, get_next_expiry
 
 N8N_WEBHOOK = "https://sayujks20417.app.n8n.cloud/webhook/ic-trading-alert"

@@ -13,7 +13,6 @@ from datetime import datetime
 from pathlib import Path
 import httpx
 import websockets
-from functools import lru_cache
 from threading import Lock
 
 logging.basicConfig(level=logging.INFO)

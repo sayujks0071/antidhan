@@ -143,7 +143,7 @@ def start_strategies_with_backoff(session):
             )
             
             if start_resp.status_code == 429:
-                print(f"   ⚠️  Rate limited. Waiting 60s...")
+                print("   ⚠️  Rate limited. Waiting 60s...")
                 time.sleep(60)
                 # Retry once
                 start_resp = session.post(

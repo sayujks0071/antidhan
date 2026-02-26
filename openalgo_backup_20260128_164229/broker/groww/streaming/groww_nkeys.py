@@ -5,7 +5,7 @@ Based on NATS nkeys specification using cryptography library for Ed25519
 
 import base64
 import os
-from typing import Tuple, Optional
+from typing import Tuple
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
 

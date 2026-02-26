@@ -2,8 +2,7 @@ import os
 import glob
 import json
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from tabulate import tabulate
 
 LOG_DIR = "logs"
@@ -158,7 +157,7 @@ def analyze_equity_stress_test(df):
     if len(losing_strategies) > 1:
         print("  - Systemic: Multiple strategies failed simultaneously. Indicates High Market Correlation (Risk On/Off event).")
     else:
-        print(f"  - Idiosyncratic: Failure isolated to specific strategies.")
+        print("  - Idiosyncratic: Failure isolated to specific strategies.")
 
 def main():
     print("Performing System Audit...")

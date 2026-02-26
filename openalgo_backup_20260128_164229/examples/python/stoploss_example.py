@@ -4,7 +4,6 @@
 
 from openalgo import api
 import time
-from datetime import datetime
 
 # Setup OpenAlgo client
 client = api(

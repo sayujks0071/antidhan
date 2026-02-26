@@ -9,9 +9,7 @@ import asyncio
 import websockets
 import json
 import random
-import time
 import argparse
-import uuid
 import logging
 import os
 from datetime import datetime
@@ -267,7 +265,7 @@ async def run_test(client_count, duration):
     
     summary = f"\n{'='*60}\n"
     summary += f"TEST COMPLETED at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-    summary += f"No dictionary size errors detected during the test.\n"
+    summary += "No dictionary size errors detected during the test.\n"
     summary += f"Log file saved to: {log_file}\n"
     summary += f"{'='*60}\n"
     

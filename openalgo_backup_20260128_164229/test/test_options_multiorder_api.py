@@ -51,13 +51,13 @@ def test_iron_condor():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -83,13 +83,13 @@ def test_long_straddle():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -115,13 +115,13 @@ def test_short_straddle():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -147,13 +147,13 @@ def test_bull_call_spread():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -180,13 +180,13 @@ def test_long_call_butterfly():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -212,13 +212,13 @@ def test_call_ratio_spread():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -246,13 +246,13 @@ def test_iron_butterfly():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -294,13 +294,13 @@ def test_limit_orders():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -326,13 +326,13 @@ def test_future_underlying():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -355,13 +355,13 @@ def test_validation_error():
         "legs": []  # Empty legs - should cause validation error
     }
 
-    print(f"\nRequest Payload (Empty legs):")
+    print("\nRequest Payload (Empty legs):")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -388,13 +388,13 @@ def test_jade_lizard():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -419,13 +419,13 @@ def test_diagonal_spread():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -450,13 +450,13 @@ def test_calendar_spread():
         ]
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")

@@ -4,10 +4,8 @@ import threading
 import time
 import hashlib
 import ssl
-import os
 import httpx
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Any, Union
 from utils.logging import get_logger
 
 logger = get_logger(__name__)

@@ -47,7 +47,7 @@ def test_log_location():
     # Check old logs folder is removed
     old_logs_dir = Path('logs')
     if not old_logs_dir.exists():
-        print(f"[OK] Old logs directory removed")
+        print("[OK] Old logs directory removed")
     else:
         print(f"[WARNING] Old logs directory still exists: {old_logs_dir.absolute()}")
         print("  Please remove it manually")

@@ -5,9 +5,6 @@ Uses the browser-strategy-config subagent workflow
 """
 import requests
 import re
-import time
-import json
-from pathlib import Path
 
 BASE_URL = "http://127.0.0.1:5001"
 USERNAME = "sayujks0071"
@@ -36,7 +33,7 @@ def login_to_openalgo():
         csrf_match = re.search(r'name="csrf_token" value="([^"]+)"', response.text)
         if csrf_match:
             csrf_token = csrf_match.group(1)
-            print(f"   ✅ CSRF token found")
+            print("   ✅ CSRF token found")
         else:
             csrf_token = None
             print("   ⚠️  CSRF token not found")
@@ -219,7 +216,7 @@ def main():
     print("  SUMMARY")
     print("=" * 60)
     print()
-    print(f"✅ OpenAlgo Login: Success")
+    print("✅ OpenAlgo Login: Success")
     print(f"{'✅' if kite_connected else '⚠️ '} Kite Broker: {'Connected' if kite_connected else 'Manual login required'}")
     print(f"{'✅' if strategies_ready else '⚠️ '} MCX Strategies: {'Ready' if strategies_ready else 'Use browser to start'}")
     print()

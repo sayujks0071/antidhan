@@ -6,8 +6,6 @@ Identifies what has changed and what's still needed
 import json
 import subprocess
 from pathlib import Path
-from datetime import datetime
-from collections import defaultdict
 
 CONFIG_FILE = Path(__file__).parent.parent / "strategies" / "strategy_configs.json"
 LOG_DIR = Path(__file__).parent.parent / "log" / "strategies"
@@ -119,7 +117,7 @@ def compare_with_previous():
     print("-" * 80)
     print()
     
-    print(f"Running Strategies:")
+    print("Running Strategies:")
     print(f"  Previous: {previous['running_strategies']}")
     print(f"  Current:  {current['running_strategies']}")
     if current['running_strategies'] > previous['running_strategies']:
@@ -127,31 +125,31 @@ def compare_with_previous():
     elif current['running_strategies'] < previous['running_strategies']:
         print(f"  ⚠️  Decreased by {previous['running_strategies'] - current['running_strategies']}")
     else:
-        print(f"  ➡️  No change")
+        print("  ➡️  No change")
     print()
     
-    print(f"Optimization Processes:")
+    print("Optimization Processes:")
     print(f"  Previous: {previous['optimization_processes']}")
     print(f"  Current:  {current['optimization_processes']}")
     if current['optimization_processes'] > 0:
-        print(f"  ✅ Still running in background")
+        print("  ✅ Still running in background")
     else:
-        print(f"  ⚠️  Not running")
+        print("  ⚠️  Not running")
     print()
     
-    print(f"Orders Placed:")
+    print("Orders Placed:")
     print(f"  Previous: {previous['orders_placed']}")
     print(f"  Current:  {current['orders_placed']}")
     if current['orders_placed'] > previous['orders_placed']:
-        print(f"  ✅ Orders are now being placed!")
+        print("  ✅ Orders are now being placed!")
     else:
-        print(f"  ⚠️  Still no orders placed")
+        print("  ⚠️  Still no orders placed")
     print()
     
-    print(f"Signals Generated:")
+    print("Signals Generated:")
     print(f"  Current:  {current['signals_generated']}")
     if current['signals_generated'] > 0:
-        print(f"  ✅ Strategies are generating signals")
+        print("  ✅ Strategies are generating signals")
     print()
     
     # Check specific fixes

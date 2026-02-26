@@ -2,11 +2,7 @@ import json
 import os
 from datetime import datetime, timedelta
 import pandas as pd
-from database.token_db import get_br_symbol, get_oa_symbol, get_token
-from broker.dhan_sandbox.mapping.transform_data import map_exchange_type
-import urllib.parse
-import jwt
-import httpx
+from database.token_db import get_br_symbol, get_token
 from utils.httpx_client import get_httpx_client
 from broker.dhan_sandbox.api.baseurl import get_url
 from utils.logging import get_logger

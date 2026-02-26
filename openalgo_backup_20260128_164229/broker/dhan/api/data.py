@@ -4,11 +4,7 @@ import time
 import threading
 from datetime import datetime, timedelta
 import pandas as pd
-from database.token_db import get_br_symbol, get_oa_symbol, get_token
-from broker.dhan.mapping.transform_data import map_exchange_type
-import urllib.parse
-import jwt
-import httpx
+from database.token_db import get_br_symbol, get_token
 from utils.httpx_client import get_httpx_client
 from broker.dhan.api.baseurl import get_url
 from utils.logging import get_logger
@@ -708,7 +704,7 @@ class BrokerData:
                 return self._process_quotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_quotes_batch(self, symbols: list) -> list:

@@ -8,10 +8,8 @@ Shared utilities based on AITRAPP production-grade patterns:
 - Portfolio heat tracking
 - Optimized indicators
 """
-import math
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 import pandas as pd
-import numpy as np
 
 
 class ExitManager:

@@ -67,8 +67,8 @@ def main():
     
     if not backups:
         print("No backups found.")
-        print(f"\nCreate a backup with:")
-        print(f"  python3 scripts/save_settings.py")
+        print("\nCreate a backup with:")
+        print("  python3 scripts/save_settings.py")
         return 0
     
     # Check for latest symlink
@@ -112,7 +112,7 @@ def main():
         else:
             # No manifest - show basic info
             print(f"{i}. {backup_dir.name}{marker}")
-            print(f"   (No manifest file)")
+            print("   (No manifest file)")
             size = get_backup_size(backup_dir)
             size_str = format_size(size)
             print(f"   Size: {size_str}")
@@ -120,12 +120,12 @@ def main():
         print()
     
     print(f"{'='*80}")
-    print(f"\nTo restore a backup:")
-    print(f"  python3 scripts/restore_settings.py")
-    print(f"\nTo restore latest backup:")
-    print(f"  python3 scripts/restore_settings.py --backup latest")
-    print(f"\nTo create a new backup:")
-    print(f"  python3 scripts/save_settings.py")
+    print("\nTo restore a backup:")
+    print("  python3 scripts/restore_settings.py")
+    print("\nTo restore latest backup:")
+    print("  python3 scripts/restore_settings.py --backup latest")
+    print("\nTo create a new backup:")
+    print("  python3 scripts/save_settings.py")
     
     return 0
 

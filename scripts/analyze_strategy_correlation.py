@@ -2,7 +2,7 @@ import sys
 import os
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Add openalgo root to path
 sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
@@ -79,7 +79,7 @@ def get_strategy_signals(strategy_module, df):
                     signals.append(0)
             else:
                 signals.append(0)
-        except Exception as e:
+        except Exception:
             # print(f"Error in {strategy_module}: {e}")
             signals.append(0)
 

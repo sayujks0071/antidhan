@@ -15,7 +15,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Index
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import NullPool
-from typing import Dict, Optional
+from typing import Dict
 import os
 import csv
 from utils.logging import get_logger

@@ -1,8 +1,6 @@
 # api/funds.py
 
 import os
-import http.client
-import json
 from utils.httpx_client import get_httpx_client
 from broker.iifl.baseurl import INTERACTIVE_URL
 from utils.logging import get_logger

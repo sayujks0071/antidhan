@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for, session
 from database.sandbox_db import (
-    get_config, set_config, get_all_configs,
+    set_config, get_all_configs,
     SandboxOrders, SandboxTrades, SandboxPositions,
     SandboxHoldings, SandboxFunds, db_session
 )
@@ -336,7 +336,6 @@ def my_pnl():
     """Render the historical P&L page"""
     try:
         from decimal import Decimal
-        from datetime import datetime, date
         import pytz
 
         user_id = session.get('user')

@@ -139,6 +139,6 @@ def get_margin_data(auth_token):
     except (KeyError, TypeError) as e:
         logger.exception(f"Error processing margin data structure: {e}")
         return {}
-    except Exception as e:
+    except Exception:
         logger.exception("An unexpected error occurred while fetching margin data")
         return {}

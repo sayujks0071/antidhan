@@ -54,7 +54,7 @@ def authenticate_broker(code):
         logger.exception("An HTTP request error occurred during Upstox authentication.")
         return None, f"An HTTP request error occurred: {e}"
         
-    except Exception as e:
+    except Exception:
         logger.exception("An unexpected error occurred during Upstox authentication.")
         return None, "An unexpected error occurred during authentication."
 

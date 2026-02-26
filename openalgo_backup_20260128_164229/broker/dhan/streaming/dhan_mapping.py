@@ -1,7 +1,7 @@
 """
 Dhan-specific mapping utilities for the WebSocket adapter
 """
-from typing import Dict, Set, Optional
+from typing import Set, Optional
 
 class DhanExchangeMapper:
     """Maps between OpenAlgo exchange names and Dhan exchange codes"""

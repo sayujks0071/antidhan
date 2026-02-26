@@ -6,9 +6,8 @@ Periodically queries Clawdbot for strategy parameter optimizations based on perf
 import os
 import sys
 import logging
-import asyncio
 from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 # Add services to path

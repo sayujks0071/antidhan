@@ -4,7 +4,6 @@ Monitor MCX Strategy Logs using Clawdbot AI
 Continuously monitors running MCX strategies and provides AI-powered analysis
 """
 import os
-import sys
 import time
 import json
 import subprocess
@@ -165,7 +164,7 @@ def main():
                 
                 # AI Analysis (every 5 minutes)
                 if time.time() - last_analysis_time >= analysis_interval:
-                    print(f"\n🤖 Running Clawdbot AI Analysis...")
+                    print("\n🤖 Running Clawdbot AI Analysis...")
                     analysis = analyze_with_clawdbot(log_content)
                     
                     if analysis:

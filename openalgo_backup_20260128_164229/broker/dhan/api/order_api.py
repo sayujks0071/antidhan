@@ -1,9 +1,8 @@
-import httpx
 import json
 import os
-from database.auth_db import get_auth_token, get_user_id, verify_api_key
+from database.auth_db import get_user_id, verify_api_key
 from database.token_db import get_token
-from database.token_db import get_br_symbol , get_oa_symbol, get_symbol
+from database.token_db import get_br_symbol , get_symbol
 from broker.dhan.mapping.transform_data import transform_data , map_product_type, reverse_map_product_type, transform_modify_order_data
 from broker.dhan.mapping.transform_data import map_exchange_type, map_exchange
 from utils.httpx_client import get_httpx_client
@@ -344,7 +343,7 @@ def modify_order(data,auth):
     BROKER_API_KEY = os.getenv('BROKER_API_KEY')
     data['apikey'] = BROKER_API_KEY
 
-    orderid = data["orderid"];
+    orderid = data["orderid"]
     transformed_order_data = transform_modify_order_data(data)  # You need to implement this function
     
   

@@ -6,15 +6,12 @@ Note: Motilal Oswal uses BINARY packets for market data subscriptions,
 not JSON. This is different from their Trade WebSocket which uses JSON.
 """
 import json
-import logging
 import threading
 import time
 import websocket
 import ssl
-import struct
 from struct import pack, unpack
 from datetime import datetime, timedelta
-from typing import Dict, Optional
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -345,7 +342,7 @@ class MotilalWebSocket:
                 elif msgtype == 'W':  # DPR (circuit limits)
                     logger.debug(f"Skipping DPR packet for {key}")
                 elif msgtype == '1':  # Heartbeat
-                    logger.debug(f"Heartbeat received")
+                    logger.debug("Heartbeat received")
                 elif msgtype == 'X':  # Unknown - need to investigate
                     logger.debug(f"Received message type 'X' for {key} - investigating")
                 elif msgtype == 'g':  # Lowercase 'g' - possibly alternate OHLC or tick data

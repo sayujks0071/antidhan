@@ -6,7 +6,7 @@ without dealing with authentication or connection management.
 
 import os
 from typing import Dict, List, Any, Optional, Tuple
-from database.auth_db import verify_api_key, get_auth_token, get_broker_name
+from database.auth_db import get_broker_name
 from utils.logging import get_logger
 from .websocket_client import get_websocket_client, WebSocketClient
 

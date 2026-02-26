@@ -2,8 +2,6 @@ import json
 import time
 import ssl
 import websocket
-import os
-import logging
 import threading
 from urllib.parse import urlencode
 from utils.logging import get_logger

@@ -13,7 +13,7 @@ import re
 def test_logout_csrf_protection(base_url="http://127.0.0.1:5000"):
     """Test logout CSRF protection"""
     print(f"\n{'='*60}")
-    print(f"Testing Logout CSRF Protection")
+    print("Testing Logout CSRF Protection")
     print(f"Server: {base_url}")
     print(f"{'='*60}\n")
     
@@ -62,7 +62,7 @@ def test_logout_csrf_protection(base_url="http://127.0.0.1:5000"):
             print("✓ PASS: Logout form uses POST method with CSRF token")
             results.append(True)
         else:
-            print(f"✗ FAIL: Logout form missing POST method or CSRF token")
+            print("✗ FAIL: Logout form missing POST method or CSRF token")
             print(f"  Has POST form: {has_post_form}")
             print(f"  Has CSRF token: {has_csrf_token}")
             results.append(False)

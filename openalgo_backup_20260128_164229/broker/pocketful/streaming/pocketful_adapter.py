@@ -7,7 +7,6 @@ import struct
 from typing import Dict, Any, Optional, List
 
 from database.auth_db import get_auth_token
-from database.token_db import get_token
 
 import sys
 import os

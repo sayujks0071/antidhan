@@ -1,11 +1,9 @@
 import json
 import logging
-import time
-import threading
 import socketio
 import requests
-from typing import Dict, Any, Optional, List, Callable
-from broker.fivepaisaxts.baseurl import MARKET_DATA_URL,INTERACTIVE_URL,BASE_URL
+from typing import Dict, List
+from broker.fivepaisaxts.baseurl import MARKET_DATA_URL,BASE_URL
 
 
 class FivepaisaXTSWebSocketClient:
@@ -150,7 +148,7 @@ class FivepaisaXTSWebSocketClient:
                         self.logger.info(f"[MARKET DATA LOGIN] Success! Token obtained, UserID: {self.actual_user_id}")
                         return True
                     else:
-                        self.logger.error(f"[MARKET DATA LOGIN] Missing token or userID in response")
+                        self.logger.error("[MARKET DATA LOGIN] Missing token or userID in response")
                         return False
                 else:
                     self.logger.error(f"[MARKET DATA LOGIN] API returned error: {result}")

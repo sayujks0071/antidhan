@@ -2,7 +2,7 @@ import os
 import glob
 import json
 import re
-from datetime import datetime, date
+from datetime import datetime
 
 # Configuration
 LOG_DIRS = [

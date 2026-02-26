@@ -10,8 +10,6 @@ import threading
 import time
 from typing import Dict, List, Any, Optional, Callable
 from queue import Queue
-import os
-from dotenv import load_dotenv
 from utils.logging import get_logger
 
 # Initialize logger
@@ -473,7 +471,7 @@ class WebSocketClient:
                     except Exception as e:
                         logger.error(f"Error in error callback: {e}")
                         
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             logger.error(f"Invalid JSON message: {message}")
         except Exception as e:
             logger.exception(f"Error handling message: {e}")

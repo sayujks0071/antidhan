@@ -1,4 +1,8 @@
-import urllib.request, urllib.error, json, http.cookiejar, time
+import urllib.request
+import urllib.error
+import json
+import http.cookiejar
+import time
 
 HOST = 'http://127.0.0.1:5002'
 cj = http.cookiejar.CookieJar()

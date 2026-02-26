@@ -10,7 +10,7 @@ import math
 import logging
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List
 
 logging.basicConfig(level=logging.INFO)

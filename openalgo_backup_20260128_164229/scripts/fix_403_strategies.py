@@ -3,7 +3,6 @@
 Fix 403 errors for strategies by setting API key
 """
 import json
-import os
 from pathlib import Path
 
 API_KEY = "5258b9b7d21a17843c83da367919c659579ae050889bd3aa3f1f386a90c19163"

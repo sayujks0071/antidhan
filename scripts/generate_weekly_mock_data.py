@@ -57,7 +57,7 @@ def generate_log(strategy_name, date_obj, win_rate):
     print(f"Generated logs for {strategy_name} on {date_str} at {filepath}")
 
 def main():
-    print(f"Generating mock logs for the past 7 days...")
+    print("Generating mock logs for the past 7 days...")
 
     for i in range(7):
         date_obj = TODAY - timedelta(days=i)

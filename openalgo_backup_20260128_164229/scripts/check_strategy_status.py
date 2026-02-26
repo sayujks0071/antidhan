@@ -7,7 +7,7 @@ import json
 import subprocess
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List
+from typing import List
 
 CONFIG_PATH = Path("/Users/mac/dyad-apps/openalgo/strategies/strategy_configs.json")
 ENV_PATH = Path("/Users/mac/dyad-apps/openalgo/strategies/strategy_env.json")
@@ -124,7 +124,7 @@ def main():
             needs_restart.append(status_info)
     
     # Print summary
-    print(f"\n📊 Summary:")
+    print("\n📊 Summary:")
     print(f"  Total strategies: {len(configs)}")
     print(f"  Running: {len(running)}")
     print(f"  Stopped: {len(stopped)}")
@@ -163,7 +163,7 @@ def main():
             print(f"  - {s['name']} ({s['id']})")
     
     # Recent errors
-    print(f"\n⚠️  Recent Errors:")
+    print("\n⚠️  Recent Errors:")
     error_found = False
     for strategy_id, config in list(configs.items())[:5]:  # Check first 5 strategies
         errors = get_recent_errors(strategy_id, limit=2)

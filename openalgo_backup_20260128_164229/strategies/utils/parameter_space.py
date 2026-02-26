@@ -3,8 +3,7 @@ Parameter Space Definitions for Strategy Optimization
 ------------------------------------------------------
 Defines parameter ranges and constraints for optimizing MCX strategies.
 """
-from typing import Dict, List, Tuple, Any
-import numpy as np
+from typing import Dict, List, Tuple
 
 # Parameter space definitions for each strategy
 PARAMETER_SPACES = {

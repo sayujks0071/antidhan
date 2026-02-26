@@ -109,7 +109,7 @@ class TelegramBotConfig(Resource):
                 'data': config
             }), 200)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error getting bot config")
             return make_response(jsonify({
                 'status': 'error',
@@ -157,7 +157,7 @@ class TelegramBotConfig(Resource):
                     'message': 'Failed to update bot configuration'
                 }), 500)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error updating bot config")
             return make_response(jsonify({
                 'status': 'error',
@@ -368,7 +368,7 @@ class TelegramUsers(Resource):
                 'count': len(users)
             }), 200)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error getting telegram users")
             return make_response(jsonify({
                 'status': 'error',
@@ -422,7 +422,7 @@ class BroadcastMessage(Resource):
                 'fail_count': fail_count
             }), 200)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error broadcasting message")
             return make_response(jsonify({
                 'status': 'error',
@@ -492,7 +492,7 @@ class SendNotification(Resource):
                     'message': 'Notification queued for delivery'
                 }), 200)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error sending notification")
             return make_response(jsonify({
                 'status': 'error',
@@ -525,7 +525,7 @@ class TelegramStats(Resource):
                 'data': stats
             }), 200)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error getting stats")
             return make_response(jsonify({
                 'status': 'error',
@@ -562,7 +562,7 @@ class UserPreferences(Resource):
                 'data': preferences
             }), 200)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error getting preferences")
             return make_response(jsonify({
                 'status': 'error',
@@ -612,7 +612,7 @@ class UserPreferences(Resource):
                     'message': 'Failed to update preferences'
                 }), 500)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error updating preferences")
             return make_response(jsonify({
                 'status': 'error',

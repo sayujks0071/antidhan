@@ -3,7 +3,6 @@ from importlib import import_module
 from database.auth_db import get_auth_token, get_api_key_for_tradingview
 from database.settings_db import get_analyze_mode
 from utils.session import check_session_validity
-from services.place_smart_order_service import place_smart_order
 from services.close_position_service import close_position
 from services.orderbook_service import get_orderbook
 from services.tradebook_service import get_tradebook
@@ -303,7 +302,7 @@ def export_orderbook():
             if api_key:
                 success, response, status_code = get_orderbook(api_key=api_key)
                 if not success:
-                    logger.error(f"Failed to get orderbook data in analyze mode")
+                    logger.error("Failed to get orderbook data in analyze mode")
                     return "Error getting orderbook data", 500
                 data = response.get('data', {})
                 order_data = data.get('orders', [])
@@ -361,7 +360,7 @@ def export_tradebook():
             if api_key:
                 success, response, status_code = get_tradebook(api_key=api_key)
                 if not success:
-                    logger.error(f"Failed to get tradebook data in analyze mode")
+                    logger.error("Failed to get tradebook data in analyze mode")
                     return "Error getting tradebook data", 500
                 tradebook_data = response.get('data', [])
             else:
@@ -418,7 +417,7 @@ def export_positions():
             if api_key:
                 success, response, status_code = get_positionbook(api_key=api_key)
                 if not success:
-                    logger.error(f"Failed to get positions data in analyze mode")
+                    logger.error("Failed to get positions data in analyze mode")
                     return "Error getting positions data", 500
                 positions_data = response.get('data', [])
             else:

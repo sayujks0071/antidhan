@@ -6,7 +6,6 @@ Tests LTP data streaming for 1800+ symbols from CSV file including exchange info
 import sys
 import os
 import time
-import json
 import csv
 from datetime import datetime
 from collections import defaultdict

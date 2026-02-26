@@ -1,4 +1,3 @@
-import logging
 
 class AngelExchangeMapper:
     """Maps OpenAlgo exchange codes to Angel-specific exchange types"""

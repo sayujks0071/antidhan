@@ -1,7 +1,6 @@
 import sys
 import os
 import pandas as pd
-import numpy as np
 
 # Adjust path to find the strategy script
 sys.path.append(os.path.abspath("openalgo/strategies/scripts"))

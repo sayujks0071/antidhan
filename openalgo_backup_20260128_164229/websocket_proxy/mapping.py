@@ -1,6 +1,5 @@
 from utils.logging import get_logger
 from database.token_db import get_token, get_brexchange
-from database.symbol import SymToken
 
 class ExchangeMapper:
     """Base class for mapping OpenAlgo exchange codes to broker-specific exchange types"""

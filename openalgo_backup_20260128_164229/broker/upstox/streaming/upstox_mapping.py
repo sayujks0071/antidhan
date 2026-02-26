@@ -1,5 +1,5 @@
 # broker/upstox/streaming/upstox_mapping.py
-from typing import Dict, Set
+from typing import Dict
 import logging
 
 class UpstoxExchangeMapper:

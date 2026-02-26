@@ -22,14 +22,11 @@ Created: 2025-12-23
 import sys
 import os
 import argparse
-from datetime import datetime
-from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import create_engine, text, inspect
-from sqlalchemy.exc import OperationalError, IntegrityError
+from sqlalchemy import create_engine, text
 from utils.logging import get_logger
 from dotenv import load_dotenv
 

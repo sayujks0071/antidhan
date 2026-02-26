@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template_string
+from flask import Flask, request, render_template_string
 from openalgo import api
 
 app = Flask(__name__)

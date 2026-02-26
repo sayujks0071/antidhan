@@ -61,7 +61,7 @@ def calculate_margin_api(positions, auth):
         # Orders endpoint for single position
         endpoint = "https://api.kite.trade/margins/orders"
         payload = transformed_positions
-        logger.info(f"Using orders margin endpoint for single position")
+        logger.info("Using orders margin endpoint for single position")
 
     logger.debug(f"Zerodha margin calculation payload: {json.dumps(payload)}")
 

@@ -1,11 +1,11 @@
 #Mapping OpenAlgo API Request https://openalgo.in/docs
 #Mapping ibullssecurities Broking Parameters https://symphonyfintech.com/xts-trading-front-end-api/
 
-from database.token_db import get_br_symbol,get_token
+from database.token_db import get_br_symbol
 from utils.logging import get_logger
 from broker.ibulls.api.data import BrokerData
 from flask import session
-from database.auth_db import get_auth_token, get_feed_token
+from database.auth_db import get_feed_token
 
 logger = get_logger(__name__)
 

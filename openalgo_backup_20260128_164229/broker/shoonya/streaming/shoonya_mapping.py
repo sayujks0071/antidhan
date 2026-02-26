@@ -1,7 +1,7 @@
 """
 Shoonya-specific mapping utilities for the WebSocket adapter
 """
-from typing import Dict, Set, Optional
+from typing import Dict, Optional
 
 class ShoonyaExchangeMapper:
     """Maps between OpenAlgo exchange names and Shoonya exchange codes"""

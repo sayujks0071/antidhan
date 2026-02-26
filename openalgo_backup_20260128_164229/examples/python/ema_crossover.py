@@ -1,8 +1,6 @@
 from openalgo import api
 import pandas as pd
-import numpy as np
 import time
-import threading
 from datetime import datetime, timedelta
 
 # Get API key from openalgo portal

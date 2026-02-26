@@ -1,4 +1,3 @@
-import logging
 
 class PaytmExchangeMapper:
     """Maps OpenAlgo exchange codes to Paytm-specific exchange types"""

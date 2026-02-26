@@ -15,7 +15,6 @@ import json
 import threading
 import zmq
 from typing import Dict, List, Optional, Any, Tuple, Callable
-from collections import defaultdict
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -229,7 +228,7 @@ class ConnectionPool:
         self.peak_symbol_counts = []  # Snapshot of counts at peak
 
         self.logger.info(
-            f"[POOL] ========== CONNECTION POOL INITIALIZED =========="
+            "[POOL] ========== CONNECTION POOL INITIALIZED =========="
         )
         self.logger.info(
             f"[POOL] Broker: {broker_name} | User: {user_id}"
@@ -238,7 +237,7 @@ class ConnectionPool:
             f"[POOL] Config: {self.max_symbols} symbols/connection x {self.max_connections} max connections = {self.max_symbols * self.max_connections} total capacity"
         )
         self.logger.info(
-            f"[POOL] =================================================="
+            "[POOL] =================================================="
         )
 
     def _create_adapter(self) -> Any:
@@ -530,13 +529,13 @@ class ConnectionPool:
             num_connections = len(self.adapters)
 
             if total_symbols > 0:
-                self.logger.info(f"[POOL] ========== UNSUBSCRIBING ALL ==========")
+                self.logger.info("[POOL] ========== UNSUBSCRIBING ALL ==========")
                 self.logger.info(f"[POOL] Connections used: {num_connections}")
                 self.logger.info(f"[POOL] Total symbols subscribed: {total_symbols}")
                 for idx, count in enumerate(self.adapter_symbol_counts):
                     if count > 0:
                         self.logger.info(f"[POOL]   Connection {idx + 1}: {count}/{self.max_symbols} symbols ({(count/self.max_symbols)*100:.0f}%)")
-                self.logger.info(f"[POOL] ==========================================")
+                self.logger.info("[POOL] ==========================================")
 
             for adapter in self.adapters:
                 if hasattr(adapter, 'unsubscribe_all'):
@@ -551,12 +550,12 @@ class ConnectionPool:
         """Disconnect all adapters and clean up"""
         with self.lock:
             # Log PEAK usage (not current, since unsubscribes may have already happened)
-            self.logger.info(f"[POOL] ========== DISCONNECTING POOL ==========")
+            self.logger.info("[POOL] ========== DISCONNECTING POOL ==========")
             self.logger.info(f"[POOL] Peak connections used: {self.peak_connections_used}")
             self.logger.info(f"[POOL] Peak symbols subscribed: {self.peak_total_symbols}")
             for idx, count in enumerate(self.peak_symbol_counts):
                 self.logger.info(f"[POOL]   Connection {idx + 1}: {count}/{self.max_symbols} symbols ({(count/self.max_symbols)*100:.0f}%)")
-            self.logger.info(f"[POOL] ==========================================")
+            self.logger.info("[POOL] ==========================================")
 
             for idx, adapter in enumerate(self.adapters):
                 try:

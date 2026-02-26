@@ -1,6 +1,4 @@
 import os
-import json
-import urllib.parse
 from hashlib import sha256
 from utils.logging import get_logger
 from utils.httpx_client import get_httpx_client

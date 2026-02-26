@@ -3,17 +3,12 @@ Dhan WebSocket Adapter for OpenAlgo
 Manages both 5-level and 20-level depth connections
 """
 import threading
-import json
 import logging
 import time
-import asyncio
-import platform
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from collections import defaultdict
-from datetime import datetime, time as dt_time
 
 from database.auth_db import get_auth_token
-from database.token_db import get_token
 
 import sys
 import os

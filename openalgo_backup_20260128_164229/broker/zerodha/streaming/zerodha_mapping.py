@@ -8,7 +8,7 @@ Zerodha WebSocket data mapping utilities.
 This module provides utilities for mapping between Zerodha's WebSocket data format
 and OpenAlgo's standard format.
 """
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict
 from datetime import datetime, timezone
 
 class ZerodhaExchangeMapper:

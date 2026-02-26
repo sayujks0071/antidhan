@@ -1,6 +1,5 @@
-from flask import Blueprint, request, redirect, url_for, render_template, session, jsonify, make_response, flash
+from flask import Blueprint, request, redirect, url_for, render_template, session, jsonify, flash
 from limiter import limiter  # Import the limiter instance
-from extensions import socketio
 import os
 from database.auth_db import upsert_auth, auth_cache, feed_token_cache
 from database.user_db import authenticate_user, User, db_session, find_user_by_username, find_user_by_email  # Import the function

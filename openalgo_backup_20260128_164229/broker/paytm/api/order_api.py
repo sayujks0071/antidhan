@@ -1,17 +1,11 @@
 import json
-import os
-import urllib.parse
 import httpx
 from utils.httpx_client import get_httpx_client
-from database.auth_db import get_auth_token
-from database.token_db import get_br_symbol, get_oa_symbol, get_token
+from database.token_db import get_token
 from broker.paytm.mapping.transform_data import (
     transform_data,
     map_product_type,
-    reverse_map_product_type,
-    transform_modify_order_data,
-    map_exchange,
-    reverse_map_order_type
+    reverse_map_product_type
 )
 from utils.logging import get_logger
 
@@ -113,7 +107,7 @@ def get_open_positionss(tradingsymbol, exchange, product, auth):
     logger.debug(f"Looking for position: symbol={tradingsymbol}, exchange={exchange}, product={product}, target_id={target_security_id}")
     
     logger.debug("=== Position Check Details ===")
-    logger.debug(f"Looking for position:")
+    logger.debug("Looking for position:")
     logger.debug(f"Symbol: {tradingsymbol}")
     logger.debug(f"Exchange: {exchange}")
     logger.debug(f"Product: {product} (Broker format: {reverse_map_product_type(product)})")

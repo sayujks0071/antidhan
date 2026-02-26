@@ -46,7 +46,6 @@ Strike Labels (different for CE and PE):
 """
 
 from typing import Tuple, Dict, Any, List, Optional
-from database.auth_db import get_auth_token_broker
 from database.symbol import SymToken, db_session
 from services.quotes_service import get_quotes, get_multiquotes
 from services.option_symbol_service import (

@@ -32,17 +32,17 @@ if len(parts) == 3:
         exp_dt = datetime.fromtimestamp(exp, tz=timezone.utc)
         now = datetime.now(timezone.utc)
 
-        print(f"\n=== Token Expiration ===")
+        print("\n=== Token Expiration ===")
         print(f"  Issued at (iat): {datetime.fromtimestamp(iat, tz=timezone.utc)}")
         print(f"  Expires at (exp): {exp_dt}")
         print(f"  Current time: {now}")
 
         if now > exp_dt:
-            print(f"  Status: ❌ TOKEN EXPIRED")
+            print("  Status: ❌ TOKEN EXPIRED")
             print(f"  Expired by: {now - exp_dt}")
         else:
-            print(f"  Status: ✓ Token valid")
+            print("  Status: ✓ Token valid")
             print(f"  Time remaining: {exp_dt - now}")
 
-    print(f"\n=== Client ID ===")
+    print("\n=== Client ID ===")
     print(f"  dhanClientId: {data.get('dhanClientId')}")

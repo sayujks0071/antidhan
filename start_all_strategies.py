@@ -130,22 +130,22 @@ def start_all_strategies(within_window_only: bool, repair: bool) -> int:
 
     # Summary
     print(f"\n{'=' * 70}")
-    print(f"📊 Summary:")
+    print("📊 Summary:")
     print(f"   ✅ Started: {len(started)}")
     print(f"   ❌ Failed:  {len(failed)}")
 
     if started:
-        print(f"\n   Started strategies:")
+        print("\n   Started strategies:")
         for name in started:
             print(f"     • {name}")
 
     if failed:
-        print(f"\n   Failed strategies:")
+        print("\n   Failed strategies:")
         for name, reason in failed:
             print(f"     • {name}: {reason}")
 
     print(f"\n{'=' * 70}")
-    print(f"✅ Done!")
+    print("✅ Done!")
     return 0 if not failed else 1
 
 

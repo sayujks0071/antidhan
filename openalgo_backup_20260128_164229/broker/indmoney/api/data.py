@@ -1,10 +1,8 @@
 import json
-import os
 import time
 from datetime import datetime, timedelta
 import pandas as pd
 from database.token_db import get_token
-import httpx
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
 from broker.indmoney.api.baseurl import get_url
@@ -403,7 +401,7 @@ class BrokerData:
                 return self._process_multiquotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_multiquotes_batch(self, symbols: list) -> list:
@@ -457,7 +455,7 @@ class BrokerData:
         try:
             params = {'scrip-codes': scrip_codes_param}
             response = get_api_response("/market/quotes/full", self.auth_token, "GET", params)
-            logger.debug(f"Indmoney multiquotes API response received")
+            logger.debug("Indmoney multiquotes API response received")
 
             quotes_data = response.get('data', {})
             logger.debug(f"Multiquotes response keys: {list(quotes_data.keys())}")
@@ -861,7 +859,6 @@ class BrokerData:
     
     def _date_to_timestamp_ms(self, date_str: str, end_of_day: bool = False) -> int:
         """Convert date string to Unix timestamp in milliseconds (IST)"""
-        from datetime import datetime
         
         if end_of_day:
             # For end date, use end of day (23:59:59)
@@ -876,7 +873,6 @@ class BrokerData:
     
     def _split_date_range(self, start_date: str, end_date: str, max_days: int) -> list:
         """Split date range into chunks based on Indmoney API limits"""
-        from datetime import datetime, timedelta
         
         start = datetime.strptime(start_date, "%Y-%m-%d")
         end = datetime.strptime(end_date, "%Y-%m-%d")

@@ -121,7 +121,7 @@ def test_endpoint(api, endpoint, expected_limit, description):
         if i < expected_limit - 1:
             time.sleep(0.01)
     
-    print(f"\n\nResults:")
+    print("\n\nResults:")
     print(f"  Successful: {success_count}/{total_requests}")
     print(f"  Rate limited: {rate_limited_count}/{total_requests}")
     
@@ -130,7 +130,7 @@ def test_endpoint(api, endpoint, expected_limit, description):
         print(f"  ✅ Rate limit correctly enforced at {expected_limit} requests")
         return True
     else:
-        print(f"  ❌ Rate limit not properly enforced")
+        print("  ❌ Rate limit not properly enforced")
         return False
 
 
@@ -167,7 +167,7 @@ def test_rate_limit_reset(api, endpoint, limit):
 
 def test_multiple_clients(api, endpoint, limit):
     """Test that different clients have separate rate limits"""
-    print(f"\nTesting separate rate limits for different clients")
+    print("\nTesting separate rate limits for different clients")
     print("-" * 50)
     
     # Client 1 uses up their limit

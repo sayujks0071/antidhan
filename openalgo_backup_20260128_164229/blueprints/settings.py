@@ -1,6 +1,6 @@
 # blueprints/settings.py
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from database.settings_db import get_analyze_mode, set_analyze_mode
 from utils.session import check_session_validity
 from utils.logging import get_logger

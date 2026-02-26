@@ -1,8 +1,6 @@
 # api/funds.py
 
 import os
-import http.client
-import json
 from utils.httpx_client import get_httpx_client
 from broker.jainamxts.baseurl import INTERACTIVE_URL
 from utils.logging import get_logger
@@ -22,12 +20,12 @@ def get_margin_data(auth_token):
         'authorization': auth_token ,
         'Content-Type': 'application/json'
     }
-    logger.debug(f"Fetching funds with headers")
+    logger.debug("Fetching funds with headers")
     response = client.get(f"{INTERACTIVE_URL}/user/balance", headers=headers)
     
     margin_data = response.json()
 
-    logger.debug(f"Funds Details fetched successfully")
+    logger.debug("Funds Details fetched successfully")
 
     if (
         margin_data.get("result") and 

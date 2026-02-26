@@ -1,4 +1,3 @@
-import logging
 
 class IndmoneyExchangeMapper:
     """Maps OpenAlgo exchange codes to INDmoney-specific segment codes"""

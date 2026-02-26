@@ -1,9 +1,8 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
+from flask import Blueprint, render_template, jsonify, session
 from flask_cors import cross_origin
 from datetime import datetime, time as dt_time, timedelta
 import time as time_module
 import pandas as pd
-import numpy as np
 from importlib import import_module
 from database.auth_db import get_auth_token, get_api_key_for_tradingview
 from utils.session import check_session_validity

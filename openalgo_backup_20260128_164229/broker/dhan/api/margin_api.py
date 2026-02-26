@@ -230,7 +230,7 @@ def calculate_margin_api(positions, auth, api_key=None):
     if len(margin_responses) == 1:
         # Single position - return as-is
         final_response = margin_responses[0]
-        logger.info(f"Single leg strategy - returning individual margin")
+        logger.info("Single leg strategy - returning individual margin")
     else:
         # Multiple positions - aggregate by summing
         final_response = parse_batch_margin_response(margin_responses)

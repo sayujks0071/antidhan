@@ -141,7 +141,7 @@ def place_order(order_type, order_data):
                 log(f"  -> Queued in Action Center (ID: {pending_order_id})", "INFO")
                 return True, pending_order_id
             else:
-                log(f"  -> Executed immediately (not queued)", "WARNING")
+                log("  -> Executed immediately (not queued)", "WARNING")
                 return True, None
         else:
             log(f"[FAIL] {order_type} failed: {response.text}", "ERROR")

@@ -1,12 +1,9 @@
 import json
-import os
-import urllib.parse
 import httpx
 from utils.httpx_client import get_httpx_client
-from database.auth_db import get_auth_token
 from database.token_db import get_br_symbol, get_oa_symbol
-from broker.aliceblue.mapping.transform_data import transform_data , map_product_type, reverse_map_product_type, transform_modify_order_data
-from utils.config import get_broker_api_key , get_broker_api_secret
+from broker.aliceblue.mapping.transform_data import transform_data , map_product_type, transform_modify_order_data
+from utils.config import get_broker_api_secret
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -70,7 +67,7 @@ def get_trade_book(auth):
         elif isinstance(response, dict):
             logger.info(f"AliceBlue API returned dict with keys: {list(response.keys())}")
             if response.get('stat') == 'Ok':
-                logger.info(f"Success response, checking data field...")
+                logger.info("Success response, checking data field...")
 
     return response
 

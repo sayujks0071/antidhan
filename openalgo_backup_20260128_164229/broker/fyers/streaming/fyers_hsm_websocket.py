@@ -12,8 +12,7 @@ import threading
 import websocket
 import ssl
 import logging
-from typing import Dict, List, Any, Optional, Callable
-from datetime import datetime
+from typing import Dict, List, Optional
 
 class FyersHSMWebSocket:
     """

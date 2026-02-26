@@ -46,6 +46,18 @@ except ImportError:
     print("ERROR: Could not import strategy utilities.", flush=True)
     sys.exit(1)
 
+# Trading Utils Import (for Indicators)
+try:
+    from trading_utils import calculate_rsi, calculate_supertrend
+except ImportError:
+    try:
+        sys.path.insert(0, strategies_dir)
+        from utils.trading_utils import calculate_rsi, calculate_supertrend
+    except ImportError:
+        print("ERROR: Could not import trading_utils indicators.", flush=True)
+        # We can fallback to local or exit. Given instructions, we prefer trading_utils.
+        sys.exit(1)
+
 # Robust Market Open Check (Local Fallback to avoid dependencies)
 try:
     from trading_utils import is_market_open
@@ -157,70 +169,6 @@ class LocalHistoryClient:
         except Exception as e:
             print(f"History Fetch Error: {e}", flush=True)
             return pd.DataFrame()
-
-
-def calculate_rsi(df, period=14):
-    """Calculates RSI using pandas."""
-    if df.empty: return df
-
-    delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).fillna(0)
-    loss = (-delta.where(delta < 0, 0)).fillna(0)
-
-    avg_gain = gain.ewm(com=period-1, min_periods=period).mean()
-    avg_loss = loss.ewm(com=period-1, min_periods=period).mean()
-
-    rs = avg_gain / avg_loss
-    df['rsi'] = 100 - (100 / (1 + rs))
-    return df
-
-
-def calculate_supertrend(df, period=10, multiplier=3):
-    """Calculates SuperTrend using pandas."""
-    if df.empty: return df
-
-    # ATR Calculation
-    df['tr0'] = abs(df['high'] - df['low'])
-    df['tr1'] = abs(df['high'] - df['close'].shift())
-    df['tr2'] = abs(df['low'] - df['close'].shift())
-    df['tr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1)
-    df['atr'] = df['tr'].ewm(alpha=1/period, adjust=False).mean()
-
-    # Basic Bands
-    hl2 = (df['high'] + df['low']) / 2
-    df['basic_upper'] = hl2 + (multiplier * df['atr'])
-    df['basic_lower'] = hl2 - (multiplier * df['atr'])
-
-    # Initialize final bands and supertrend column
-    df['final_upper'] = 0.0
-    df['final_lower'] = 0.0
-    df['supertrend'] = True
-
-    # Iterative calculation
-    for i in range(1, len(df)):
-        # Final Upper Band
-        if df['basic_upper'].iloc[i] < df['final_upper'].iloc[i-1] or \
-           df['close'].iloc[i-1] > df['final_upper'].iloc[i-1]:
-            df.iat[i, df.columns.get_loc('final_upper')] = df['basic_upper'].iloc[i]
-        else:
-            df.iat[i, df.columns.get_loc('final_upper')] = df['final_upper'].iloc[i-1]
-
-        # Final Lower Band
-        if df['basic_lower'].iloc[i] > df['final_lower'].iloc[i-1] or \
-           df['close'].iloc[i-1] < df['final_lower'].iloc[i-1]:
-            df.iat[i, df.columns.get_loc('final_lower')] = df['basic_lower'].iloc[i]
-        else:
-            df.iat[i, df.columns.get_loc('final_lower')] = df['final_lower'].iloc[i-1]
-
-        # SuperTrend Direction (True=Bullish/Green, False=Bearish/Red)
-        if df['supertrend'].iloc[i-1] and df['close'].iloc[i] <= df['final_lower'].iloc[i]:
-            df.iat[i, df.columns.get_loc('supertrend')] = False
-        elif not df['supertrend'].iloc[i-1] and df['close'].iloc[i] >= df['final_upper'].iloc[i]:
-            df.iat[i, df.columns.get_loc('supertrend')] = True
-        else:
-            df.iat[i, df.columns.get_loc('supertrend')] = df['supertrend'].iloc[i-1]
-
-    return df
 
 
 class NiftySuperTrendStrategy:
@@ -459,11 +407,19 @@ class NiftySuperTrendStrategy:
                     for col in cols:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
 
-                    df = calculate_supertrend(df, period=SUPERTREND_PERIOD, multiplier=SUPERTREND_MULTIPLIER)
-                    df = calculate_rsi(df, period=RSI_PERIOD)
+                    # Calculate using shared utility functions
+                    # trading_utils.calculate_supertrend returns (st_series, dir_series)
+                    # We need to adapt it because the local implementation was adding columns
+                    # The shared impl: return pd.Series(supertrend, index=df.index), pd.Series(direction, index=df.index)
+                    st_series, dir_series = calculate_supertrend(df['close'], period=SUPERTREND_PERIOD, multiplier=SUPERTREND_MULTIPLIER)
+                    df['supertrend_val'] = st_series
+                    df['supertrend_dir'] = dir_series # 1: Up, -1: Down
+
+                    # trading_utils.calculate_rsi returns a Series
+                    df['rsi'] = calculate_rsi(df['close'], period=RSI_PERIOD)
 
                     last_row = df.iloc[-1]
-                    supertrend_bullish = bool(last_row.get("supertrend", False))
+                    supertrend_bullish = (last_row.get("supertrend_dir", 0) == 1)
                     rsi_val = last_row.get("rsi", 50.0)
 
                     is_bullish = supertrend_bullish and (rsi_val > 50)

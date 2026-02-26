@@ -51,7 +51,7 @@ class SmartOrder(Resource):
             
             return make_response(jsonify(response_data), status_code)
 
-        except Exception as e:
+        except Exception:
             logger.exception("An unexpected error occurred in SmartOrder endpoint.")
             error_message = 'An unexpected error occurred'
             if get_analyze_mode():

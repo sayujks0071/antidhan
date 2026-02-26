@@ -3,7 +3,6 @@ from flask import request, jsonify, make_response
 from marshmallow import ValidationError
 from limiter import limiter
 import os
-import traceback
 
 from restx_api.schemas import ModifyOrderSchema
 from services.modify_order_service import modify_order, emit_analyzer_error
@@ -60,7 +59,7 @@ class ModifyOrder(Resource):
             executor.submit(async_log_order, 'modifyorder', data, error_response)
             return make_response(jsonify(error_response), 400)
             
-        except Exception as e:
+        except Exception:
             logger.exception("An unexpected error occurred in ModifyOrder endpoint.")
             error_message = 'An unexpected error occurred'
             if get_analyze_mode():

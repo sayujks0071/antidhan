@@ -9,16 +9,14 @@ import threading
 import time
 import os
 import socket
-from typing import Dict, Set, Any, Optional, Tuple
+from typing import Dict, Set, Tuple
 from dotenv import load_dotenv
 from collections import defaultdict
 
-from .port_check import is_port_in_use, find_available_port
+from .port_check import is_port_in_use
 from database.auth_db import get_broker_name
-from sqlalchemy import text
 from database.auth_db import verify_api_key
 from .broker_factory import create_broker_adapter
-from .base_adapter import BaseBrokerWebSocketAdapter
 
 # Initialize logger
 logger = get_logger("websocket_proxy")
@@ -383,7 +381,7 @@ class WebSocketProxy:
             else:
                 logger.warning(f"Client {client_id} requested invalid action: {action}")
                 await self.send_error(client_id, "INVALID_ACTION", f"Invalid action: {action}")
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             logger.exception(f"Invalid JSON from client {client_id}: {message}")
             await self.send_error(client_id, "INVALID_JSON", "Invalid JSON message")
         except Exception as e:
@@ -401,7 +399,6 @@ class WebSocketProxy:
             dict: Broker configuration containing broker_name and credentials
         """
         try:
-            from database.auth_db import get_broker_name
             from sqlalchemy import text
             
             # Get user's connected broker from database

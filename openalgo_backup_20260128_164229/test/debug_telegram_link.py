@@ -77,7 +77,7 @@ def debug_telegram_users():
                 print(f"   [OK] Telegram user '{tg_username}' matches auth user: {matches}")
             else:
                 print(f"   [ERROR] Telegram user '{tg_username}' has NO matching auth user!")
-                print(f"      This user won't receive alerts!")
+                print("      This user won't receive alerts!")
 
     except Exception as e:
         print(f"   Error checking auth users: {e}")
@@ -98,7 +98,7 @@ def debug_telegram_users():
             # Check if this user has telegram linked
             telegram_user = get_telegram_user_by_username(username)
             if telegram_user:
-                print(f"   [OK] Telegram linked:")
+                print("   [OK] Telegram linked:")
                 print(f"     - Telegram ID: {telegram_user['telegram_id']}")
                 print(f"     - Notifications: {telegram_user.get('notifications_enabled', False)}")
             else:

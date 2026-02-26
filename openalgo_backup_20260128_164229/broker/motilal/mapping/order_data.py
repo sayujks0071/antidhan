@@ -167,7 +167,7 @@ def transform_order_data(orders):
 
         # Log for debugging price issues
         if order_price == 0 and ordertype == 'LIMIT' and order_status == 'open':
-            logger.warning(f"LIMIT order with open status has price=0.")
+            logger.warning("LIMIT order with open status has price=0.")
             logger.warning(f"Order ID: {order.get('uniqueorderid')}")
             logger.warning(f"Symbol: {order.get('symbol')}")
             logger.warning(f"Order Type: {order.get('ordertype')}")

@@ -9,7 +9,7 @@ Supports split orders per leg if splitsize is specified.
 import copy
 import time
 import os
-from typing import Tuple, Dict, Any, Optional, List
+from typing import Tuple, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from database.auth_db import get_auth_token_broker
 from database.apilog_db import async_log_order, executor as log_executor

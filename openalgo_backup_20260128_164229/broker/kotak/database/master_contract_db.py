@@ -2,12 +2,8 @@
 
 import os
 import pandas as pd
-import numpy as np
 import httpx
-import gzip
-import shutil
 import json
-import io
 
 
 from sqlalchemy import create_engine, Column, Integer, String, Float , Sequence, Index

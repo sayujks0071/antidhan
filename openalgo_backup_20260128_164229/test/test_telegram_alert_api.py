@@ -42,13 +42,13 @@ def test_basic_alert():
         "message": "Test alert from API - Basic message"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -69,13 +69,13 @@ def test_priority_alert():
         "priority": 10
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -96,13 +96,13 @@ def test_formatted_alert():
         "priority": 5
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -123,13 +123,13 @@ def test_price_alert():
         "priority": 8
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -150,13 +150,13 @@ def test_trade_signal():
         "priority": 9
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -177,13 +177,13 @@ def test_risk_alert():
         "priority": 10
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -203,13 +203,13 @@ def test_validation_error():
         # Missing message - should cause validation error
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -230,13 +230,13 @@ def test_invalid_user():
         "priority": 5
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")

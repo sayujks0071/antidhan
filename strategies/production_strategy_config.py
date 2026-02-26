@@ -10,8 +10,6 @@ This configuration manages risk across Equity, F&O, and MCX segments.
 """
 
 import os
-import json
-from datetime import datetime
 
 # =============================================================================
 # RISK MANAGEMENT CONFIGURATION (MOST IMPORTANT)

@@ -1,7 +1,6 @@
 import os
 import hashlib
 import json
-import base64
 import httpx
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
@@ -26,11 +25,11 @@ def authenticate_broker(userid, encKey):
         
         # Step 2: Generate SHA-256 hash using the combination of User ID + API Key + Encryption Key
         # This is the pattern specified in their API docs
-        logger.debug(f"Generating checksum for authentication")
+        logger.debug("Generating checksum for authentication")
         # The AliceBlue API V2 documentation specifies: User ID + API Key + Encryption Key
         # This is the official order specified in their documentation
         checksum_input = f"{userid}{BROKER_API_SECRET}{encKey}"
-        logger.debug(f"Checksum input pattern: userId + apiSecret + encKey")
+        logger.debug("Checksum input pattern: userId + apiSecret + encKey")
         checksum = hashlib.sha256(checksum_input.encode()).hexdigest()
         
         # Step 3: Prepare request payload with exact parameters matching their API documentation
@@ -47,7 +46,7 @@ def authenticate_broker(userid, encKey):
             }
         
         # Step 4: Make the API request to get session ID
-        logger.debug(f"Making getUserSID request to AliceBlue API")
+        logger.debug("Making getUserSID request to AliceBlue API")
         url = "https://ant.aliceblueonline.com/rest/AliceBlueAPIService/api/customer/getUserSID"
         response = client.post(url, json=payload, headers=headers)
         
@@ -71,10 +70,10 @@ def authenticate_broker(userid, encKey):
             # Special case handling for common errors
             if "User does not login" in error_msg:
                 logger.error(f"User not logged in: {error_msg}")
-                return None, f"User is not logged in. Please login to the AliceBlue platform first and then try again."
+                return None, "User is not logged in. Please login to the AliceBlue platform first and then try again."
             elif "Invalid Input" in error_msg:
                 logger.error(f"Invalid input error: {error_msg}")
-                return None, f"Invalid input. Please check your user ID and API credentials."
+                return None, "Invalid input. Please check your user ID and API credentials."
             else:
                 logger.error(f"API error: {error_msg}")
                 return None, f"API error: {error_msg}"
@@ -94,7 +93,7 @@ def authenticate_broker(userid, encKey):
                 
         # Case 5: If we got this far, we couldn't find a session ID
         logger.error(f"Couldn't extract session ID from response: {data}")
-        return None, f"Failed to extract session ID from response. Please check API credentials and try again."
+        return None, "Failed to extract session ID from response. Please check API credentials and try again."
             
     except json.JSONDecodeError:
         # Handle invalid JSON response

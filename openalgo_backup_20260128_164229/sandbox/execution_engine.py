@@ -28,7 +28,6 @@ from database.sandbox_db import (
 )
 from sandbox.fund_manager import FundManager, validate_margin_consistency, reconcile_margin
 from services.quotes_service import get_quotes, get_multiquotes
-from database.auth_db import get_auth_token_broker
 from utils.logging import get_logger
 
 logger = get_logger(__name__)

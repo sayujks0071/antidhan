@@ -4,7 +4,7 @@ Convert bear call spread from MIS (INTRADAY) → CNC (NRML/carry-forward)
 Run at 2:50 PM if unrealized MTM < ₹10,234 (not yet at breakeven for day)
 After conversion: hold to 02 MAR expiry for full ₹19,744 potential
 """
-import requests, json
+import requests
 from datetime import datetime
 import pytz
 

@@ -5,7 +5,6 @@ Tests the edit functionality with running and stopped states
 """
 
 import requests
-import json
 import time
 import sys
 from pathlib import Path

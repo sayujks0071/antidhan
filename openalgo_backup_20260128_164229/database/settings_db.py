@@ -1,6 +1,6 @@
 # database/settings_db.py
 
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, MetaData, Text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, Text
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import NullPool

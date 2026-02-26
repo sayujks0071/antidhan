@@ -14,13 +14,12 @@ import os
 import sys
 from datetime import datetime, time
 import pytz
-from decimal import Decimal
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.sandbox_db import (
-    SandboxPositions, db_session, get_config
+    SandboxPositions, get_config
 )
 from sandbox.position_manager import PositionManager
 from utils.logging import get_logger

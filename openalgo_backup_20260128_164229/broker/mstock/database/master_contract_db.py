@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import requests
 import re
-from io import StringIO
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Float, Sequence, Index
 from sqlalchemy.orm import scoped_session, sessionmaker

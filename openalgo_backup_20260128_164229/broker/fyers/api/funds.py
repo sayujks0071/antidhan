@@ -2,7 +2,7 @@
 
 import os
 import json
-from typing import Dict, Any, Optional
+from typing import Dict
 import httpx
 from utils.httpx_client import get_httpx_client
 from broker.fyers.api.order_api import get_positions
@@ -126,7 +126,7 @@ def get_margin_data(auth_token: str) -> Dict[str, str]:
                 "utiliseddebits": "{:.2f}".format(total_utilized)
             }
             
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             logger.exception("Error calculating fund totals")
             return default_response
             
@@ -136,7 +136,7 @@ def get_margin_data(auth_token: str) -> Dict[str, str]:
         logger.error(f"Request failed: {str(e)}")
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse Fyers API response: {str(e)}")
-    except Exception as e:
+    except Exception:
         logger.exception("Unexpected error in get_margin_data")
     
     return default_response

@@ -19,8 +19,8 @@ import re
 from urllib import request
 import os
 from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional
 from collections import defaultdict
 
 try:
@@ -591,7 +591,7 @@ def main():
             print(f"   📝 Log: {log_file.name}")
             log_data = parse_log_for_entries(log_file)
         else:
-            print(f"   ⚠️  No log file found")
+            print("   ⚠️  No log file found")
             log_data = {}
         
         analysis[strategy_id] = {

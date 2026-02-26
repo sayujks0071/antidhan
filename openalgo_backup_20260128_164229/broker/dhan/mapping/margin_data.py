@@ -2,7 +2,7 @@
 # Mapping Dhan Margin API https://dhanhq.co/docs/v2/funds/
 
 from database.token_db import get_token
-from broker.dhan.mapping.transform_data import map_exchange_type, map_product_type, map_order_type
+from broker.dhan.mapping.transform_data import map_exchange_type
 from utils.logging import get_logger
 
 logger = get_logger(__name__)

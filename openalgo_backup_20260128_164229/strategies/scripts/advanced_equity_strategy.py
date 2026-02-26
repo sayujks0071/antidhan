@@ -4,16 +4,11 @@ Advanced Equity Strategy & Analysis Tool
 Daily analysis and strategy deployment for NSE Equities.
 """
 import os
-import sys
-import time
-import json
 import logging
-import requests
 import pandas as pd
 import numpy as np
 import random
 from datetime import datetime, timedelta
-from pathlib import Path
 
 # Try importing openalgo
 try:
@@ -356,9 +351,9 @@ class AdvancedEquityStrategy:
             stop = round(entry * 0.98, 2)
             target = round(entry * 1.04, 2)
             print(f"   - Entry: {entry} | Stop: {stop} | Target: {target} | R:R: {rr}")
-            print(f"   - Position Size: 100 shares | Risk: 1% of capital")
-            print(f"   - Rationale: High composite score with aligned sector and momentum.")
-            print(f"   - Filters Passed: ✅ Trend ✅ Momentum ✅ Volume ✅ Sector ✅ Liquidity")
+            print("   - Position Size: 100 shares | Risk: 1% of capital")
+            print("   - Rationale: High composite score with aligned sector and momentum.")
+            print("   - Filters Passed: ✅ Trend ✅ Momentum ✅ Volume ✅ Sector ✅ Liquidity")
 
         print("\n🔧 STRATEGY ENHANCEMENTS APPLIED:")
         print("- AI Hybrid: Added sector rotation filter")

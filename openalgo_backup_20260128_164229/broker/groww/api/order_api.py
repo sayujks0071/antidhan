@@ -1,26 +1,17 @@
 import json
-import os
 import uuid
 import re
 import datetime
 from datetime import datetime
-from database.auth_db import get_auth_token
-from database.token_db import get_token
-from database.token_db import get_br_symbol, get_oa_symbol, get_symbol
-from broker.groww.database.master_contract_db import format_openalgo_to_groww_symbol, format_groww_to_openalgo_symbol
+from database.token_db import get_br_symbol
+from broker.groww.database.master_contract_db import format_openalgo_to_groww_symbol
 from utils.httpx_client import get_httpx_client
 from broker.groww.mapping.transform_data import (
     # Functions
-    transform_data, map_product_type, reverse_map_product_type, transform_modify_order_data,
-    map_exchange_type, map_exchange, map_segment_type, map_validity, map_order_type, map_transaction_type,
+    map_product_type, map_exchange_type, map_segment_type, map_validity, map_order_type, map_transaction_type,
     # Constants
-    VALIDITY_DAY, VALIDITY_IOC,
-    EXCHANGE_NSE, EXCHANGE_BSE, 
-    SEGMENT_CASH, SEGMENT_FNO,
-    PRODUCT_CNC, PRODUCT_MIS, PRODUCT_NRML,
-    ORDER_TYPE_MARKET, ORDER_TYPE_LIMIT, ORDER_TYPE_SL, ORDER_TYPE_SLM,
-    TRANSACTION_TYPE_BUY, TRANSACTION_TYPE_SELL,
-    ORDER_STATUS_NEW, ORDER_STATUS_ACKED, ORDER_STATUS_APPROVED, ORDER_STATUS_CANCELLED
+    VALIDITY_DAY, EXCHANGE_NSE, SEGMENT_CASH, SEGMENT_FNO,
+    ORDER_TYPE_MARKET, ORDER_TYPE_LIMIT, ORDER_TYPE_SL, ORDER_TYPE_SLM
 )
 from utils.logging import get_logger
 
@@ -684,10 +675,10 @@ def get_positions(auth):
         }
         
         # Log the request details (with redacted auth token)
-        logger.info(f"-------- GET POSITIONS REQUEST --------")
+        logger.info("-------- GET POSITIONS REQUEST --------")
         logger.info(f"API URL: {positions_url}")
         logger.info(f"Request parameters: {params}")
-        logger.info(f'Request headers: {{\n  "Authorization": "Bearer ***REDACTED***",\n  "Accept": "application/json",\n  "Content-Type": "application/json"\n}}')
+        logger.info('Request headers: {\n  "Authorization": "Bearer ***REDACTED***",\n  "Accept": "application/json",\n  "Content-Type": "application/json"\n}')
         
         # Make the API call for CASH segment
         response_obj = client.get(
@@ -698,7 +689,7 @@ def get_positions(auth):
         )
         
         # Log the response status
-        logger.info(f"-------- GET POSITIONS RESPONSE --------")
+        logger.info("-------- GET POSITIONS RESPONSE --------")
         logger.info(f"Response status code: {response_obj.status_code}")
         
         # Parse the response
@@ -1023,7 +1014,7 @@ def get_holdings(auth):
         holdings_url = f"{GROWW_BASE_URL}/v1/portfolio/holdings"
         
         # Log the request details
-        logger.info(f"-------- GET HOLDINGS REQUEST --------")
+        logger.info("-------- GET HOLDINGS REQUEST --------")
         logger.info(f"API URL: {holdings_url}")
         
         # Make the API call
@@ -1034,7 +1025,7 @@ def get_holdings(auth):
         )
         
         # Log the response status
-        logger.info(f"-------- GET HOLDINGS RESPONSE --------")
+        logger.info("-------- GET HOLDINGS RESPONSE --------")
         logger.info(f"Response status code: {response_obj.status_code}")
         
         # Parse the response
@@ -1532,7 +1523,7 @@ def place_smartorder_api(data, auth):
             logger.error(error_msg)
             return None, {"status": "error", "message": error_msg}, None
 
-        logger.info(f"Smart order details:\n" + 
+        logger.info("Smart order details:\n" +
                      f"Symbol: {symbol}\n" + 
                      f"Exchange: {exchange}\n" + 
                      f"Product: {product}\n" + 
@@ -1542,7 +1533,7 @@ def place_smartorder_api(data, auth):
         try:
             from database.token_db import get_br_symbol
         except ImportError:
-            from openalgo.database.token_db import get_br_symbol
+            pass
             
         # Get current open position for the symbol
         position_str = get_open_position(symbol, exchange, map_product_type(product), AUTH_TOKEN)
@@ -1610,7 +1601,7 @@ def place_smartorder_api(data, auth):
 
         if action:
             # Double-check the calculation
-            logger.info(f"=== FINAL SMART ORDER DECISION ===")
+            logger.info("=== FINAL SMART ORDER DECISION ===")
             logger.info(f"Current Position: {current_position}")
             logger.info(f"Target Position: {position_size}")
             logger.info(f"Action to take: {action}")
@@ -1650,7 +1641,7 @@ def place_smartorder_api(data, auth):
                 response_obj.status = 200
                 return response_obj, response, orderid
             else:
-                logger.error(f"Smart order placement failed")
+                logger.error("Smart order placement failed")
                 logger.error(f"Response: {response}")
                 logger.error(f"Response Type: {type(response)}")
                 logger.error(f"Res Object: {res}")
@@ -1748,7 +1739,7 @@ def get_holdings(auth):
 
 
 def close_all_positions(token=None, auth=None):
-    logger.info(f"Starting close_all_positions")
+    logger.info("Starting close_all_positions")
     logger.info(f"Current timestamp: {datetime.now().isoformat()}")
     
     # Validate input
@@ -1794,7 +1785,7 @@ def close_all_positions(token=None, auth=None):
                 logger.info(f"Net Quantity: {net_qty}")
                 
                 if int(net_qty) == 0:
-                    logger.info(f"Skipping position with zero net quantity")
+                    logger.info("Skipping position with zero net quantity")
                     continue
 
                 # Get trading details
@@ -2003,7 +1994,7 @@ def cancel_order(orderid, auth, segment=None, symbol=None, exchange=None):
         # If we're still using CASH segment for what appears to be an FNO order ID, warn about it
         if is_fno_order and segment == SEGMENT_CASH:
             logger.warning(f"Warning: Using CASH segment for what appears to be an FNO order: {orderid}")
-            logger.warning(f"Switching to FNO segment for this order")
+            logger.warning("Switching to FNO segment for this order")
             segment = SEGMENT_FNO
         
         # Double check and log the segment we're using
@@ -2016,7 +2007,7 @@ def cancel_order(orderid, auth, segment=None, symbol=None, exchange=None):
         }
         
         # Send cancel request to Groww API
-        logger.info(f"-------- CANCEL ORDER REQUEST --------")
+        logger.info("-------- CANCEL ORDER REQUEST --------")
         logger.info(f"Order ID: {orderid}")
         logger.info(f"Segment: {segment}")
         logger.info(f"API URL: {GROWW_CANCEL_ORDER_URL}")
@@ -2036,7 +2027,7 @@ def cancel_order(orderid, auth, segment=None, symbol=None, exchange=None):
             timeout=30
         )
         
-        logger.info(f"-------- CANCEL ORDER RESPONSE --------")
+        logger.info("-------- CANCEL ORDER RESPONSE --------")
         logger.info(f"Response status code: {response_obj.status_code}")
         
         # Parse response
@@ -2073,7 +2064,7 @@ def cancel_order(orderid, auth, segment=None, symbol=None, exchange=None):
         
         # Check if the response indicates success
         if response_obj.status_code == 200:
-            logger.info(f"-------- SUCCESSFUL ORDER CANCELLATION --------")
+            logger.info("-------- SUCCESSFUL ORDER CANCELLATION --------")
             # Check API response status field
             api_status = response_data.get('status', '')
             
@@ -2121,7 +2112,7 @@ def cancel_order(orderid, auth, segment=None, symbol=None, exchange=None):
             # Log the success
             logger.info(f"Successfully processed cancel request for order {orderid}")
         else:
-            logger.warning(f"-------- FAILED ORDER CANCELLATION --------")
+            logger.warning("-------- FAILED ORDER CANCELLATION --------")
             # API returned an error status code
             error_message = response_data.get('message', 'Error cancelling order')
             error_details = response_data.get('error', {})
@@ -2155,7 +2146,7 @@ def cancel_order(orderid, auth, segment=None, symbol=None, exchange=None):
         # Even if we got an exception, return success format for consistency
         # The order cancellation might actually be processing despite the error
         if "CANCELLATION_REQUESTED" in str(e):
-            logger.info(f"Order seems to be in CANCELLATION_REQUESTED state despite exception")
+            logger.info("Order seems to be in CANCELLATION_REQUESTED state despite exception")
             response = {
                 "status": "success",
                 "orderid": orderid,
@@ -2770,17 +2761,17 @@ def get_order_trades(orderid, auth, segment=None):
         url = f"{GROWW_ORDER_TRADES_URL}/{orderid}?segment={segment}&page={page}&page_size={page_size}"
         
         # Log request details
-        logger.info(f"-------- GET ORDER TRADES REQUEST --------")
+        logger.info("-------- GET ORDER TRADES REQUEST --------")
         logger.info(f"Order ID: {orderid}")
         logger.info(f"Segment: {segment}")
         logger.info(f"API URL: {url}")
-        logger.info(f"Request headers: {{\n  \"Authorization\": \"Bearer ***REDACTED***\",\n  \"Accept\": \"application/json\",\n  \"Content-Type\": \"application/json\"\n}}")
+        logger.info("Request headers: {\n  \"Authorization\": \"Bearer ***REDACTED***\",\n  \"Accept\": \"application/json\",\n  \"Content-Type\": \"application/json\"\n}")
         
         # Make the API call
         response_obj = client.get(url, headers=headers, timeout=30)
         
         # Log the response details
-        logger.info(f"-------- GET ORDER TRADES RESPONSE --------")
+        logger.info("-------- GET ORDER TRADES RESPONSE --------")
         logger.info(f"Response status code: {response_obj.status_code}")
         
         try:

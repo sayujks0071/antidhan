@@ -2,7 +2,6 @@ import os
 import httpx
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
-from broker.mstock.database import master_contract_db
 
 logger = get_logger(__name__)
 
@@ -79,6 +78,6 @@ def get_margin_data(auth_token):
     except httpx.RequestError as e:
         logger.error(f"Network Error while fetching margin data: {e}")
         return {}
-    except Exception as e:
+    except Exception:
         logger.exception("Unexpected error while fetching margin data.")
         return {}

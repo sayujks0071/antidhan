@@ -2,7 +2,7 @@ from database.auth_db import verify_api_key
 from database.token_db_enhanced import get_cache
 from database.qty_freeze_db import get_freeze_qty_for_option
 from utils.logging import get_logger
-from typing import Tuple, Dict, Any, List
+from typing import Tuple, Dict, Any
 
 logger = get_logger(__name__)
 
@@ -24,7 +24,7 @@ def search_symbols(query: str, exchange: str = None, api_key: str = None) -> Tup
         if api_key:
             user_id = verify_api_key(api_key)
             if not user_id:
-                logger.warning(f"Invalid API key provided for search")
+                logger.warning("Invalid API key provided for search")
                 return False, {
                     'status': 'error',
                     'message': 'Invalid openalgo apikey'

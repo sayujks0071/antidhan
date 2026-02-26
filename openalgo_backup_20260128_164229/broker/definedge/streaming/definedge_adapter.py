@@ -1,12 +1,10 @@
 import threading
-import json
 import logging
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 from broker.definedge.streaming.definedge_websocket import DefinedGeWebSocket
 from database.auth_db import get_auth_token, get_feed_token
-from database.token_db import get_token
 
 import sys
 import os
@@ -597,7 +595,7 @@ class DefinedgeWebSocketAdapter(BaseBrokerWebSocketAdapter):
                     # Mark this as initial snapshot for cache
                     message['_is_snapshot'] = True
                 else:
-                    self.logger.warning(f"⚠️ No OHLC in touchline ACK (market may be closed)")
+                    self.logger.warning("⚠️ No OHLC in touchline ACK (market may be closed)")
                 
                 # Always process acknowledgment as it contains initial snapshot
                 # Continue processing - don't return

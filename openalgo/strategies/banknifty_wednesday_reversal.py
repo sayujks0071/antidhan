@@ -40,23 +40,33 @@ except ImportError:
     print("ERROR: Could not import strategy utilities.", flush=True)
     sys.exit(1)
 
-def is_market_open():
-    """
-    Checks if NSE market is open (09:15 - 15:30 IST).
-    Uses UTC time + 5.5 hours to avoid pytz dependency.
-    """
-    now_utc = datetime.now(timezone.utc)
-    ist_offset = timedelta(hours=5, minutes=30)
-    now_ist = now_utc + ist_offset
+# Trading Utils Import (for Indicators)
+try:
+    from trading_utils import calculate_rsi, is_market_open
+except ImportError:
+    try:
+        sys.path.insert(0, strategies_dir)
+        from utils.trading_utils import calculate_rsi, is_market_open
+    except ImportError:
+        # Fallback if trading_utils not found or import fails
+        def calculate_rsi(series, period=14):
+            print("Warning: Using fallback RSI", flush=True)
+            return pd.Series()
 
-    if now_ist.weekday() >= 5: # Saturday/Sunday
-        return False
+        # Local fallback for market open if utils fail
+        def is_market_open():
+            now_utc = datetime.now(timezone.utc)
+            ist_offset = timedelta(hours=5, minutes=30)
+            now_ist = now_utc + ist_offset
 
-    current_time = now_ist.time()
-    market_start = datetime.strptime("09:15", "%H:%M").time()
-    market_end = datetime.strptime("15:30", "%H:%M").time()
+            if now_ist.weekday() >= 5: # Saturday/Sunday
+                return False
 
-    return market_start <= current_time <= market_end
+            current_time = now_ist.time()
+            market_start = datetime.strptime("09:15", "%H:%M").time()
+            market_end = datetime.strptime("15:30", "%H:%M").time()
+
+            return market_start <= current_time <= market_end
 
 class PrintLogger:
     def info(self, msg): print(msg, flush=True)
@@ -105,16 +115,6 @@ class HistoryClient:
         except Exception as e:
             print(f"History Fetch Error: {e}", flush=True)
             return pd.DataFrame()
-
-def calculate_rsi(series, period=14):
-    """Calculates RSI using pandas."""
-    delta = series.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-
-    rs = gain / loss
-    rsi = 100 - (100 / (1 + rs))
-    return rsi
 
 # Configuration
 STRATEGY_NAME = os.getenv("STRATEGY_NAME", "BankNiftyWednesdayReversal")

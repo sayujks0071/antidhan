@@ -1,4 +1,4 @@
-from flask_restx import Namespace, Resource, fields
+from flask_restx import Namespace, Resource
 from flask import request, jsonify, make_response, Response
 from marshmallow import ValidationError
 from database.auth_db import get_auth_token_broker

@@ -67,7 +67,7 @@ def load_test_symbols_interactive():
     """Load symbols based on user's interactive choice"""
     choice = get_symbol_loading_choice()
     
-    print(f"\n📊 Processing your selection...")
+    print("\n📊 Processing your selection...")
     
     if choice == 1:
         print("🔄 Loading ALL symbols from CSV...")
@@ -258,18 +258,18 @@ def main():
         sys.exit(1)
     
     # Confirm with user before starting
-    print(f"\n📋 READY TO START")
+    print("\n📋 READY TO START")
     print("-" * 30)
     print(f"🔢 Symbols to monitor: {len(test_symbols)}")
-    print(f"⏱️  Test duration: 30 minutes")
-    print(f"📊 Stats interval: Every 60 seconds")
+    print("⏱️  Test duration: 30 minutes")
+    print("📊 Stats interval: Every 60 seconds")
     
     # Show exchange breakdown
     exchange_count = defaultdict(int)
     for symbol in test_symbols:
         exchange_count[symbol['exchange']] += 1
     
-    print(f"\n📈 Exchange breakdown:")
+    print("\n📈 Exchange breakdown:")
     for exchange, count in sorted(exchange_count.items()):
         print(f"   {exchange}: {count} symbols")
     
@@ -345,7 +345,7 @@ def main():
             print("-" * 50)
     
     try:
-        print(f"📡 Connecting to WebSocket...")
+        print("📡 Connecting to WebSocket...")
         start_time = datetime.now()
         end_time = start_time + timedelta(seconds=TEST_DURATION)
         
@@ -356,7 +356,7 @@ def main():
         client.subscribe_ltp(test_symbols, on_data_received=on_data_received)
         print("✅ Subscription completed!")
         
-        print(f"\n🚀 Starting 30-minute monitoring session...")
+        print("\n🚀 Starting 30-minute monitoring session...")
         print(f"🕐 Start Time: {start_time.strftime('%H:%M:%S')}")
         print(f"🕐 End Time: {end_time.strftime('%H:%M:%S')}")
         print("📊 Statistics will be printed every minute")
@@ -379,7 +379,7 @@ def main():
                 
             time.sleep(1)  # Check every second
         
-        print(f"\n✅ 30-minute test completed!")
+        print("\n✅ 30-minute test completed!")
         
     except KeyboardInterrupt:
         print("\n🛑 Test interrupted by user")
@@ -428,7 +428,7 @@ def main():
             print(f"Total Updates Received: {update_count}")
             
             # EXCHANGE BREAKDOWN
-            print(f"\nEXCHANGE BREAKDOWN")
+            print("\nEXCHANGE BREAKDOWN")
             print("-" * 20)
             exchange_stats = defaultdict(lambda: {'total': 0, 'with_data': 0})
             

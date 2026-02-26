@@ -1,7 +1,6 @@
 # api/margin_api.py
 
 import json
-from database.token_db import get_br_symbol
 from broker.samco.mapping.margin_data import (
     transform_margin_position,
     parse_margin_response

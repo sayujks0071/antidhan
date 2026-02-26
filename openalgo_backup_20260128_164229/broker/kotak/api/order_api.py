@@ -1,8 +1,6 @@
 import httpx
 import json
 import urllib.parse
-import os
-from database.auth_db import get_auth_token
 from database.token_db import get_token , get_br_symbol, get_symbol
 from broker.kotak.mapping.transform_data import transform_data , map_product_type, reverse_map_product_type, transform_modify_order_data, reverse_map_exchange,map_exchange
 from utils.logging import get_logger

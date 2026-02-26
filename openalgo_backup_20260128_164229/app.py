@@ -6,7 +6,7 @@ import re
 import sys
 
 # Initialize logging EARLY to suppress verbose startup logs
-from utils.logging import get_logger, log_startup_banner, highlight_url  # Import centralized logging
+from utils.logging import get_logger  # Import centralized logging
 
 from flask import Flask, render_template, session
 from flask_wtf.csrf import CSRFProtect  # Import CSRF protection
@@ -52,7 +52,7 @@ from blueprints.admin import admin_bp  # Import the admin blueprint
 from services.telegram_bot_service import telegram_bot_service
 from database.telegram_db import get_bot_config
 
-from restx_api import api_v1_bp, api
+from restx_api import api_v1_bp
 
 from database.auth_db import init_db as ensure_auth_tables_exists
 from database.user_db import init_db as ensure_user_tables_exists
@@ -588,7 +588,7 @@ if __name__ == '__main__':
     ngrok_url = None
     if os.getenv('NGROK_ALLOW', 'FALSE').upper() == 'TRUE':
         try:
-            from pyngrok import ngrok, conf
+            from pyngrok import ngrok
             from urllib.parse import urlparse
 
             # Extract domain from HOST_SERVER if provided

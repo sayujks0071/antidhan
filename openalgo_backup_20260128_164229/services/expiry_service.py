@@ -1,8 +1,7 @@
 from database.symbol import SymToken, db_session
 from database.auth_db import verify_api_key
 from utils.logging import get_logger
-from typing import Tuple, Dict, Any, List
-from sqlalchemy import distinct, func
+from typing import Tuple, Dict, Any
 
 logger = get_logger(__name__)
 
@@ -24,7 +23,7 @@ def get_expiry_dates(symbol: str, exchange: str, instrumenttype: str, api_key: s
         if api_key:
             user_id = verify_api_key(api_key)
             if not user_id:
-                logger.warning(f"Invalid API key provided for expiry dates")
+                logger.warning("Invalid API key provided for expiry dates")
                 return False, {
                     'status': 'error',
                     'message': 'Invalid openalgo apikey'
@@ -138,7 +137,7 @@ def get_expiry_dates(symbol: str, exchange: str, instrumenttype: str, api_key: s
         
         # If no exact matches found, let's be more lenient and check different patterns
         if not filtered_expiry_dates:
-            logger.info(f"No exact matches found. Trying alternative patterns.")
+            logger.info("No exact matches found. Trying alternative patterns.")
             # Try different patterns that might exist in the database
             if instrumenttype == 'futures':
                 alternative_patterns = [

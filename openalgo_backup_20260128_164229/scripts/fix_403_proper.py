@@ -184,7 +184,7 @@ def main():
             print(f"✅ {msg}")
         else:
             print(f"❌ {msg}")
-            print(f"     Continuing anyway...")
+            print("     Continuing anyway...")
         time.sleep(1)
         
         # Step 3: Start strategy

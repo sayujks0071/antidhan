@@ -192,7 +192,7 @@ def get_order_status_with_auth(
     # Only fetch average_price for complete orders
     # Order statuses can be: open, complete, rejected
     if order_status.lower() == 'complete':
-        logger.info(f"[OrderStatus] Order is complete, fetching average price from tradebook")
+        logger.info("[OrderStatus] Order is complete, fetching average price from tradebook")
         try:
             # Use tradebook_service to get trade data
             success, tradebook_response, status_code = get_tradebook(
@@ -251,7 +251,7 @@ def get_order_status_with_auth(
         
         # Log to analyzer database
         log_executor.submit(async_log_analyzer, analyzer_request, response_data, 'orderstatus')
-        logger.debug(f"[OrderStatus] Logged to analyzer database")
+        logger.debug("[OrderStatus] Logged to analyzer database")
         
         # Emit socket event for toast notification asynchronously (non-blocking)
         socketio.start_background_task(
@@ -262,11 +262,11 @@ def get_order_status_with_auth(
             'response': response_data
         }
         )
-        logger.debug(f"[OrderStatus] Emitted socket event for analyzer update")
+        logger.debug("[OrderStatus] Emitted socket event for analyzer update")
     else:
         logger.info(f"[OrderStatus] LIVE mode - Preparing response for OrderID {orderid} with status: {order_found.get('order_status')}")
         log_executor.submit(async_log_order, 'orderstatus', request_data, response_data)
-        logger.debug(f"[OrderStatus] Logged to order database")
+        logger.debug("[OrderStatus] Logged to order database")
 
     logger.info(f"[OrderStatus] Successfully processed order status for OrderID {orderid} - Status: {order_found.get('order_status')}, Symbol: {order_found.get('symbol')}, Average Price: {average_price}")
     return True, response_data, 200

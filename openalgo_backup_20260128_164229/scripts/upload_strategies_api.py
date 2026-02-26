@@ -3,9 +3,7 @@
 Upload Python strategies via API
 Requires login session first
 """
-import os
 import sys
-import requests
 from pathlib import Path
 
 # Add parent directory to path
@@ -42,7 +40,7 @@ def upload_strategy_via_api(strategy_file_path, strategy_name=None):
         # 1. Login first to get session cookie
         # 2. Use that cookie in requests
         print(f"📤 Uploading: {file_path.name}")
-        print(f"   ⚠️  Requires web session - use browser or provide session cookie")
+        print("   ⚠️  Requires web session - use browser or provide session cookie")
         return False
 
 def upload_strategies_direct():

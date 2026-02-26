@@ -1,8 +1,8 @@
 import unittest
 import sys
 import os
-from unittest.mock import patch, MagicMock
-from flask import Flask, session, jsonify
+from unittest.mock import MagicMock
+from flask import Flask
 
 # Add openalgo directory to path so we can import modules directly
 sys.path.append(os.path.join(os.getcwd(), 'openalgo'))

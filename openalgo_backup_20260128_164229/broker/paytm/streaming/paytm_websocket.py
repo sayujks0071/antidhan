@@ -3,8 +3,6 @@ import websocket
 import ssl
 import json
 import time
-import logging
-import threading
 from logzero import logger
 
 class PaytmWebSocket(object):

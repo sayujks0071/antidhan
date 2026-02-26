@@ -1,6 +1,5 @@
 import os
 from datetime import datetime
-import random
 
 # Target directory matches perform_eod_optimization.py LOG_DIRS[0]
 LOG_DIR = "openalgo/strategies/logs"

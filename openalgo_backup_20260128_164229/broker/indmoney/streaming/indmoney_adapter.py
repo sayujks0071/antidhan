@@ -2,7 +2,7 @@ import threading
 import json
 import logging
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 from broker.indmoney.streaming.indWebSocket import IndWebSocket
 from database.auth_db import get_auth_token
@@ -17,8 +17,7 @@ from websocket_proxy.base_adapter import BaseBrokerWebSocketAdapter
 from websocket_proxy.mapping import SymbolMapper
 from .indmoney_mapping import (
     IndmoneyExchangeMapper,
-    IndmoneyModeMapper,
-    IndmoneyCapabilityRegistry
+    IndmoneyModeMapper
 )
 
 
@@ -191,7 +190,7 @@ class IndmoneyWebSocketAdapter(BaseBrokerWebSocketAdapter):
                 self.logger.error(f"SUBSCRIPTION ERROR for {symbol}.{exchange}: {e}", exc_info=True)
                 return self._create_error_response("SUBSCRIPTION_ERROR", str(e))
         else:
-            self.logger.warning(f"NOT CONNECTED YET - subscription will be sent when connection opens")
+            self.logger.warning("NOT CONNECTED YET - subscription will be sent when connection opens")
 
         # Return success
         return self._create_success_response(
@@ -274,7 +273,7 @@ class IndmoneyWebSocketAdapter(BaseBrokerWebSocketAdapter):
     def _on_open(self, wsapp) -> None:
         """Callback when connection is established"""
         self.logger.info("==================== WEBSOCKET OPENED ====================")
-        self.logger.info(f"Connection established to INDmoney WebSocket")
+        self.logger.info("Connection established to INDmoney WebSocket")
         self.connected = True
 
         # Resubscribe to existing subscriptions if reconnecting

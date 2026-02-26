@@ -6,7 +6,6 @@ Tests LTP, Quote, and Depth for RELIANCE and TCS
 import sys
 import os
 import time
-import json
 from datetime import datetime
 
 # Add parent directory to path
@@ -20,7 +19,6 @@ from services.market_data_service import get_market_data_service
 from services.websocket_service import (
     get_websocket_status,
     subscribe_to_symbols,
-    unsubscribe_from_symbols,
     get_websocket_subscriptions,
     unsubscribe_all
 )
@@ -329,7 +327,7 @@ def test_mode_switching(client, symbols):
             if mode == "LTP" and 'ltp' in data:
                 print(f"  ✓ Received LTP data: {format_price(data['ltp'].get('value', 0))}")
             elif mode == "Quote" and 'quote' in data:
-                print(f"  ✓ Received Quote data: OHLC available")
+                print("  ✓ Received Quote data: OHLC available")
             elif mode == "Depth" and 'depth' in data:
                 buy_levels = len(data['depth'].get('buy', []))
                 sell_levels = len(data['depth'].get('sell', []))
@@ -502,8 +500,8 @@ def main():
         
         # Display connection metrics
         print(f"\n{Colors.CYAN}Connection Metrics:{Colors.ENDC}")
-        print(f"  Total test duration: ~60 seconds")
-        print(f"  Data updates received: Many (check terminal output)")
+        print("  Total test duration: ~60 seconds")
+        print("  Data updates received: Many (check terminal output)")
         print(f"  Connection stability: {'Stable' if client.is_connected() else 'Unstable'}")
         
     except KeyboardInterrupt:
@@ -524,7 +522,7 @@ def main():
         client.disconnect()
         print(f"{Colors.GREEN}Test completed successfully!{Colors.ENDC}")
         print(f"\n{Colors.YELLOW}Note:{Colors.ENDC} This test covered both service layer functions and direct WebSocket client usage.")
-        print(f"The service layer is designed for internal Flask app usage, while WebSocketClient is for external integrations.")
+        print("The service layer is designed for internal Flask app usage, while WebSocketClient is for external integrations.")
 
 if __name__ == "__main__":
     main()

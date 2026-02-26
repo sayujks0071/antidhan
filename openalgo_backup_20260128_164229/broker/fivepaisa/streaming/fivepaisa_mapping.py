@@ -1,4 +1,3 @@
-import logging
 
 class FivePaisaExchangeMapper:
     """Maps OpenAlgo exchange codes to 5Paisa-specific exchange codes"""

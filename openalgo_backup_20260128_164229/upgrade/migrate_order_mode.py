@@ -14,7 +14,6 @@ Usage:
 import os
 import sys
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.exc import OperationalError
 
 # Set UTF-8 encoding for output to handle Unicode characters on Windows
 if sys.platform == 'win32':

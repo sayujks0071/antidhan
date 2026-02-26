@@ -2,9 +2,6 @@
 
 import os
 import pandas as pd
-import gzip
-import shutil
-from datetime import datetime
 
 # Import httpx and shared client
 import httpx

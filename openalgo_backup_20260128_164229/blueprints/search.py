@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash, jsonify
+from flask import Blueprint, render_template, request, flash, jsonify
 from database.symbol import enhanced_search_symbols
 from database.token_db_enhanced import (
     fno_search_symbols,
@@ -6,7 +6,6 @@ from database.token_db_enhanced import (
     get_distinct_underlyings_cached as get_distinct_underlyings
 )
 from utils.session import check_session_validity
-from typing import List, Dict
 from utils.logging import get_logger
 
 logger = get_logger(__name__)

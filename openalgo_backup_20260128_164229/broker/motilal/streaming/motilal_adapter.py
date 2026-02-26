@@ -6,10 +6,9 @@ WebSocket proxy infrastructure to provide standardized market data streaming.
 """
 
 import threading
-import json
 import logging
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import sys
 import os
 

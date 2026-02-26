@@ -1,8 +1,5 @@
 # api/funds.py
 
-import os
-import json
-import httpx
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
 

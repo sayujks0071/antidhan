@@ -3,7 +3,6 @@
 Check All Running Strategy Logs using Clawdbot AI
 Analyzes logs from all currently running strategies
 """
-import os
 import sys
 import json
 import re
@@ -287,7 +286,7 @@ def main():
         log_file = find_strategy_log_file(strategy_id, strategy_name)
         
         if not log_file:
-            print(f"  ⚠️  No log file found")
+            print("  ⚠️  No log file found")
             all_results[strategy_name] = {"error": "No log file found"}
             print()
             continue
@@ -329,7 +328,7 @@ def main():
                         if "issues" in analysis_data:
                             issues = analysis_data["issues"]
                             if issues:
-                                print(f"\n    🔍 Issues:")
+                                print("\n    🔍 Issues:")
                                 if isinstance(issues, list):
                                     for issue in issues[:3]:
                                         print(f"      - {issue}")
@@ -339,7 +338,7 @@ def main():
                         if "recommendations" in analysis_data:
                             recs = analysis_data["recommendations"]
                             if recs:
-                                print(f"\n    💡 Recommendations:")
+                                print("\n    💡 Recommendations:")
                                 if isinstance(recs, list):
                                     for rec in recs[:3]:
                                         print(f"      - {rec}")

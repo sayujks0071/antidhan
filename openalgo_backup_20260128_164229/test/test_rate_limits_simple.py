@@ -144,10 +144,10 @@ def test_rate_limiter_logic():
     time.sleep(1.1)  # Wait for rate limit to reset
     
     if limiter.is_allowed('/placeorder'):
-        print(f"  ✓ PASSED - Request allowed after rate limit reset")
+        print("  ✓ PASSED - Request allowed after rate limit reset")
         test3_passed = True
     else:
-        print(f"  ✗ FAILED - Request not allowed after rate limit reset")
+        print("  ✗ FAILED - Request not allowed after rate limit reset")
         test3_passed = False
     
     # Test 4: Different clients have separate limits

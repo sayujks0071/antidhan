@@ -1,5 +1,4 @@
 import json
-import os
 from broker.indmoney.mapping.margin_data import transform_margin_positions, parse_margin_response
 from broker.indmoney.api.baseurl import get_url
 from utils.httpx_client import get_httpx_client

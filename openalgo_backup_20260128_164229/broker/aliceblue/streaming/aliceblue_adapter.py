@@ -9,18 +9,16 @@ import os
 from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
 
-from .aliceblue_client import Aliceblue, Instrument
+from .aliceblue_client import Aliceblue
 from database.auth_db import get_auth_token, get_feed_token
 from database.token_db import get_token
 
 import sys
-import os
 
 # Add parent directory to path to allow imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
 
 from websocket_proxy.base_adapter import BaseBrokerWebSocketAdapter
-from websocket_proxy.mapping import SymbolMapper
 from .aliceblue_mapping import AliceBlueExchangeMapper, AliceBlueCapabilityRegistry, AliceBlueMessageMapper, AliceBlueFeedType
 
 class AliceblueWebSocketAdapter(BaseBrokerWebSocketAdapter):
@@ -111,8 +109,8 @@ class AliceblueWebSocketAdapter(BaseBrokerWebSocketAdapter):
                 # Store session_id (JWT) for WebSocket authentication
                 self.session_id = session_id
                 self.logger.info(f"Using BROKER_API_KEY as client_id (user_id): {self.client_id}")
-                self.logger.info(f"Using BROKER_API_SECRET for X-API-KEY header")
-                self.logger.info(f"Using auth_token as session_id for auth")
+                self.logger.info("Using BROKER_API_SECRET for X-API-KEY header")
+                self.logger.info("Using auth_token as session_id for auth")
             
             self.logger.info(f"Final values: client_id={self.client_id}, session_id={self.session_id}")
             
@@ -156,7 +154,7 @@ class AliceblueWebSocketAdapter(BaseBrokerWebSocketAdapter):
                 invalid_response = self.aliceblue_client._request("ws/invalidateSocketSess", "A", session_data)
 
                 if invalid_response and invalid_response.get('stat') == 'Ok':
-                    self.logger.info(f"Previous session invalidated successfully")
+                    self.logger.info("Previous session invalidated successfully")
                 else:
                     self.logger.warning(f"Session invalidation response: {invalid_response}")
                     # Continue anyway - might be first time connection
@@ -271,7 +269,7 @@ class AliceblueWebSocketAdapter(BaseBrokerWebSocketAdapter):
             # Second SHA256 hash of the first hash
             susertoken = hashlib.sha256(sha256_encryption1.encode('utf-8')).hexdigest()
 
-            self.logger.info(f"Generating susertoken from session_id (JWT)")
+            self.logger.info("Generating susertoken from session_id (JWT)")
             self.logger.info(f"Session ID (first 50 chars): {self.session_id[:50]}...")
             self.logger.info(f"Session ID length: {len(self.session_id)}")
             self.logger.info(f"First SHA256: {sha256_encryption1}")
@@ -1000,7 +998,7 @@ class AliceblueWebSocketAdapter(BaseBrokerWebSocketAdapter):
                         market_data['exchange'] = str(value)
             
             # Publish raw data for debugging
-            topic = f"DEBUG_MARKET_DATA"
+            topic = "DEBUG_MARKET_DATA"
             self.publish_market_data(topic, market_data)
             
         except Exception as e:

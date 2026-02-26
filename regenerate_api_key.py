@@ -44,7 +44,7 @@ try:
         api_key_obj.api_key_hash = api_key_hash
         api_key_obj.created_at = datetime.now()
         db_session.commit()
-        print(f"Updated API key hash for user sks20417")
+        print("Updated API key hash for user sks20417")
     else:
         # Create new entry
         new_key = ApiKeys(
@@ -56,7 +56,7 @@ try:
         )
         db_session.add(new_key)
         db_session.commit()
-        print(f"Created new API key entry for user sks20417")
+        print("Created new API key entry for user sks20417")
 except Exception as e:
     print(f"Error: {e}")
     db_session.rollback()

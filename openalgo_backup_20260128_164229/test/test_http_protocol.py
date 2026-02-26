@@ -97,7 +97,7 @@ def test_broker_protocol():
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     
     # Import your httpx_client
-    from utils.httpx_client import get_httpx_client, request
+    from utils.httpx_client import get_httpx_client
     
     client = get_httpx_client()
     
@@ -137,7 +137,7 @@ def test_broker_protocol():
         print(f"Status code: {response.status_code}")
         
         # Check connection pool info
-        print(f"\nConnection pool settings:")
+        print("\nConnection pool settings:")
         print(f"  Max connections: {client._transport._pool._max_connections}")
         print(f"  Max keepalive: {client._transport._pool._max_keepalive_connections}")
         print(f"  Keepalive expiry: {client._transport._pool._keepalive_expiry}")

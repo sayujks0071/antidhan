@@ -7,7 +7,6 @@ import os
 import sys
 import logging
 import time
-import json
 from datetime import datetime
 from pathlib import Path
 

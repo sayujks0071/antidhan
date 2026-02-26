@@ -3,11 +3,10 @@ Enhanced Token DB with Full Memory Caching for 100,000+ symbols
 Optimized for zero-config deployment with configurable session reset time (SESSION_EXPIRY_TIME)
 """
 
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 import time
-from dataclasses import dataclass, field
-from collections import defaultdict
+from dataclasses import dataclass
 import pytz
 from utils.logging import get_logger
 

@@ -1,14 +1,10 @@
-from flask import Blueprint, request, redirect, url_for, render_template, session, jsonify, make_response
+from flask import Blueprint, request, redirect, url_for, render_template, session, jsonify
 from flask import current_app as app
 from limiter import limiter  # Import the limiter instance
 from utils.config import get_broker_api_key, get_broker_api_secret, get_login_rate_limit_min, get_login_rate_limit_hour
 from utils.auth_utils import handle_auth_success, handle_auth_failure
 from utils.logging import get_logger
-import http.client
 import json
-import jwt
-import base64
-import hashlib
 import os
 
 # Initialize logger
@@ -518,7 +514,7 @@ def broker_callback(broker,para=None):
             forward_url = 'kotak.html'
 
             if auth_token:
-                logger.info(f"Kotak authentication successful, auth_token received")
+                logger.info("Kotak authentication successful, auth_token received")
             else:
                 logger.error(f"Kotak authentication failed: {error_message}")
 
@@ -593,7 +589,7 @@ def broker_callback(broker,para=None):
                     if step1_response and 'otp_token' in step1_response:
                         session['definedge_otp_token'] = step1_response['otp_token']
                         otp_message = "OTP has been resent successfully"
-                        logger.info(f"Definedge OTP resent successfully")
+                        logger.info("Definedge OTP resent successfully")
                         return jsonify({'status': 'success', 'message': otp_message})
                     else:
                         return jsonify({'status': 'error', 'message': 'Failed to resend OTP'})

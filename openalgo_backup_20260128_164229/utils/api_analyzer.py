@@ -1,10 +1,8 @@
 from datetime import datetime, timedelta
 import pytz
-from database.analyzer_db import AnalyzerLog, db_session
+from database.analyzer_db import AnalyzerLog
 from database.symbol import SymToken
-from sqlalchemy import func
 import json
-from extensions import socketio
 from utils.constants import (
     VALID_EXCHANGES,
     VALID_ACTIONS,

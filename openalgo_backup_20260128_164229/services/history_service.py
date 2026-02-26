@@ -1,7 +1,7 @@
 import importlib
 import traceback
 import pandas as pd
-from typing import Tuple, Dict, Any, Optional, List, Union
+from typing import Tuple, Dict, Any, Optional
 from database.auth_db import get_auth_token_broker
 from database.token_db import get_token
 from utils.constants import VALID_EXCHANGES

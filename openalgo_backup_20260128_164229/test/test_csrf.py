@@ -197,7 +197,7 @@ class CSRFTester:
     def run_all_tests(self):
         """Run all CSRF tests"""
         print(f"\n{'='*60}")
-        print(f"OpenAlgo CSRF Protection Test Suite")
+        print("OpenAlgo CSRF Protection Test Suite")
         print(f"Platform: {platform.system()} {platform.release()}")
         print(f"Python: {platform.python_version()}")
         print(f"{'='*60}")

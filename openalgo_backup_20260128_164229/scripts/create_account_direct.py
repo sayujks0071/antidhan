@@ -12,7 +12,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
 sys.path.insert(0, project_root)
 
-from database.user_db import add_user, find_user_by_username, init_db, User, db_session
+from database.user_db import add_user, init_db, User
 from database.auth_db import upsert_api_key
 import secrets
 
@@ -41,12 +41,12 @@ def create_account(username, email, password):
             key_id = upsert_api_key(username, api_key)
             
             if key_id:
-                print(f"✅ API key generated successfully!")
-                print(f"\n📋 Account Details:")
+                print("✅ API key generated successfully!")
+                print("\n📋 Account Details:")
                 print(f"   Username: {username}")
                 print(f"   Email: {email}")
                 print(f"   API Key: {api_key}")
-                print(f"\n🔑 You can now login at: http://127.0.0.1:5002/auth/login")
+                print("\n🔑 You can now login at: http://127.0.0.1:5002/auth/login")
                 return True
             else:
                 print("⚠️  User created but API key generation failed")

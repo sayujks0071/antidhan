@@ -1,4 +1,3 @@
-import logging
 
 class MstockExchangeMapper:
     """Maps OpenAlgo exchange codes to mstock-specific exchange types"""

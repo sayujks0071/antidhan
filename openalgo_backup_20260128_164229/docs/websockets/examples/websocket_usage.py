@@ -7,8 +7,7 @@ import time
 from services.websocket_service import (
     get_websocket_status,
     subscribe_to_symbols,
-    unsubscribe_from_symbols,
-    get_market_data
+    unsubscribe_from_symbols
 )
 from services.market_data_service import (
     get_market_data_service,
@@ -150,7 +149,7 @@ def calculate_market_metrics():
     
     if price_changes:
         avg_change = sum(price_changes) / len(price_changes)
-        print(f"\nMarket Summary:")
+        print("\nMarket Summary:")
         print(f"Average Change: {avg_change:.2f}%")
         print(f"Total Volume: {total_volume:,}")
 

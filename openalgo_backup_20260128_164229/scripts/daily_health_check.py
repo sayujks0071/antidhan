@@ -33,7 +33,7 @@ except SystemExit:
     print("Environment check failed. Please fix .env issues.")
     sys.exit(1)
 
-from database.auth_db import Auth, db_session, get_api_key_for_tradingview
+from database.auth_db import Auth, get_api_key_for_tradingview
 
 def check_port(host, port):
     try:
@@ -113,7 +113,7 @@ def generate_report():
     print(f"🔐 DAILY LOGIN HEALTH CHECK - {now}\n")
 
     # KITE CHECK
-    print(f"✅ KITE CONNECT (Port 5001):")
+    print("✅ KITE CONNECT (Port 5001):")
     kite_port_open = check_port('127.0.0.1', 5001)
     print(f"- Server Status: {'✅ Running' if kite_port_open else '🔴 Down'}")
 
@@ -124,26 +124,26 @@ def generate_report():
         if kite_api_key:
             success, data, error = check_api_connectivity(5001, kite_api_key)
             if success:
-                 print(f"- Auth Token: ✅ Valid")
+                 print("- Auth Token: ✅ Valid")
                  print(f"- Token Expiry: {expiry_str}")
-                 print(f"- API Test: ✅ Connected")
+                 print("- API Test: ✅ Connected")
                  kite_connected = True
             else:
-                 print(f"- Auth Token: 🔴 Failed / Invalid")
+                 print("- Auth Token: 🔴 Failed / Invalid")
                  print(f"- API Test: 🔴 Failed ({error})")
-                 print(f"  -> Login URL: http://127.0.0.1:5001/auth/login")
+                 print("  -> Login URL: http://127.0.0.1:5001/auth/login")
         else:
-            print(f"- Auth Token: ⚠️ Not Configured (No Zerodha user found)")
-            print(f"  -> Login URL: http://127.0.0.1:5001/auth/login")
+            print("- Auth Token: ⚠️ Not Configured (No Zerodha user found)")
+            print("  -> Login URL: http://127.0.0.1:5001/auth/login")
     else:
         if kite_api_key:
-             print(f"- Auth Token: ❓ Found in DB but Server Down")
-        print(f"- API Test: 🔴 Skipped (Server Down)")
+             print("- Auth Token: ❓ Found in DB but Server Down")
+        print("- API Test: 🔴 Skipped (Server Down)")
 
     print("")
 
     # DHAN CHECK
-    print(f"✅ DHAN API (Port 5002):")
+    print("✅ DHAN API (Port 5002):")
     dhan_port_open = check_port('127.0.0.1', 5002)
     print(f"- Server Status: {'✅ Running' if dhan_port_open else '🔴 Down'}")
 
@@ -153,25 +153,25 @@ def generate_report():
         if dhan_api_key:
             success, data, error = check_api_connectivity(5002, dhan_api_key)
             if success:
-                 print(f"- Access Token: ✅ Valid")
+                 print("- Access Token: ✅ Valid")
                  print(f"- Token Expiry: {expiry_str}")
-                 print(f"- API Test: ✅ Connected")
+                 print("- API Test: ✅ Connected")
             else:
-                 print(f"- Access Token: 🔴 Failed / Invalid")
+                 print("- Access Token: 🔴 Failed / Invalid")
                  print(f"- API Test: 🔴 Failed ({error})")
-                 print(f"  -> Login URL: http://127.0.0.1:5002/auth/login")
+                 print("  -> Login URL: http://127.0.0.1:5002/auth/login")
         else:
-            print(f"- Access Token: ⚠️ Not Configured (No Dhan user found)")
-            print(f"  -> Login URL: http://127.0.0.1:5002/auth/login")
+            print("- Access Token: ⚠️ Not Configured (No Dhan user found)")
+            print("  -> Login URL: http://127.0.0.1:5002/auth/login")
     else:
         if dhan_api_key:
-             print(f"- Access Token: ❓ Found in DB but Server Down")
-        print(f"- API Test: 🔴 Skipped (Server Down)")
+             print("- Access Token: ❓ Found in DB but Server Down")
+        print("- API Test: 🔴 Skipped (Server Down)")
 
     print("")
 
     # OPENALGO AUTH
-    print(f"✅ OPENALGO AUTH:")
+    print("✅ OPENALGO AUTH:")
     print(f"- Login Status: {'✅ Authenticated' if (kite_api_key or dhan_api_key) else '⚠️ No users found'}")
 
     strat_count, strat_errors = check_strategies()

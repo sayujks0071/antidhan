@@ -1,6 +1,4 @@
-import json
 import os
-import httpx
 import pyotp
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger

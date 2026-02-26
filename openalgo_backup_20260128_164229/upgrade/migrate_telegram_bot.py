@@ -14,14 +14,12 @@ Usage:
 import sys
 import os
 import argparse
-from datetime import datetime
-from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine, text, inspect
-from sqlalchemy.exc import OperationalError, IntegrityError
+from sqlalchemy.exc import OperationalError
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -366,7 +364,7 @@ class TelegramBotMigration:
                 )
                 conn.commit()
 
-            logger.info(f"✅ Downgrade completed. Telegram bot tables removed.")
+            logger.info("✅ Downgrade completed. Telegram bot tables removed.")
             return True
 
         except Exception as e:

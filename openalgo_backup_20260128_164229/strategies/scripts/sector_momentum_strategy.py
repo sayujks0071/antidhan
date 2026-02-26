@@ -8,7 +8,6 @@ import sys
 import time
 import argparse
 import logging
-import pandas as pd
 from datetime import datetime, timedelta
 
 # Add project root to path

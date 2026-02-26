@@ -1,18 +1,13 @@
-import json
-import os
 import pytz
 from datetime import datetime, timedelta
 import pandas as pd
 import httpx
-from typing import Dict, List, Any, Union, Optional
+from typing import Dict, List, Any
 import time
 import traceback
 from utils.httpx_client import get_httpx_client
 
-from database.token_db import get_br_symbol, get_oa_symbol, get_token
-from datetime import datetime, timedelta
-import pandas as pd
-import pytz
+from database.token_db import get_br_symbol, get_token
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -1312,7 +1307,7 @@ class BrokerData:
         
         # Single symbol case - return in simpler format for OpenAlgo frontend
         if isinstance(symbol_list, (str, dict)) or len(symbol_list) == 1:
-            logger.info(f"Returning data for single symbol")
+            logger.info("Returning data for single symbol")
     
             # Log what is being passed to the formatter
             logger.debug(f"Quote data passed to formatter: {quote_data}")
@@ -1721,7 +1716,7 @@ class BrokerData:
                 return self._process_quotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_quotes_batch(self, symbols: list) -> list:
@@ -1871,7 +1866,7 @@ class BrokerData:
                                     results.append({
                                         'symbol': original.get('symbol', es),
                                         'exchange': original.get('exchange', 'UNKNOWN'),
-                                        'error': f'Invalid trading symbol in Groww'
+                                        'error': 'Invalid trading symbol in Groww'
                                     })
 
                             # Retry with filtered symbols (recursive call with max 5 retries)
