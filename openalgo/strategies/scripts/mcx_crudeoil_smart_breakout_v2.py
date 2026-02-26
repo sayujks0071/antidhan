@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 [Strategy Description]
 MCX Smart Breakout Strategy V2 (Alpha V2)
@@ -11,27 +10,12 @@ Enhancements:
 """
 import os
 import sys
-import argparse
-import pandas as pd
-import numpy as np
 
 # Add repo root to path
 try:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    strategies_dir = os.path.dirname(current_dir)
-    utils_dir = os.path.join(strategies_dir, "utils")
-    if utils_dir not in sys.path:
-        sys.path.insert(0, utils_dir)
-except Exception:
-    pass
-
-try:
-    from base_strategy import BaseStrategy
+    from strategy_preamble import BaseStrategy
 except ImportError:
-    try:
-        from utils.base_strategy import BaseStrategy
-    except ImportError:
-        from openalgo.strategies.utils.base_strategy import BaseStrategy
+    from base_strategy import BaseStrategy
 
 class MCXSmartStrategyV2(BaseStrategy):
     def setup(self):
@@ -149,7 +133,7 @@ class MCXSmartStrategyV2(BaseStrategy):
                     self.logger.info(f"EXIT SHORT ({reason}): Price={current['close']}")
                     self.buy(abs(pos_qty), current['close'])
 
-    def generate_signal_internal(self, df):
+    def get_signal(self, df):
         """Internal method for backtesting signal generation."""
         if df.empty:
             return "HOLD", 0.0, {}
@@ -198,7 +182,7 @@ def generate_signal(df, client=None, symbol=None, params=None):
     kwargs['client'] = client
 
     strat = MCXSmartStrategyV2(**kwargs)
-    return strat.generate_signal_internal(df)
+    return strat.get_signal(df)
 
 if __name__ == "__main__":
     MCXSmartStrategyV2.cli()
