@@ -395,34 +395,6 @@
     "schedule_start": "09:00",
     "schedule_stop": "23:30"
   },
-  "NSE_RSI_MACD_STRATEGY": {
-    "id": "NSE_RSI_MACD_STRATEGY",
-    "name": "NSE RSI MACD Strategy",
-    "description": "NSE Equities Trend Following Strategy using MACD (12,26,9) and RSI (14)",
-    "file_path": "strategies/scripts/nse_rsi_macd_strategy.py",
-    "user_id": "testuser",
-    "created_at": "2026-02-12T22:00:00",
-    "symbol": "SBIN",
-    "schedule_enabled": true,
-    "schedule_days": [
-      "mon",
-      "tue",
-      "wed",
-      "thu",
-      "fri"
-    ],
-    "params": {
-      "rsi_period": 14,
-      "macd_fast": 12,
-      "macd_slow": 26,
-      "macd_signal": 9,
-      "quantity": 1
-    },
-    "is_running": false,
-    "is_scheduled": true,
-    "schedule_start": "09:15",
-    "schedule_stop": "15:30"
-  },
   "MCX_GOLD_MOMENTUM_STRATEGY": {
     "id": "MCX_GOLD_MOMENTUM_STRATEGY",
     "name": "MCX Gold Momentum Strategy",
@@ -481,5 +453,34 @@
     "is_scheduled": true,
     "schedule_start": "09:00",
     "schedule_stop": "23:30"
+  },
+  "SUPER_TREND_VWAP_V2": {
+    "id": "SUPER_TREND_VWAP_V2",
+    "name": "Super Trend VWAP V2",
+    "description": "VWAP V2 with Multi-Timeframe Trend Confirmation (1H EMA Filter)",
+    "file_path": "strategies/scripts/supertrend_vwap_strategy_v2.py",
+    "user_id": "system",
+    "created_at": "2026-03-01T10:00:00",
+    "symbol": "NIFTY",
+    "schedule_enabled": true,
+    "schedule_days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri"
+    ],
+    "params": {
+      "threshold": 150,
+      "stop_pct": 1.8,
+      "adx_threshold": 20,
+      "adx_period": 14,
+      "mtf_interval": "1h",
+      "mtf_ema_period": 50
+    },
+    "is_running": false,
+    "is_scheduled": true,
+    "schedule_start": "09:15",
+    "schedule_stop": "15:30"
   }
 }
