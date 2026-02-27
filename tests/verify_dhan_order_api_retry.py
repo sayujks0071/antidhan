@@ -6,84 +6,109 @@ import os
 # Add openalgo to sys.path
 sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
 
-# Mock dependencies before import
-sys.modules['utils.logging'] = MagicMock()
-sys.modules['database.auth_db'] = MagicMock()
-sys.modules['database.token_db'] = MagicMock()
-sys.modules['database.apilog_db'] = MagicMock()
-sys.modules['broker.dhan.api.baseurl'] = MagicMock()
-sys.modules['broker.dhan.mapping.transform_data'] = MagicMock()
+# Create mocks for dependencies
+mock_utils_logging = MagicMock()
+mock_auth_db = MagicMock()
+mock_token_db = MagicMock()
+mock_apilog_db = MagicMock()
+mock_baseurl = MagicMock()
+mock_transform_data = MagicMock()
+mock_httpx = MagicMock()
 
-# Mock httpx and utils.httpx_client entirely
-sys.modules['httpx'] = MagicMock()
-mock_httpx_client_module = MagicMock()
-sys.modules['utils.httpx_client'] = mock_httpx_client_module
+# Create a mock for utils.httpx_client that will replace the actual module
+mock_utils_httpx_client = MagicMock()
 
-# Now import the module under test
-# We need to make sure we import it freshly if it was already imported (it shouldn't be in this process)
-if 'broker.dhan.api.order_api' in sys.modules:
-    del sys.modules['broker.dhan.api.order_api']
+# Set up the mock for the 'request' function specifically
+# This is crucial because `from utils.httpx_client import request` imports the function object
+mock_request_func = MagicMock()
+mock_utils_httpx_client.request = mock_request_func
+# Also mock get_httpx_client just in case
+mock_utils_httpx_client.get_httpx_client = MagicMock()
 
-from broker.dhan.api import order_api
+# Patch sys.modules with our mocks BEFORE importing the module under test
+# This ensures that `from utils.httpx_client import request` gets our mock function
+with patch.dict(sys.modules, {
+    'utils.logging': mock_utils_logging,
+    'database.auth_db': mock_auth_db,
+    'database.token_db': mock_token_db,
+    'database.apilog_db': mock_apilog_db,
+    'broker.dhan_sandbox.api.baseurl': mock_baseurl,
+    'broker.dhan_sandbox.mapping.transform_data': mock_transform_data,
+    'httpx': mock_httpx,
+    'utils.httpx_client': mock_utils_httpx_client
+}):
+    # Import the module under test inside the patch context
+    # This forces it to use our mocked modules
+    # Note: We must ensure it's reloaded if it was already imported
+    if 'broker.dhan_sandbox.api.order_api' in sys.modules:
+        del sys.modules['broker.dhan_sandbox.api.order_api']
+
+    from broker.dhan_sandbox.api import order_api
 
 class TestDhanOrderApiRetry(unittest.TestCase):
     def setUp(self):
-        # Reset mocks
-        mock_httpx_client_module.reset_mock()
+        # Reset the mock for the request function before each test
+        mock_request_func.reset_mock()
 
-        # Mock the response object returned by get/post/etc
+        # Mock the response object returned by the request function
         self.mock_response = MagicMock()
         self.mock_response.status_code = 200
         self.mock_response.text = '{"status": "success", "orderId": "123", "data": {}}'
         self.mock_response.json.return_value = {"status": "success", "orderId": "123", "data": {}}
         self.mock_response.headers = {}
 
-        # Setup return values for wrapper functions
-        mock_httpx_client_module.get.return_value = self.mock_response
-        mock_httpx_client_module.post.return_value = self.mock_response
-        mock_httpx_client_module.put.return_value = self.mock_response
-        mock_httpx_client_module.delete.return_value = self.mock_response
-        mock_httpx_client_module.request.return_value = self.mock_response
-
-        # Setup return value for get_httpx_client() to ensure old way is NOT used or mocked correctly if needed
-        # We want to ensure the module level functions are used.
-        self.mock_client = MagicMock()
-        mock_httpx_client_module.get_httpx_client.return_value = self.mock_client
+        # Set the mock request function to return our mock response
+        mock_request_func.return_value = self.mock_response
 
     def test_get_api_response_uses_wrapper(self):
         # Call get_api_response with GET
         order_api.get_api_response("/test", "token", method="GET")
 
-        # Verify utils.httpx_client.get was called
-        # If it uses client.get(), this assertion will fail, which is what we want (it proves we switched to wrapper)
-        mock_httpx_client_module.get.assert_called()
+        # Verify utils.httpx_client.request was called with retry logic
+        mock_request_func.assert_called()
+        args, kwargs = mock_request_func.call_args
+        self.assertEqual(kwargs.get('max_retries'), 3)
+        # Verify it was called with GET
+        self.assertEqual(args[0], "GET")
 
     def test_place_order_api_uses_wrapper(self):
         data = {"symbol": "TEST", "exchange": "NSE", "apikey": "key"}
-        with patch.dict(os.environ, {"BROKER_API_KEY": "test_broker_key"}):
-            with patch('broker.dhan.api.order_api.transform_data', return_value={}):
-                with patch('broker.dhan.api.order_api.get_token', return_value="token"):
-                # verification of verify_api_key might be needed if mocked strictly
-                    with patch('broker.dhan.api.order_api.verify_api_key', return_value="user_id"):
-                        with patch('broker.dhan.api.order_api.get_user_id', return_value="client_id"):
-                            order_api.place_order_api(data, "token")
 
-        # Verify utils.httpx_client.post was called
-        mock_httpx_client_module.post.assert_called()
+        # We need to mock functions imported inside the module or used by it
+        with patch.dict(os.environ, {"BROKER_API_KEY": "test_broker_key"}):
+            # The module uses these imported functions, so we mock them on the imported module
+            order_api.transform_data = MagicMock(return_value={})
+            order_api.get_token = MagicMock(return_value="token")
+
+            # Place the order
+            order_api.place_order_api(data, "token")
+
+        # Verify utils.httpx_client.request was called with retry logic
+        mock_request_func.assert_called()
+        args, kwargs = mock_request_func.call_args
+        self.assertEqual(kwargs.get('max_retries'), 3)
+        self.assertEqual(args[0], "POST")
 
     def test_cancel_order_uses_wrapper(self):
         order_api.cancel_order("123", "token")
 
-        # Verify utils.httpx_client.delete was called
-        mock_httpx_client_module.delete.assert_called()
+        # Verify utils.httpx_client.request was called with retry logic
+        mock_request_func.assert_called()
+        args, kwargs = mock_request_func.call_args
+        self.assertEqual(kwargs.get('max_retries'), 3)
+        self.assertEqual(args[0], "DELETE")
 
     def test_modify_order_uses_wrapper(self):
         data = {"orderid": "123", "apikey": "key"}
-        with patch('broker.dhan.api.order_api.transform_modify_order_data', return_value={}):
-             order_api.modify_order(data, "token")
+        order_api.transform_modify_order_data = MagicMock(return_value={})
 
-        # Verify utils.httpx_client.put was called
-        mock_httpx_client_module.put.assert_called()
+        order_api.modify_order(data, "token")
+
+        # Verify utils.httpx_client.request was called with retry logic
+        mock_request_func.assert_called()
+        args, kwargs = mock_request_func.call_args
+        self.assertEqual(kwargs.get('max_retries'), 3)
+        self.assertEqual(args[0], "PUT")
 
 if __name__ == '__main__':
     unittest.main()
