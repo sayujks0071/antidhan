@@ -407,6 +407,14 @@ def start_strategy_process(strategy_id):
             logger.warning(f"Cannot start strategy {strategy_id}: {contract_message}")
             return False, f"Master contract dependency not met: {contract_message}"
 
+        # Fetch API Key for Strategy
+        try:
+            from database.auth_db import get_first_available_api_key
+            api_key = get_first_available_api_key()
+        except ImportError:
+            api_key = None
+            logger.warning("Could not import auth_db to fetch API Key")
+
         try:
             # Create log file for this run with IST timestamp
             ist_now = get_ist_time()
@@ -455,6 +463,13 @@ def start_strategy_process(strategy_id):
             # Start the process
             # Use Python unbuffered mode for real-time output
             cmd = [get_python_executable(), "-u", str(file_path.absolute())]
+
+            # Pass API Key via Environment Variable
+            env = os.environ.copy()
+            if api_key:
+                env['OPENALGO_APIKEY'] = api_key
+
+            subprocess_args['env'] = env
 
             # Log the command being executed for debugging
             logger.info(f"Executing command: {' '.join(cmd)}")
