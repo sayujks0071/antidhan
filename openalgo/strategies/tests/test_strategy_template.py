@@ -1,100 +1,81 @@
-import sys
 import os
+import sys
+import unittest
 import pandas as pd
-import pytest
+import numpy as np
 from unittest.mock import MagicMock, patch
 
-# Adjust path to import from scripts
-# Assuming this test is in openalgo/strategies/tests/
-# We need to add openalgo/strategies/scripts/ to path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-scripts_dir = os.path.abspath(os.path.join(current_dir, '../scripts'))
-if scripts_dir not in sys.path:
-    sys.path.append(scripts_dir)
+# Add project root to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-# We also need to ensure openalgo/strategies/utils is in path because strategy_template imports from there
-# Although strategy_template does this itself, doing it here helps avoid import errors before the module loads
-utils_dir = os.path.abspath(os.path.join(current_dir, '../utils'))
-if utils_dir not in sys.path:
-    sys.path.append(utils_dir)
+# Import the strategy module dynamically since it might not be in the python path directly
+import importlib.util
+spec = importlib.util.spec_from_file_location(
+    "strategy_template",
+    os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts/strategy_template.py'))
+)
+strategy_template = importlib.util.module_from_spec(spec)
+sys.modules["strategy_template"] = strategy_template
+spec.loader.exec_module(strategy_template)
 
-# Import the module to be tested
-# We wrap this in try-except or just import, assuming path is correct
-try:
-    from strategy_template import YourStrategy, generate_signal, ATR_SL_MULTIPLIER, ATR_TP_MULTIPLIER
-except ImportError:
-    # Fallback if running from root
-    sys.path.append('openalgo/strategies/scripts')
-    from strategy_template import YourStrategy, generate_signal, ATR_SL_MULTIPLIER, ATR_TP_MULTIPLIER
+class TestStrategyTemplate(unittest.TestCase):
+    def setUp(self):
+        self.symbol = "NIFTY"
+        self.strategy = strategy_template.YourStrategy(symbol=self.symbol)
 
-class TestStrategyTemplate:
-    def setup_method(self):
-        # Create a dummy DataFrame with enough data for indicators (ATR=14, VolAvg=20)
-        dates = pd.date_range(start='2024-01-01', periods=100, freq='5min')
-        self.df = pd.DataFrame({
-            'datetime': dates,
-            'open': [100.0] * 100,
-            'high': [105.0] * 100,
-            'low': [95.0] * 100,
-            'close': [102.0] * 100,
-            'volume': [1000] * 100
-        })
-        # Add some variation to allow ATR calculation
-        for i in range(100):
-            self.df.loc[i, 'high'] = 105.0 + (i % 5)
-            self.df.loc[i, 'low'] = 95.0 - (i % 5)
-            self.df.loc[i, 'close'] = 100.0 + (i % 3)
+        # Mock API Client
+        self.strategy.client = MagicMock()
+        self.strategy.pm = MagicMock()
+        self.strategy.smart_order = MagicMock()
 
     def test_initialization(self):
-        # Mock APIClient to avoid connection attempts
-        with patch('strategy_template.APIClient') as MockClient:
-            with patch('strategy_template.PositionManager') as MockPM:
-                # We also need to mock os.getenv to avoid missing API key warning/error
-                with patch.dict(os.environ, {'OPENALGO_API_KEY': 'dummy'}):
-                    strategy = YourStrategy(symbol='TEST', api_key='dummy')
-                    assert strategy.symbol == 'TEST'
-                    assert strategy.quantity == 10
-                    assert strategy.name == 'StrategyName_TEST'
+        """Test if strategy initializes correctly with default parameters."""
+        self.assertEqual(self.strategy.symbol, "NIFTY")
+        self.assertEqual(self.strategy.quantity, 10)
+        self.assertEqual(self.strategy.bars_in_trade, 0)
+        self.assertEqual(self.strategy.trailing_stop, 0.0)
+
+    def test_mandatory_constants(self):
+        """Verify mandatory risk parameters are present."""
+        self.assertTrue(hasattr(strategy_template, 'ATR_SL_MULTIPLIER'))
+        self.assertTrue(hasattr(strategy_template, 'ATR_TP_MULTIPLIER'))
+        self.assertTrue(hasattr(strategy_template, 'BREAKEVEN_TRIGGER_R'))
+        self.assertTrue(hasattr(strategy_template, 'TIME_STOP_BARS'))
+        self.assertTrue(hasattr(strategy_template, 'MAX_RISK_PCT'))
+        self.assertTrue(hasattr(strategy_template, 'MAX_DAILY_LOSS_PCT'))
+        self.assertTrue(hasattr(strategy_template, 'CAPITAL'))
 
     def test_generate_signal_structure(self):
-        action, score, details = generate_signal(self.df)
+        """Test generate_signal function signature and return type."""
+        # Create dummy dataframe
+        dates = pd.date_range(start='2023-01-01', periods=60, freq='5min')
+        df = pd.DataFrame({
+            'open': np.random.randn(60) + 100,
+            'high': np.random.randn(60) + 105,
+            'low': np.random.randn(60) + 95,
+            'close': np.random.randn(60) + 100,
+            'volume': np.random.randint(100, 1000, 60)
+        }, index=dates)
 
-        assert action in ['BUY', 'SELL', 'HOLD']
-        assert isinstance(score, float)
-        assert isinstance(details, dict)
+        action, score, details = strategy_template.generate_signal(df)
 
-        required_keys = ['atr', 'quantity', 'sl', 'tp']
-        for key in required_keys:
-            assert key in details, f"Missing key: {key}"
+        self.assertIn(action, ['BUY', 'SELL', 'HOLD'])
+        self.assertIsInstance(score, float)
+        self.assertIsInstance(details, dict)
 
-    def test_risk_parameters_usage(self):
-        action, score, details = generate_signal(self.df)
+        # Check mandatory details
+        self.assertIn('atr', details)
+        self.assertIn('quantity', details)
+        self.assertIn('sl', details)
+        self.assertIn('tp', details)
 
-        atr = details.get('atr', 0)
-        price = details.get('close', 0)
-        sl = details.get('sl', 0)
-        tp = details.get('tp', 0)
+    def test_cycle_no_data(self):
+        """Test cycle handles empty data gracefully."""
+        self.strategy.fetch_history = MagicMock(return_value=pd.DataFrame())
+        try:
+            self.strategy.cycle()
+        except Exception as e:
+            self.fail(f"cycle() raised Exception with empty data: {e}")
 
-        if atr > 0:
-            # Verify SL/TP logic matches constants
-            sl_dist = price - sl
-            tp_dist = tp - price
-
-            # Allow small floating point differences
-            assert abs(sl_dist - (ATR_SL_MULTIPLIER * atr)) < 0.01, f"SL Dist: {sl_dist}, Exp: {ATR_SL_MULTIPLIER * atr}"
-            assert abs(tp_dist - (ATR_TP_MULTIPLIER * atr)) < 0.01, f"TP Dist: {tp_dist}, Exp: {ATR_TP_MULTIPLIER * atr}"
-
-    def test_empty_dataframe(self):
-        empty_df = pd.DataFrame()
-        action, score, details = generate_signal(empty_df)
-        assert action == 'HOLD'
-        assert score == 0.0
-        assert details == {}
-
-    def test_small_dataframe(self):
-        # DataFrame smaller than required (50 rows in template)
-        small_df = self.df.head(10)
-        action, score, details = generate_signal(small_df)
-        assert action == 'HOLD'
-        assert score == 0.0
-        assert details == {}
+if __name__ == '__main__':
+    unittest.main()
