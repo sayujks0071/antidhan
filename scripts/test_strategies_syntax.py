@@ -88,3 +88,21 @@ if __name__ == "__main__":
     test_ml_v2()
     test_nse_rsi_macd()
     test_mcx_crudeoil()
+
+def test_my_nse():
+    print("Testing My NSE Strategy...")
+    try:
+        from openalgo.strategies.scripts.my_nse_strategy import generate_signal
+        df = pd.DataFrame({
+            'open': np.linspace(100, 200, 50),
+            'high': np.linspace(105, 205, 50),
+            'low': np.linspace(95, 195, 50),
+            'close': np.linspace(100, 200, 50),
+            'volume': np.random.randint(1000, 5000, 50)
+        })
+        signal, qty, meta = generate_signal(df)
+        print("My NSE Strategy Signal:", signal)
+    except Exception as e:
+        print(f"My NSE Strategy Failed: {e}")
+
+test_my_nse()
