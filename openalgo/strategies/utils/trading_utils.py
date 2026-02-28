@@ -15,7 +15,21 @@ import numpy as np
 import pandas as pd
 import pytz
 
-from utils import httpx_client
+try:
+    from openalgo.utils import httpx_client
+except ImportError:
+    try:
+        from utils import httpx_client
+    except ImportError:
+        import httpx
+        class DummyHttpxClient:
+            def request(self, method, url, **kwargs):
+                return httpx.request(method, url, **kwargs)
+            def post(self, url, **kwargs):
+                return httpx.post(url, **kwargs)
+            def get(self, url, **kwargs):
+                return httpx.get(url, **kwargs)
+        httpx_client = DummyHttpxClient()
 
 # Configure logging
 try:
@@ -522,15 +536,6 @@ class SmartOrder:
         except Exception as e:
             logger.error(f"SmartOrder Failed: {e}")
             return None
-
-    def get_pnl(self, current_price):
-        if self.position == 0:
-            return 0.0
-
-        if self.position > 0:
-            return (current_price - self.entry_price) * abs(self.position)
-        else:
-            return (self.entry_price - current_price) * abs(self.position)
 
 
 class FileCache:
@@ -1197,16 +1202,6 @@ def calculate_vwmacd(df, fast=12, slow=26, signal=9):
 
     ema_fast = vwap.ewm(span=fast, adjust=False).mean()
     ema_slow = vwap.ewm(span=slow, adjust=False).mean()
-    macd_line = ema_fast - ema_slow
-    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
-    histogram = macd_line - signal_line
-    return macd_line, signal_line, histogram
-
-
-def calculate_macd(series, fast=12, slow=26, signal=9):
-    """Calculate MACD, Signal, Hist."""
-    ema_fast = series.ewm(span=fast, adjust=False).mean()
-    ema_slow = series.ewm(span=slow, adjust=False).mean()
     macd_line = ema_fast - ema_slow
     signal_line = macd_line.ewm(span=signal, adjust=False).mean()
     histogram = macd_line - signal_line
