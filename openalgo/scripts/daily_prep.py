@@ -173,6 +173,7 @@ def fetch_instruments():
             {'exchange': 'MCX', 'token': '102', 'symbol': 'CRUDEOIL19FEB26FUT', 'name': 'CRUDEOIL', 'expiry': '2026-02-19', 'lot_size': 100, 'instrument_type': 'FUT'},
             {'exchange': 'MCX', 'token': '103', 'symbol': 'NATURALGAS24FEB26FUT', 'name': 'NATURALGAS', 'expiry': '2026-02-24', 'lot_size': 1250, 'instrument_type': 'FUT'},
             {'exchange': 'MCX', 'token': '105', 'symbol': 'COPPERM27FEB26FUT', 'name': 'COPPER', 'expiry': '2026-02-27', 'lot_size': 2500, 'instrument_type': 'FUT'},
+            {'exchange': 'MCX', 'token': '106', 'symbol': 'ZINCM05FEB26FUT', 'name': 'ZINC', 'expiry': '2026-02-05', 'lot_size': 5000, 'instrument_type': 'FUT'},
 
             # NSE Futures
             {'exchange': 'NFO', 'token': '7', 'symbol': 'NIFTY23OCTFUT', 'name': 'NIFTY', 'expiry': monthly_expiry.strftime('%Y-%m-%d'), 'lot_size': 50, 'instrument_type': 'FUT'},
