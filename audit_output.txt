@@ -1,22 +1,24 @@
+Log file logs/openalgo.log not found. Generating mock logs...
 Generating mock logs at logs/mock_openalgo.log...
 
 Analyzing logs from logs/mock_openalgo.log...
 
 --- Latency Audit ---
-[10:00:00] Symbol: NIFTY, Latency: 223.00 ms
-[10:10:00] Symbol: BANKNIFTY, Latency: 169.00 ms
-[10:30:00] Symbol: NIFTY, Latency: 227.00 ms
-[10:45:00] Symbol: RELIANCE, Latency: 422.00 ms
-[11:00:00] Symbol: NIFTY, Latency: 443.00 ms
-Average Latency: 296.80 ms
+[10:00:00] Symbol: NIFTY, Latency: 229.00 ms
+[10:10:00] Symbol: BANKNIFTY, Latency: 87.00 ms
+[10:30:00] Symbol: NIFTY, Latency: 389.00 ms
+[10:45:00] Symbol: RELIANCE, Latency: 525.00 ms
+  [WARNING] Latency > 500ms! Bottleneck investigation required.
+[11:00:00] Symbol: NIFTY, Latency: 175.00 ms
+Average Latency: 281.00 ms
 
 --- Slippage Check ---
-Symbol: NIFTY, Slippage: -0.68 pts
-Symbol: BANKNIFTY, Slippage: -0.96 pts
-Symbol: NIFTY, Slippage: 0.10 pts
-Symbol: RELIANCE, Slippage: 0.82 pts
-Symbol: NIFTY, Slippage: 1.04 pts
-Average Slippage: 0.06 pts
+Symbol: NIFTY, Slippage: 0.08 pts
+Symbol: BANKNIFTY, Slippage: -0.87 pts
+Symbol: NIFTY, Slippage: -0.33 pts
+Symbol: RELIANCE, Slippage: 3.00 pts
+Symbol: NIFTY, Slippage: -0.49 pts
+Average Slippage: 0.28 pts
 
 --- Logic Verification ---
 Strategy: SuperTrendVWAPStrategy (NIFTY) - Verifying 3 signals
