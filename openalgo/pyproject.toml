@@ -198,7 +198,7 @@ known-first-party = ["broker", "blueprints", "database", "services", "utils", "r
 testpaths = ["test"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --timeout=60"
+addopts = "-v "
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",

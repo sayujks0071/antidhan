@@ -127,11 +127,19 @@ class BaseStrategy:
         # Load environment variables
         load_dotenv()
 
-        # Resolve API Key
-        self.api_key = self._resolve_api_key(api_key)
+        # Use new get_api_credentials helper from trading_utils
+        try:
+            from trading_utils import get_api_credentials
+            resolved_key, resolved_host = get_api_credentials()
+        except ImportError:
+            try:
+                from utils.trading_utils import get_api_credentials
+                resolved_key, resolved_host = get_api_credentials()
+            except ImportError:
+                resolved_key, resolved_host = None, "http://127.0.0.1:5000"
 
-        # Default to 5000 to match trading_utils default, allow override via env
-        self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')
+        self.api_key = api_key or resolved_key
+        self.host = host or resolved_host or "http://127.0.0.1:5000"
 
         if not self.api_key and not client:
              # Warn but don't fail immediately, allowing for test/mock scenarios
@@ -196,38 +204,6 @@ class BaseStrategy:
         except Exception as e:
             # Don't fail if we can't figure out paths, just log it later if logger exists
             pass
-
-    def _resolve_api_key(self, api_key):
-        """Resolve API Key from multiple sources."""
-        if api_key:
-            return api_key
-
-        # 1. Try environment variables
-        key = os.getenv('OPENALGO_APIKEY') or os.getenv('OPENALGO_API_KEY')
-        if key:
-            return key
-
-        # 2. Try database
-        try:
-            # Ensure project root is in path
-            self._add_project_root_to_path()
-            # This requires 'database' to be importable
-            from database.auth_db import get_first_available_api_key
-            key = get_first_available_api_key()
-            if key:
-                if hasattr(self, 'logger'):
-                    self.logger.info("Resolved API key from database.")
-                return key
-        except ImportError:
-            # Database module not available or path issue
-            pass
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.warning(f"Failed to fetch API key from DB: {e}")
-            else:
-                pass
-
-        return None
 
     def setup_logging(self, log_file=None):
         self.logger = logging.getLogger(self.name)
