@@ -162,9 +162,34 @@ def place_smart_order_with_auth(
     if not is_valid:
         if get_analyze_mode():
             return False, emit_analyzer_error(original_data, error_message), 400
+
         error_response = {"status": "error", "message": error_message}
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 400
+
+    # Check if SecurityId exists before routing to broker (SecurityId Required error)
+    symbol = order_data.get("symbol")
+    exchange = order_data.get("exchange")
+    if symbol and exchange:
+        token = get_token(symbol, exchange)
+        if not token:
+            logger.error(f"SecurityId Required: Token not found for {symbol} {exchange}")
+            error_response = {
+                "status": "error",
+                "message": "SecurityId Required",
+            }
+            executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+            return False, error_response, 400
+
+    # Check if auth_token is valid early before routing to broker (Invalid Token error)
+    if not get_analyze_mode() and not auth_token:
+        logger.error("Invalid Token: Authentication token is missing or empty")
+        error_response = {
+            "status": "error",
+            "message": "Invalid Token",
+        }
+        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+        return False, error_response, 401
 
     # If in analyze mode, route to sandbox for virtual trading
     if get_analyze_mode():
@@ -207,16 +232,6 @@ def place_smart_order_with_auth(
         )
         return success, response_data, status_code
 
-    # Check if auth_token is valid
-    if not auth_token:
-        logger.error("Invalid Token: Authentication token is missing or empty")
-        error_response = {
-            "status": "error",
-            "message": "Invalid Token: Authentication token is missing or empty",
-        }
-        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
-        return False, error_response, 401
-
     # Live Mode - Proceed with actual order placement
     broker_module = import_broker_module(broker)
     if broker_module is None:
@@ -230,19 +245,66 @@ def place_smart_order_with_auth(
     response_data = {}
     order_id = None
 
-    try:
-        res, response_data, order_id = broker_module.place_smartorder_api(
-            order_data, auth_token
-        )
-    except Exception as e:
-        logger.error(f"Error in broker_module.place_smartorder_api: {e}")
-        traceback.print_exc()
-        error_response = {
-            "status": "error",
-            "message": "Failed to place smart order due to internal error",
-        }
-        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
-        return False, error_response, 500
+    max_retries = 3
+    backoff_factor = 0.5
+    for attempt in range(max_retries + 1):
+        try:
+            res, response_data, order_id = broker_module.place_smartorder_api(
+                order_data, auth_token
+            )
+
+            # Safely handle mocks and un-typed responses
+            status_code = getattr(res, 'status_code', None)
+
+            # If we don't have a status code from res, check if response_data contains an error code
+            if not isinstance(status_code, int):
+                # Try to get status from response_data if res is None or mock
+                if isinstance(response_data, dict):
+                    status_str = response_data.get('status')
+                    if status_str == 'error':
+                        # If the error is 'Internal Server Error' or similar, we might want to retry.
+                        # However, for now, we assume if we can't determine it's a 500, we don't retry,
+                        # UNLESS it's explicitly explicitly a 5xx in some other field.
+                        pass
+
+                # If we still don't have a valid int status_code, we break out of retry loop.
+                # E.g. business logic error, invalid token, etc.
+                break
+
+            # If we have an integer status code, check if it's < 500. If so, break.
+            if status_code < 500:
+                break
+
+            # We reached here, it means we have a 500-level error (status_code >= 500)
+            if attempt < max_retries:
+                wait_time = backoff_factor * (2 ** attempt)
+                logger.warning(f"Broker API returned 500-level error ({status_code}). Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                # Exhausted retries on 500-level error
+                logger.error(f"Failed to place smart order after {max_retries} retries due to {status_code} error.")
+                error_response = {
+                    "status": "error",
+                    "message": f"Broker API returned {status_code} error after retries",
+                }
+                executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+                return False, error_response, status_code
+
+        except Exception as e:
+            logger.error(f"Error in broker_module.place_smartorder_api: {e}")
+            if attempt < max_retries:
+                wait_time = backoff_factor * (2 ** attempt)
+                logger.warning(f"Retrying in {wait_time}s due to exception...")
+                time.sleep(wait_time)
+                continue
+
+            traceback.print_exc()
+            error_response = {
+                "status": "error",
+                "message": "Failed to place smart order due to internal error",
+            }
+            executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+            return False, error_response, 500
 
     try:
         # Handle case where position size matches current position
