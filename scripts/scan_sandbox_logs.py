@@ -63,16 +63,16 @@ def parse_text_log(filepath):
                             current_trade = {}
 
                 # Legacy Logic (keep for backward compatibility if other logs use it)
-                elif "Entry signal detected" in line:
+                elif "Entry signal detected" in line or "Signal Buy" in line or "Signal Sell" in line:
                     price_match = re.search(r'Price: ([\d\.]+)', line)
                     if price_match:
                          current_trade = {
                             'entry_time': dt,
                             'entry_price': float(price_match.group(1)),
-                            'direction': 'LONG',
+                            'direction': 'LONG' if "Buy" in line or "Entry" in line else 'SHORT',
                             'status': 'OPEN'
                         }
-                elif "Exiting position" in line:
+                elif "Exiting position" in line or "Exiting at" in line:
                      price_match = re.search(r'at ([\d\.]+)', line)
                      if not price_match:
                          price_match = re.search(r'Price: ([\d\.]+)', line)
@@ -82,7 +82,10 @@ def parse_text_log(filepath):
                             current_trade['exit_time'] = dt
                             current_trade['exit_price'] = exit_price
                             current_trade['status'] = 'CLOSED'
-                            current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+                            if current_trade['direction'] == 'LONG':
+                                current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+                            else:
+                                current_trade['pnl'] = (current_trade['entry_price'] - exit_price)
                             trades.append(current_trade)
                             current_trade = {}
 
