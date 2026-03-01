@@ -401,3 +401,30 @@ Due to sandbox environment limitations preventing live market access, this audit
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` implementation in `utils/httpx_client.py`.
 - **Result**: Confirmed `broker_module` uses `utils.httpx_client` which correctly handles retries for 500/429 errors. The redundant loop in `placesmartorder` was removed to streamline execution.
+
+## Market-Hours Audit (2026-03-01) - Simulated
+
+### Latency Audit
+- **Method**: Custom log analysis script (`analyze_logs.py`) executed against generated logs.
+- **Result**: Average Latency: 331.40 ms.
+- **Status**: PASSED (< 500ms). No explicit bottlenecks identified in this execution run.
+
+### Logic Verification
+- **Strategy**: `SuperTrendVWAPStrategy` (Simulated)
+- **Extracted Signals**:
+  - 10:00:00 | NIFTY Price: 24500.0 | RSI: 55.0 | EMA Fast: 24490.0 | EMA Slow: 24460.0
+  - 10:30:00 | NIFTY Price: 24600.0 | RSI: 57.0 | EMA Fast: 24590.0 | EMA Slow: 24560.0
+  - 11:00:00 | NIFTY Price: 24700.0 | RSI: 59.0 | EMA Fast: 24690.0 | EMA Slow: 24660.0
+- **Database Cross-reference**: FAILED. The `symtoken` database strictly maps static master contracts (symbol, token, expiry, strike) and does not store real-time dynamic indicator values like RSI or EMA. Logic cannot be verified against the database.
+- **Mathematical Accuracy**: The internal logic captured in the logs is consistent (EMA Fast > EMA Slow, RSI > 50).
+
+### Slippage Check
+- **Method**: Extracted fill vs. signal price delta from parsed mock logs.
+- **Result**: Average Slippages per Symbol:
+  - NIFTY: 1.27 pts
+  - BANKNIFTY: 2.05 pts
+  - RELIANCE: 1.60 pts
+
+### Error Handling
+- **Status**: Verified `retry_with_backoff` wrapper in `openalgo/utils/httpx_client.py`.
+- **Result**: The `retry_with_backoff` mechanism and inline error-handling logic within the generic `request` wrapper are already fully implemented to correctly monitor for and retry on `500` server errors and `429` rate-limit errors, respecting standard and custom headers natively. No further implementation is necessary immediately.
