@@ -1247,3 +1247,12 @@ def calculate_adx_di(df, period=14):
     except Exception:
         zero_series = pd.Series(0, index=df.index)
         return zero_series, zero_series, zero_series
+
+def get_api_credentials():
+    """Fallback utility for getting API credentials."""
+    import os
+    return {
+        "api_key": os.environ.get("OPENALGO_APIKEY", "dummy_key"),
+        "host": os.environ.get("OPENALGO_HOST", "http://127.0.0.1"),
+        "port": os.environ.get("OPENALGO_PORT", "5000")
+    }
