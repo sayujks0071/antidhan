@@ -28,6 +28,27 @@ except ImportError:
         )
     except ImportError:
         # Fallback implementation if trading_utils not found (should not happen in prod)
+        def choose_nearest_expiry(expiry_dates):
+            if not expiry_dates: return None
+            today = datetime.now().date()
+            valid_dates = []
+            for d_str in expiry_dates:
+                try:
+                    d_date = datetime.strptime(d_str, "%d%b%y").date()
+                    if d_date >= today:
+                        valid_dates.append((d_date, d_str))
+                except ValueError: continue
+            if not valid_dates: return None
+            valid_dates.sort(key=lambda x: x[0])
+            return valid_dates[0][1]
+
+        def is_chain_valid(chain_response, min_strikes=10, require_oi=True, require_volume=False):
+            if not chain_response or chain_response.get("status") != "success":
+                return False, "API Error or Invalid Response"
+            chain = chain_response.get("chain", [])
+            if not chain or len(chain) < min_strikes:
+                return False, f"Insufficient Strikes"
+            return True, "OK"
         def safe_float(value, default=0.0):
             try:
                 if value is None: return default
