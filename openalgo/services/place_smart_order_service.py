@@ -212,10 +212,25 @@ def place_smart_order_with_auth(
         logger.error("Invalid Token: Authentication token is missing or empty")
         error_response = {
             "status": "error",
-            "message": "Invalid Token: Authentication token is missing or empty",
+            "message": "Invalid Token",
         }
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 401
+
+    # Check for SecurityId Required (Token not found) early
+    symbol = order_data.get("symbol")
+    exchange = order_data.get("exchange")
+    if symbol and exchange:
+        # Check if SecurityId exists
+        token = get_token(symbol, exchange)
+        if not token:
+            logger.error(f"SecurityId Required: Token not found for {symbol} {exchange}")
+            error_response = {
+                "status": "error",
+                "message": "SecurityId Required",
+            }
+            executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+            return False, error_response, 400
 
     # Live Mode - Proceed with actual order placement
     broker_module = import_broker_module(broker)
@@ -230,19 +245,46 @@ def place_smart_order_with_auth(
     response_data = {}
     order_id = None
 
-    try:
-        res, response_data, order_id = broker_module.place_smartorder_api(
-            order_data, auth_token
-        )
-    except Exception as e:
-        logger.error(f"Error in broker_module.place_smartorder_api: {e}")
-        traceback.print_exc()
-        error_response = {
-            "status": "error",
-            "message": "Failed to place smart order due to internal error",
-        }
-        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
-        return False, error_response, 500
+    max_retries = 3
+    for attempt in range(max_retries + 1):
+        try:
+            res, response_data, order_id = broker_module.place_smartorder_api(
+                order_data, auth_token
+            )
+
+            status_code = res.status_code if res and hasattr(res, "status_code") else (res.status if res and hasattr(res, "status") else 200)
+
+            if status_code >= 500:
+                if attempt < max_retries:
+                    wait_time = 0.5 * (2 ** attempt)
+                    logger.warning(f"500-level error received from broker (attempt {attempt + 1}/{max_retries + 1}). Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"Failed to place smart order after {max_retries} retries due to 500-level error")
+                    error_response = {
+                        "status": "error",
+                        "message": "Failed to place smart order due to internal broker error after retries",
+                    }
+                    executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+                    return False, error_response, 500
+
+            break
+        except Exception as e:
+            if attempt < max_retries:
+                wait_time = 0.5 * (2 ** attempt)
+                logger.warning(f"Exception during place_smartorder_api: {e} (attempt {attempt + 1}/{max_retries + 1}). Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+                continue
+            else:
+                logger.error(f"Error in broker_module.place_smartorder_api: {e}")
+                traceback.print_exc()
+                error_response = {
+                    "status": "error",
+                    "message": "Failed to place smart order due to internal error",
+                }
+                executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+                return False, error_response, 500
 
     try:
         # Handle case where position size matches current position
