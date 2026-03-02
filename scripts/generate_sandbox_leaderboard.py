@@ -29,13 +29,14 @@ def parse_log_file(filepath):
                     continue
 
                 # Entry Logic: "Signal Buy ... Price: <price>"
-                if "Signal Buy" in line:
+                if "Signal Buy" in line or "Signal Sell" in line:
                     price_match = re.search(r'Price: ([\d\.]+)', line)
                     if price_match:
                         current_trade = {
                             'strategy': strategy_name,
                             'entry_time': dt,
                             'entry_price': float(price_match.group(1)),
+                            'direction': 'LONG' if "Signal Buy" in line else 'SHORT',
                             'status': 'OPEN'
                         }
 
@@ -47,7 +48,10 @@ def parse_log_file(filepath):
                             exit_price = float(price_match.group(1))
                             current_trade['exit_time'] = dt
                             current_trade['exit_price'] = exit_price
-                            current_trade['pnl'] = exit_price - current_trade['entry_price']
+                            if current_trade['direction'] == 'LONG':
+                                current_trade['pnl'] = exit_price - current_trade['entry_price']
+                            else:
+                                current_trade['pnl'] = current_trade['entry_price'] - exit_price
                             current_trade['status'] = 'CLOSED'
                             trades.append(current_trade)
                             current_trade = {}
@@ -82,9 +86,7 @@ def calculate_metrics(trades):
         win_rate = (wins / total) * 100 if total > 0 else 0
 
         # Max Drawdown
-        # Sort by entry time
         group.sort(key=lambda x: x['entry_time'])
-
         peak = 0
         current_cum = 0
         drawdowns = []
@@ -111,10 +113,8 @@ def generate_leaderboard():
     print(f"Scanning logs in {LOG_DIR}...")
     all_trades = []
 
-    # Scan logs
     for filepath in glob.glob(os.path.join(LOG_DIR, "*.log")):
         trades = parse_log_file(filepath)
-        # Filter for TODAY
         today_trades = [t for t in trades if t['entry_time'].date() == TODAY]
         all_trades.extend(today_trades)
 
@@ -126,8 +126,8 @@ def generate_leaderboard():
 
     metrics = calculate_metrics(all_trades)
 
-    # Sort by Profit Factor desc
-    ranked_strategies = sorted(metrics.items(), key=lambda x: x[1]['Profit Factor'], reverse=True)
+    # Sort by Profit Factor desc, then Max Drawdown asc
+    ranked_strategies = sorted(metrics.items(), key=lambda x: (x[1]['Profit Factor'], -x[1]['Max Drawdown']), reverse=True)
 
     markdown_content = f"# SANDBOX LEADERBOARD ({TODAY_STR})\n\n"
     markdown_content += "| Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |\n"
@@ -136,6 +136,16 @@ def generate_leaderboard():
     for rank, (strategy, m) in enumerate(ranked_strategies, 1):
         pf_str = f"{m['Profit Factor']:.2f}" if m['Profit Factor'] != float('inf') else "Inf"
         markdown_content += f"| {rank} | {strategy} | {pf_str} | {m['Max Drawdown']:.2f} | {m['Win Rate']:.1f}% | {m['Total Trades']} |\n"
+
+    markdown_content += "\n## Trade Log Summary\n\n"
+    markdown_content += "| Strategy | Direction | Entry Time | Entry Price | Exit Time | Exit Price | PnL |\n"
+    markdown_content += "|----------|-----------|------------|-------------|-----------|------------|-----|\n"
+
+    # Sort trades chronologically
+    all_trades.sort(key=lambda x: x['entry_time'])
+    for t in all_trades:
+        markdown_content += f"| {t['strategy']} | {t['direction']} | {t['entry_time'].strftime('%Y-%m-%d %H:%M:%S')} | {t['entry_price']:.2f} | {t['exit_time'].strftime('%Y-%m-%d %H:%M:%S')} | {t['exit_price']:.2f} | {t['pnl']:.2f} |\n"
+
 
     markdown_content += "\n## Analysis & Improvements\n"
 
