@@ -14,7 +14,7 @@ from broker.dhan.mapping.transform_data import (
 )
 from database.auth_db import get_auth_token, get_user_id, verify_api_key
 from database.token_db import get_br_symbol, get_oa_symbol, get_symbol, get_token
-from utils.httpx_client import get_httpx_client, get, post, put, delete, request
+from utils.httpx_client import delete, get, get_httpx_client, post, put, request
 from utils.logging import get_logger
 
 logger = get_logger(__name__)

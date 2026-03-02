@@ -6,10 +6,10 @@ Includes Retry-with-Backoff logic for robust error handling.
 
 import os
 import time
+from datetime import UTC, datetime, timezone
+from email.utils import parsedate_to_datetime
 from functools import wraps
 from typing import Optional
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 
 import httpx
 
@@ -128,7 +128,7 @@ def request(
                                 if retry_date:
                                     # If naive, assume UTC as per HTTP spec
                                     if retry_date.tzinfo is None:
-                                        retry_date = retry_date.replace(tzinfo=timezone.utc)
+                                        retry_date = retry_date.replace(tzinfo=UTC)
 
                                     now = datetime.now(retry_date.tzinfo)
                                     retry_wait = (retry_date - now).total_seconds()

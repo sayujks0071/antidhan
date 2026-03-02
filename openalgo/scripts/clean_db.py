@@ -1,7 +1,7 @@
-import sys
+import logging
 import os
 import sqlite3
-import logging
+import sys
 
 # Add repo root to path
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))

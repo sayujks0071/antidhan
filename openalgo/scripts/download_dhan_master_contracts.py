@@ -1,7 +1,8 @@
-import sys
-import os
 import logging
+import os
 import sqlite3
+import sys
+
 from dotenv import load_dotenv
 
 # Add repo root to path
@@ -50,6 +51,7 @@ class MockSocketIO:
 
 # Patch both openalgo.extensions and extensions (if imported directly)
 import openalgo.extensions
+
 openalgo.extensions.socketio = MockSocketIO()
 
 # Also try to import extensions directly and patch it, because master_contract_db uses 'from extensions'
@@ -61,7 +63,12 @@ except ImportError:
     pass
 
 try:
-    from openalgo.broker.dhan.database.master_contract_db import init_db, master_contract_download, SymToken, db_session
+    from openalgo.broker.dhan.database.master_contract_db import (
+        SymToken,
+        db_session,
+        init_db,
+        master_contract_download,
+    )
 
     logger.info("Initializing Master Contract Database...")
     # Ensure the directory exists

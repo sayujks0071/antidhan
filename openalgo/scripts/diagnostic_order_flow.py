@@ -1,8 +1,8 @@
 
+import json
+import logging
 import os
 import sys
-import logging
-import json
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -114,6 +114,10 @@ class TestDhanOrderFlow(unittest.TestCase):
             return mock_resp
 
         mock_request.side_effect = request_side_effect
+        with patch("broker.dhan_sandbox.api.order_api.place_order_api") as mock_place_order:
+            def place_order_api_side_effect(data, auth):
+                return (None, {"status": "error", "message": "Order Rejected: Market is Closed"}, None)
+            mock_place_order.side_effect = place_order_api_side_effect
 
         # Order Types to Test
         # Updated to use valid constants and correct mapping
