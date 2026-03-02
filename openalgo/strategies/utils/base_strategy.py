@@ -112,6 +112,12 @@ class BaseStrategy:
         self.type = type
         self.product = product
 
+        # Load declarative params if defined
+        class_params = getattr(self.__class__, 'params', {})
+        for k, v in class_params.items():
+            if k not in kwargs:
+                kwargs[k] = v
+
         # Set any additional kwargs as attributes (e.g. threshold, stop_pct)
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -729,7 +735,11 @@ class BaseStrategy:
     @classmethod
     def add_arguments(cls, parser):
         """Hook for subclasses to add arguments."""
-        pass
+        # Dynamically add arguments from declarative params
+        if hasattr(cls, 'params'):
+            for k, v in cls.params.items():
+                arg_type = type(v) if v is not None else str
+                parser.add_argument(f"--{k}", type=arg_type, default=v, help=f"{k} parameter")
 
     @classmethod
     def parse_arguments(cls, args):
@@ -757,6 +767,12 @@ class BaseStrategy:
 
         # Basic kwargs from all arguments
         kwargs = vars(args).copy()
+
+        # Dynamically extract declarative params from args
+        if hasattr(cls, 'params'):
+            for k in cls.params.keys():
+                if hasattr(args, k):
+                    kwargs[k] = getattr(args, k)
 
         # Ensure symbol is updated if resolved
         kwargs['symbol'] = symbol
