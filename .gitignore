@@ -59,6 +59,3 @@ openalgo/frontend/dist/
 # ── Misc stray ───────────────────────────────────────────────────────────────
 Untitled.rtf
 .cache/
-
-# ── Nested git repo — managed separately ─────────────────────────────────────
-openalgo/
