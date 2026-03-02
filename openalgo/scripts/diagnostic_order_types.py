@@ -1,7 +1,7 @@
 
+import logging
 import os
 import sys
-import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -41,6 +41,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("DiagnosticOrderTypes")
 
 from services.place_smart_order_service import place_smart_order
+
 
 class TestOrderFlow(unittest.TestCase):
     @patch("services.place_smart_order_service.import_broker_module")

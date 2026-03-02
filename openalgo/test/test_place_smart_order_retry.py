@@ -1,7 +1,7 @@
+import os
+import sys
 import unittest
 from unittest.mock import MagicMock, patch
-import sys
-import os
 
 # Add openalgo directory to sys.path to allow imports
 sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
@@ -21,6 +21,7 @@ sys.modules['utils.api_analyzer'] = MagicMock()
 
 # Now import the service to test
 from services.place_smart_order_service import place_smart_order, place_smart_order_with_auth
+
 
 class TestPlaceSmartOrderService(unittest.TestCase):
 
