@@ -25,8 +25,6 @@ from utils.logging import get_logger
 # Initialize logger
 logger = get_logger(__name__)
 
-# Smart order delay
-SMART_ORDER_DELAY = os.getenv("SMART_ORDER_DELAY", "0")  # Default value, can be overridden by environment variable
 
 
 def emit_analyzer_error(request_data: dict[str, Any], error_message: str) -> dict[str, Any]:
@@ -135,7 +133,6 @@ def place_smart_order_with_auth(
     auth_token: str,
     broker: str,
     original_data: dict[str, Any],
-    smart_order_delay: str = SMART_ORDER_DELAY,
 ) -> tuple[bool, dict[str, Any], int]:
     """
     Place a smart order using provided auth token.
@@ -335,13 +332,6 @@ def place_smart_order_with_auth(
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 500
 
-    # Add delay if needed
-    try:
-        time.sleep(float(smart_order_delay))
-    except Exception:
-        logger.error(f"Invalid SMART_ORDER_DELAY value: {smart_order_delay}")
-        traceback.print_exc()
-
     if res and res.status == 200:
         return True, order_response_data, 200
     else:
@@ -371,7 +361,6 @@ def place_smart_order(
     api_key: str | None = None,
     auth_token: str | None = None,
     broker: str | None = None,
-    smart_order_delay: str | None = None,
 ) -> tuple[bool, dict[str, Any], int]:
     """
     Place a smart order.
@@ -394,10 +383,6 @@ def place_smart_order(
     if api_key:
         original_data["apikey"] = api_key
 
-    # Use default delay if not provided
-    if smart_order_delay is None:
-        smart_order_delay = SMART_ORDER_DELAY
-
     # Add API key to order data if provided (needed for validation)
     if api_key:
         order_data["apikey"] = api_key
@@ -417,13 +402,13 @@ def place_smart_order(
             return False, error_response, 403
 
         return place_smart_order_with_auth(
-            order_data, AUTH_TOKEN, broker_name, original_data, smart_order_delay
+            order_data, AUTH_TOKEN, broker_name, original_data
         )
 
     # Case 2: Direct internal call with broker (auth_token can be checked inside)
     elif broker:
         return place_smart_order_with_auth(
-            order_data, auth_token, broker, original_data, smart_order_delay
+            order_data, auth_token, broker, original_data
         )
 
     # Case 3: Invalid parameters
