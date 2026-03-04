@@ -30,6 +30,36 @@ except ImportError:
 logger = logging.getLogger("TradingUtils")
 
 
+def get_api_credentials():
+    """
+    Centralized function to resolve API key and Host.
+    1. Environment variables.
+    2. Database fallback.
+    """
+    api_key = os.getenv('OPENALGO_APIKEY') or os.getenv('OPENALGO_API_KEY')
+    host = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')
+
+    if not api_key:
+        try:
+            # Ensure openalgo is in path if not already
+            import sys
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            strategies_dir = os.path.dirname(current_dir)
+            openalgo_root = os.path.dirname(strategies_dir)
+            if openalgo_root not in sys.path:
+                sys.path.insert(0, openalgo_root)
+
+            from database.auth_db import get_first_available_api_key
+            api_key = get_first_available_api_key()
+            if api_key:
+                logger.info("Resolved API key from database.")
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning(f"Failed to fetch API key from DB: {e}")
+
+    return api_key, host
+
 def normalize_symbol(symbol):
     """
     Normalize symbol for indices (NIFTY/BANKNIFTY).
@@ -567,9 +597,11 @@ class APIClient:
     Fallback API Client using httpx if openalgo package is missing.
     """
 
-    def __init__(self, api_key, host="http://127.0.0.1:5000"):
-        self.api_key = api_key
-        self.host = host.rstrip("/")
+    def __init__(self, api_key=None, host=None):
+        creds_api_key, creds_host = get_api_credentials()
+        self.api_key = api_key or creds_api_key
+        # Default to the resolved host if not provided
+        self.host = (host or creds_host or "http://127.0.0.1:5000").rstrip("/")
         self.cache = FileCache()
         self.quote_cache = {}  # Key: symbol, Value: (timestamp, data)
         self.quote_ttl = 1.0   # 1 second TTL

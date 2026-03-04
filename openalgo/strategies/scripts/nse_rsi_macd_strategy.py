@@ -139,6 +139,9 @@ class NSERsiMacdStrategy(BaseStrategy):
         except:
              return 'HOLD', 0.0, {}
 
+# Added to support testing
+def generate_signal(df, client=None, symbol=None, params=None):
+    return NSERsiMacdStrategy.backtest_signal(df, params)
 
 if __name__ == "__main__":
     NSERsiMacdStrategy.cli()

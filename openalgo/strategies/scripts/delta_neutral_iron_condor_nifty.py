@@ -10,9 +10,12 @@ current_file = Path(__file__).resolve()
 project_root = current_file.parent.parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
+utils_dir = current_file.parent.parent / "utils"
+if str(utils_dir) not in sys.path:
+    sys.path.append(str(utils_dir))
 
-from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
-from openalgo.strategies.utils.option_analytics import calculate_greeks, calculate_max_pain
+from trading_utils import APIClient, PositionManager, is_market_open
+from option_analytics import calculate_greeks, calculate_max_pain
 
 # Configure logging
 logging.basicConfig(
@@ -190,7 +193,7 @@ def main():
     parser.add_argument("--sentiment_score", type=float, default=None, help="External Sentiment Score (0.0-1.0)")
     args = parser.parse_args()
 
-    client = APIClient(api_key=os.getenv("OPENALGO_API_KEY"), host=f"http://127.0.0.1:{args.port}")
+    client = APIClient(host=f"http://127.0.0.1:{args.port}")
     strategy = DeltaNeutralIronCondor(client, args.symbol, args.qty, sentiment_score=args.sentiment_score)
     strategy.execute()
 

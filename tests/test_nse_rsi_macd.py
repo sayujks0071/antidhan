@@ -55,7 +55,7 @@ def test_nse_rsi_macd():
     strat = NSERsiMacdStrategy(symbol="TEST", api_key="dummy", port=5001)
     df_calc = df.copy()
     try:
-        strat.calculate_signal(df_calc)
+        df_calc = strat.calculate_indicators(df_calc)
         if 'rsi' in df_calc.columns and 'macd' in df_calc.columns and 'signal' in df_calc.columns:
             print("Indicators calculated successfully: RSI, MACD, Signal found.")
         else:

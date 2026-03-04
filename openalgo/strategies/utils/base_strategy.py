@@ -198,34 +198,17 @@ class BaseStrategy:
             pass
 
     def _resolve_api_key(self, api_key):
-        """Resolve API Key from multiple sources."""
+        """Resolve API Key from multiple sources using get_api_credentials."""
         if api_key:
             return api_key
 
-        # 1. Try environment variables
-        key = os.getenv('OPENALGO_APIKEY') or os.getenv('OPENALGO_API_KEY')
-        if key:
-            return key
-
-        # 2. Try database
         try:
-            # Ensure project root is in path
-            self._add_project_root_to_path()
-            # This requires 'database' to be importable
-            from database.auth_db import get_first_available_api_key
-            key = get_first_available_api_key()
-            if key:
-                if hasattr(self, 'logger'):
-                    self.logger.info("Resolved API key from database.")
-                return key
+            from trading_utils import get_api_credentials
+            creds_api_key, creds_host = get_api_credentials()
+            if creds_api_key:
+                return creds_api_key
         except ImportError:
-            # Database module not available or path issue
             pass
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.warning(f"Failed to fetch API key from DB: {e}")
-            else:
-                pass
 
         return None
 
