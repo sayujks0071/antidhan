@@ -55,9 +55,20 @@ def retry_with_backoff(max_retries: int = 3, backoff_factor: float = 0.5):
             last_exception = None
             for attempt in range(max_retries + 1):
                 try:
-                    return func(*args, **kwargs)
+                    response = func(*args, **kwargs)
+                    if hasattr(response, "status_code") and response.status_code in (429, 500, 502, 503, 504):
+                        response.raise_for_status()
+
+                    # Successfully completed without raising for status
+                    last_exception = None
+                    return response
                 except Exception as e:
                     last_exception = e
+                    if isinstance(e, httpx.HTTPStatusError) and e.response.status_code not in (429, 500, 502, 503, 504):
+                        # Don't retry client errors (except 429)
+                        logger.error(f"Function {func.__name__} failed with non-retriable client error: {e}")
+                        raise
+
                     if attempt < max_retries:
                         wait_time = backoff_factor * (2**attempt)
                         logger.warning(
