@@ -17,9 +17,12 @@ current_file = Path(__file__).resolve()
 project_root = current_file.parent.parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
+utils_dir = current_file.parent.parent / "utils"
+if str(utils_dir) not in sys.path:
+    sys.path.append(str(utils_dir))
 
-from openalgo.strategies.utils.trading_utils import APIClient, is_market_open
-from openalgo.strategies.utils.option_analytics import calculate_pcr, calculate_max_pain, calculate_greeks
+from trading_utils import APIClient, is_market_open
+from option_analytics import calculate_pcr, calculate_max_pain, calculate_greeks
 
 # Configure logging
 logging.basicConfig(
@@ -33,9 +36,15 @@ logging.basicConfig(
 logger = logging.getLogger("AdvancedOptionsRanker")
 
 class AdvancedOptionsRanker:
-    def __init__(self, api_key=None, host="http://127.0.0.1:5002"):
-        self.api_key = api_key or os.getenv("OPENALGO_API_KEY", "dummy_key")
-        self.host = host
+    def __init__(self, api_key=None, host=None):
+        try:
+            from openalgo.strategies.utils.trading_utils import get_api_credentials
+            creds_api_key, creds_host = get_api_credentials()
+        except ImportError:
+            creds_api_key, creds_host = None, None
+
+        self.api_key = api_key or creds_api_key
+        self.host = host or creds_host or "http://127.0.0.1:5000"
         self.client = APIClient(self.api_key, host=self.host)
 
         # Configuration
