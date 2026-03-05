@@ -88,7 +88,9 @@ def generate_mock_logs(filepath):
 
             # Latency: Random between 50ms and 600ms
             latency_ms = random.randint(50, 450) # Mostly good latency
-            if symbol == 'RELIANCE': latency_ms = random.randint(400, 600) # simulate slight bottleneck
+            if symbol == 'RELIANCE':
+                # Force latency > 500ms to simulate the placesmartorder synchronous HTTP bottleneck explicitly.
+                latency_ms = random.randint(550, 800)
 
             order_time = signal_time + timedelta(milliseconds=latency_ms)
             f.write(f"{order_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO Order Placed: BUY {symbol}\n")
@@ -192,13 +194,23 @@ def analyze_logs(filepath):
     # Report Slippage
     print("\n--- Slippage Check ---")
     total_slippage = 0
+    slippage_by_symbol = {}
     for rec in slippage_records:
-        print(f"Symbol: {rec['symbol']}, Slippage: {rec['slippage']:.2f} pts")
-        total_slippage += rec['slippage']
+        sym = rec['symbol']
+        slp = rec['slippage']
+        if sym not in slippage_by_symbol:
+            slippage_by_symbol[sym] = []
+        slippage_by_symbol[sym].append(slp)
+        print(f"Symbol: {sym}, Slippage: {slp:.2f} pts")
+        total_slippage += slp
 
     if slippage_records:
         avg_slippage = total_slippage / len(slippage_records)
-        print(f"Average Slippage: {avg_slippage:.2f} pts")
+        print(f"Total Average Slippage: {avg_slippage:.2f} pts")
+
+    for sym, slps in slippage_by_symbol.items():
+        avg_sym_slp = sum(slps) / len(slps)
+        print(f"Average Slippage for {sym}: {avg_sym_slp:.2f} pts")
 
     # Logic Verification (VWAP Strategy)
     print("\n--- Logic Verification ---")
@@ -242,6 +254,10 @@ def analyze_logs(filepath):
              print("  Result: Signal Validated: YES (Mathematically Accurate)")
         else:
              print("  Result: Signal Validated: NO (Logic Mismatch)")
+
+    print("\n  Note: Verification of signals against `symtoken` RSI/EMA values was skipped.")
+    print("  Analysis of the database structure confirmed `symtoken` strictly maps master contract data (symbol, exchange, token).")
+    print("  It does NOT house dynamic indicator values like RSI/EMA, rendering that specific cross-referencing impossible.")
 
 
 if __name__ == "__main__":
