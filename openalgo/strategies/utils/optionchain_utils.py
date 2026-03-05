@@ -71,9 +71,19 @@ except ImportError:
             return expiry_date
 
 class OptionChainClient:
-    def __init__(self, api_key, host="http://127.0.0.1:5000"):
-        self.api_key = api_key
-        self.host = host.rstrip('/')
+    def __init__(self, api_key=None, host=None):
+        try:
+            from trading_utils import get_api_credentials
+            resolved_key, resolved_host = get_api_credentials()
+        except ImportError:
+            try:
+                from .trading_utils import get_api_credentials
+                resolved_key, resolved_host = get_api_credentials()
+            except ImportError:
+                resolved_key, resolved_host = None, "http://127.0.0.1:5000"
+
+        self.api_key = api_key or resolved_key
+        self.host = (host or resolved_host or "http://127.0.0.1:5000").rstrip('/')
         self.session = requests.Session()
 
     def _post(self, endpoint, payload):

@@ -17,6 +17,41 @@ import pytz
 
 from utils import httpx_client
 
+def get_api_credentials():
+    """
+    Automatically resolve API Key and Host for strategy connections.
+    Tries environment variables first, then falls back to the database.
+    """
+    api_key = os.getenv("OPENALGO_APIKEY") or os.getenv("OPENALGO_API_KEY")
+
+    if not api_key:
+        try:
+            # Need to ensure project root is in path
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            strategies_dir = os.path.dirname(current_dir)
+            openalgo_root = os.path.dirname(strategies_dir)
+            if openalgo_root not in sys.path:
+                sys.path.insert(0, openalgo_root)
+
+            from database.auth_db import get_first_available_api_key
+            api_key = get_first_available_api_key()
+        except Exception as e:
+            # Don't fail completely, just log if possible
+            print(f"Warning: Could not fetch API key from database: {e}")
+
+    host = os.getenv("OPENALGO_HOST")
+
+    # If host isn't set, try OPENALGO_PORT.
+    # Notice we do NOT default the port to 5000 here anymore, so we don't accidentally override
+    # a strategy's own default if it provides one via the `host` argument.
+    if not host:
+        port_env = os.getenv("OPENALGO_PORT")
+        if port_env:
+            host = f"http://127.0.0.1:{int(port_env)}"
+
+    return api_key, host
+
+
 # Configure logging
 try:
     from openalgo_observability.logging_setup import setup_logging
@@ -567,9 +602,10 @@ class APIClient:
     Fallback API Client using httpx if openalgo package is missing.
     """
 
-    def __init__(self, api_key, host="http://127.0.0.1:5000"):
-        self.api_key = api_key
-        self.host = host.rstrip("/")
+    def __init__(self, api_key=None, host=None):
+        resolved_key, resolved_host = get_api_credentials()
+        self.api_key = api_key or resolved_key
+        self.host = (host or resolved_host or "http://127.0.0.1:5000").rstrip("/")
         self.cache = FileCache()
         self.quote_cache = {}  # Key: symbol, Value: (timestamp, data)
         self.quote_ttl = 1.0   # 1 second TTL
