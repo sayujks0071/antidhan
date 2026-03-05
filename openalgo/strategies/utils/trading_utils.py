@@ -404,18 +404,34 @@ class PositionManager:
 
     def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price, client=None, exchange="NSE"):
         """
-        Calculate position size based on ATR (Legacy/Intraday).
-        If client is provided, attempts to fetch Monthly ATR for robustness.
-        Delegates to calculate_risk_adjusted_quantity.
+        Calculate position size based on Monthly ATR (Robust Volatility).
+        Fetches 30 days of daily data and calculates 14-period ATR.
+        Falls back to intraday ATR if Monthly ATR is unavailable.
         """
         volatility = atr
         if client:
-            monthly_atr = self.get_monthly_atr(client, exchange)
-            if monthly_atr and monthly_atr > 0:
-                volatility = monthly_atr
-                logger.info(
-                    f"Using Monthly ATR ({monthly_atr:.2f}) instead of Intraday ATR ({atr:.2f})"
+            try:
+                # Calculate Monthly ATR explicitly here if not using get_monthly_atr helper or to ensure freshness
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=60) # Fetch enough data
+
+                df = client.history(
+                    symbol=self.symbol,
+                    exchange=exchange,
+                    interval="D",
+                    start_date=start_date.strftime("%Y-%m-%d"),
+                    end_date=end_date.strftime("%Y-%m-%d")
                 )
+
+                if not df.empty and len(df) > 15:
+                    atrs = calculate_atr(df, period=14)
+                    monthly_atr = atrs.iloc[-1]
+
+                    if monthly_atr and monthly_atr > 0:
+                        volatility = monthly_atr
+                        logger.info(f"Using Monthly ATR ({monthly_atr:.2f}) instead of Intraday ATR ({atr:.2f})")
+            except Exception as e:
+                logger.warning(f"Failed to fetch/calculate Monthly ATR: {e}. Using Intraday ATR.")
 
         qty = self.calculate_risk_adjusted_quantity(
             capital, risk_per_trade_pct, volatility, price

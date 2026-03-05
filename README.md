@@ -219,8 +219,22 @@ Based on the audit, the following areas are prioritized for the next iteration:
   - **Data Fetching:** Verified batch-requesting capability and optimized caching.
   - **Position Sizing:** Transitioning all strategies to Adaptive ATR-based sizing.
 
+### 🛡️ System Audit & Roadmap (March 2026 Update)
+
+### Audit Findings
+- **Cross-Strategy Correlation:**
+  - **High Correlation Detected:** `MCX_CrudeOil_Trend_Strategy` vs `NSE_RSI_MACD_Strategy` (>95%).
+  - **Action:** Disabled `MCX_CrudeOil_Trend_Strategy` and `NSE_RSI_MACD_Strategy` to reduce portfolio concentration risk, retaining `SuperTrendVWAPStrategy` as the primary momentum engine.
+- **Equity Curve Stress Test:**
+  - **Worst Day:** 2026-02-22.
+  - **Root Cause:** System-wide failure due to synchronized losses across correlated strategies during a trend reversal.
+  - **Action:** Implemented a **Daily Circuit Breaker** in `BaseStrategy` that halts trading if daily PnL drops below -2% of allocated capital.
+- **Infrastructure Upgrades:**
+  - **Optimization:** Confirmed `FileCache` implementation in `APIClient` correctly handles historical data requests with expiration logic.
+  - **Adaptive Sizing:** Updated `PositionManager` to strictly use **Monthly ATR** (60-day lookback) for position sizing, ensuring more stable sizing compared to volatile intraday ATR.
+
 ### 🚀 Ahead Roadmap
 
-1.  **Volume Profile Imbalance:** Detecting institutional absorption/exhaustion at key levels.
-2.  **Gamma Exposure (GEX):** Analyzing option market maker hedging flows to predict volatility.
-3.  **Market Regime Hidden Markov Models (HMM):** Using ML to classify market regimes dynamically.
+1.  **Statistical Arbitrage Pairs:** Explore mean-reversion strategies on highly correlated stock pairs (e.g., BANKNIFTY vs HDFCBANK).
+2.  **Market Neutral Options:** Investigate delta-neutral strategies (Iron Condors, Calendars) that profit from theta decay regardless of market direction.
+3.  **Volatility Breakout (VIX):** Develop strategies that specifically target volatility expansion phases, using VIX levels as a primary trigger.

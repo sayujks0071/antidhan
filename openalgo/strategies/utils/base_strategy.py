@@ -394,6 +394,40 @@ class BaseStrategy:
         3. Generating Signal (via generate_signal or get_signal)
         4. Executing Trade
         """
+        # Circuit Breaker: Halt if PnL < -2% of capital
+        if self.pm:
+            # Assume 100k capital per strategy if not defined
+            allocated_capital = getattr(self, 'capital', 100000.0)
+            daily_loss_limit = -0.02 * allocated_capital
+            # We need unrealized PnL too, but position manager mostly tracks realized + open pnl state
+            # Assuming pm.pnl is realized PnL
+            current_pnl = self.pm.pnl
+
+            # Estimate unrealized PnL if position exists
+            if self.pm.has_position():
+                try:
+                    quote = self.client.get_quote(self.symbol, self.exchange)
+                    if quote and 'ltp' in quote:
+                        ltp = float(quote['ltp'])
+                        current_pnl += self.pm.get_pnl(ltp)
+                except Exception as e:
+                    self.logger.warning(f"Could not fetch LTP for PnL check: {e}")
+
+            if current_pnl < daily_loss_limit:
+                if not getattr(self, 'circuit_breaker_triggered', False):
+                    self.logger.critical(f"Circuit Breaker Triggered! PnL ({current_pnl:.2f}) < Limit ({daily_loss_limit:.2f}). Halting.")
+                    self.circuit_breaker_triggered = True
+
+                    # If position exists, FORCE EXIT (Triggered ONCE)
+                    if self.pm.has_position():
+                        qty = abs(self.pm.position)
+                        action = "SELL" if self.pm.position > 0 else "BUY"
+                        self.logger.warning(f"Circuit Breaker: Force closing position {action} {qty} {self.symbol}")
+                        # Use execute_trade directly with HIGH urgency
+                        self.execute_trade(action, qty, urgency="HIGH")
+
+                return
+
         # Fetch Data
         exchange = self.exchange
         # Auto-detect NSE_INDEX for indices if default exchange is NSE
