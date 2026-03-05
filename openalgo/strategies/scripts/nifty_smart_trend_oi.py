@@ -49,21 +49,7 @@ class PrintLogger:
     def debug(self, msg): print(msg, flush=True)
 
 
-# API Key retrieval
-API_KEY = os.getenv("OPENALGO_APIKEY")
-HOST = os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000")
 
-if not API_KEY:
-    try:
-        from database.auth_db import get_first_available_api_key
-        API_KEY = get_first_available_api_key()
-        if API_KEY:
-            print("Successfully retrieved API Key from database.", flush=True)
-    except Exception as e:
-        print(f"Warning: Could not retrieve API key from database: {e}", flush=True)
-
-if not API_KEY:
-    print("CRITICAL: API Key must be set in OPENALGO_APIKEY environment variable", flush=True)
 
 
 # ===========================
@@ -178,8 +164,8 @@ class NetCreditTracker(OptionPositionTracker):
 class NiftySmartTrendOIStrategy:
     def __init__(self):
         self.logger = PrintLogger()
-        self.client = OptionChainClient(api_key=API_KEY, host=HOST)
-        self.api_client = APIClient(api_key=API_KEY, host=HOST) # For history
+        self.client = OptionChainClient()
+        self.api_client = APIClient() # For history
         self.tracker = NetCreditTracker(
             sl_pct=SL_PCT,
             tp_pct=TP_PCT,

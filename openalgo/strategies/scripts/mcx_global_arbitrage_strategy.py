@@ -36,8 +36,7 @@ except ImportError:
 # Configuration
 SYMBOL = os.getenv('SYMBOL', None)
 GLOBAL_SYMBOL = os.getenv('GLOBAL_SYMBOL', 'GC=F') # Default to Gold Futures
-API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
-API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
+
 
 # Strategy Parameters
 PARAMS = {
@@ -289,11 +288,7 @@ if __name__ == "__main__":
     if args.global_symbol: GLOBAL_SYMBOL = args.global_symbol
     elif os.getenv('GLOBAL_SYMBOL'): GLOBAL_SYMBOL = os.getenv('GLOBAL_SYMBOL')
     
-    if args.port: API_HOST = f"http://127.0.0.1:{args.port}"
-    elif os.getenv('OPENALGO_PORT'): API_HOST = f"http://127.0.0.1:{os.getenv('OPENALGO_PORT')}"
     
-    if args.api_key: API_KEY = args.api_key
-    else: API_KEY = os.getenv('OPENALGO_APIKEY', API_KEY)
 
     # Validate symbol or resolve default
     if not SYMBOL:
@@ -314,7 +309,7 @@ if __name__ == "__main__":
     api_client = None
     if APIClient:
         try:
-            api_client = APIClient(api_key=API_KEY, host=API_HOST)
+            api_client = APIClient()
             logger.info(f"API client initialized for {API_HOST}")
         except Exception as e:
             logger.warning(f"Could not create APIClient: {e}. Strategy will run in signal-only mode.")

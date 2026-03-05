@@ -50,7 +50,7 @@ class MCXStrategy:
         self.host = host
         self.params = params
 
-        self.client = APIClient(api_key=self.api_key, host=self.host) if APIClient else None
+        self.client = APIClient() if APIClient else None
         self.pm = PositionManager(symbol) if PositionManager else None
         self.data = pd.DataFrame()
 
@@ -283,7 +283,7 @@ if __name__ == "__main__":
         logger.error("Symbol not provided. Use --symbol or --underlying")
         sys.exit(1)
 
-    api_key = args.api_key or os.getenv("OPENALGO_APIKEY")
+    api_key = args.api_key
     port = args.port or int(os.getenv("OPENALGO_PORT", 5001))
     host = f"http://127.0.0.1:{port}"
 

@@ -71,9 +71,17 @@ except ImportError:
             return expiry_date
 
 class OptionChainClient:
-    def __init__(self, api_key, host="http://127.0.0.1:5000"):
-        self.api_key = api_key
-        self.host = host.rstrip('/')
+    def __init__(self, api_key=None, host=None):
+        try:
+            from trading_utils import get_api_credentials
+            default_api_key, default_host = get_api_credentials()
+        except ImportError:
+            import os
+            default_api_key = os.getenv("OPENALGO_APIKEY") or os.getenv("OPENALGO_API_KEY")
+            default_host = os.getenv("OPENALGO_HOST") or f"http://127.0.0.1:{os.getenv('OPENALGO_PORT', '5000')}"
+
+        self.api_key = api_key or default_api_key
+        self.host = (host or default_host).rstrip('/')
         self.session = requests.Session()
 
     def _post(self, endpoint, payload):

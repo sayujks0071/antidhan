@@ -34,9 +34,7 @@ logger = logging.getLogger("AdvancedOptionsRanker")
 
 class AdvancedOptionsRanker:
     def __init__(self, api_key=None, host="http://127.0.0.1:5002"):
-        self.api_key = api_key or os.getenv("OPENALGO_API_KEY", "dummy_key")
-        self.host = host
-        self.client = APIClient(self.api_key, host=self.host)
+        self.client = APIClient(api_key, host)
 
         # Configuration
         self.indices = ["NIFTY", "BANKNIFTY", "SENSEX"]
