@@ -60,6 +60,8 @@ class TestTradingUtilsRefactor(unittest.TestCase):
         success_response.http_version = "HTTP/1.1"
         success_response.request.extensions = {}
         success_response.text = json.dumps(success_response.json.return_value)
+        success_response.headers = {}
+        error_response.headers = {}
 
         mock_client_instance.request.side_effect = [error_response, success_response]
 

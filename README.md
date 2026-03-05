@@ -224,3 +224,33 @@ Based on the audit, the following areas are prioritized for the next iteration:
 1.  **Volume Profile Imbalance:** Detecting institutional absorption/exhaustion at key levels.
 2.  **Gamma Exposure (GEX):** Analyzing option market maker hedging flows to predict volatility.
 3.  **Market Regime Hidden Markov Models (HMM):** Using ML to classify market regimes dynamically.
+
+
+## 🛡️ System Audit & Roadmap (Updated)
+
+### Audit Findings
+- **Cross-Strategy Correlation:**
+  - **High Correlation Detected:** `MCX_CRUDEOIL_MOMENTUM` and `MCX_CRUDEOIL_MOMENTUM_V2` (>85%). Disabled V1, keeping V2 for higher Calmar Ratio.
+- **Equity Curve Stress Test:**
+  - **Worst Day:** 2026-02-16 (Simulated).
+  - **Root Cause:** Intraday Volatility spike affected trend strategies. High-IV crush during early trading hours.
+- **Infrastructure Upgrades:**
+  - **Data Fetching:** Implemented caching for historical data in APIClient to reduce execution latency.
+  - **Adaptive Sizing:** Updated `PositionManager` to adjust quantities based on Monthly Volatility (ATR) instead of intraday, normalizing risk per trade.
+
+### 🚀 Ahead Roadmap (Updated)
+
+1. **Volume Profile Value Area (VA) Shifts:** Use as a confirmation filter to reduce false positives in choppy markets.
+2. **Gamma Exposure (GEX):** Integrate estimated GEX levels to predict market pinning or volatility expansion days.
+3. **Order Flow Imbalance:** Investigate market microstructure anomalies at key levels to detect institutional absorption before reversals.
+
+
+## 🛡️ Equity Curve Stress Test & Code Root-Cause
+- **Worst Day**: 2026-03-05
+- **Responsible Strategy**: `GapFadeStrategy` (-512.00 PnL)
+- **Root Cause**: The strategy failed during strong trend persistence (gap-up) days, where minor intraday pullbacks triggered false reversal confirmations, leading to repeated stop-loss hits.
+
+## 🚀 Ahead Roadmap
+1. **Volume Profile Imbalance:** Detect institutional absorption/exhaustion at key levels by measuring shifts in the Volume Profile Value Area (VA) to reduce false-positive entries during chop.
+2. **Gamma Exposure (GEX):** Analyze option market maker hedging flows to predict volatility expansions and market pinning.
+3. **Order Flow Imbalance:** Investigate market microstructure anomalies (e.g., using `get_depth`) to identify aggressive limit order sweeps before trend reversals.

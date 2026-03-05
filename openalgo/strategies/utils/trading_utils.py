@@ -404,18 +404,26 @@ class PositionManager:
 
     def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price, client=None, exchange="NSE"):
         """
-        Calculate position size based on ATR (Legacy/Intraday).
-        If client is provided, attempts to fetch Monthly ATR for robustness.
-        Delegates to calculate_risk_adjusted_quantity.
+        Calculate position size based on ATR.
+        Strictly prioritizes using Monthly ATR for robustness.
+        Falls back to intraday ATR only if Monthly ATR is unavailable.
         """
         volatility = atr
         if client:
             monthly_atr = self.get_monthly_atr(client, exchange)
-            if monthly_atr and monthly_atr > 0:
+            if monthly_atr is not None and monthly_atr > 0:
                 volatility = monthly_atr
                 logger.info(
-                    f"Using Monthly ATR ({monthly_atr:.2f}) instead of Intraday ATR ({atr:.2f})"
+                    f"Using Monthly ATR ({monthly_atr:.2f}) for adaptive sizing."
                 )
+            else:
+                logger.warning(
+                    f"Monthly ATR unavailable or invalid. Falling back to Intraday ATR ({atr:.2f})."
+                )
+        else:
+            logger.warning(
+                f"Client not provided. Falling back to Intraday ATR ({atr:.2f})."
+            )
 
         qty = self.calculate_risk_adjusted_quantity(
             capital, risk_per_trade_pct, volatility, price
@@ -686,17 +694,41 @@ class APIClient:
         Returns:
             dict: Quote data (single dict if str input, dict of dicts if list input) or None
         """
-        # Check Cache for single symbol request
         now = time.time()
-        if not isinstance(symbol, list):
+
+        # Check Cache
+        is_list = isinstance(symbol, list)
+        symbols_to_fetch = []
+        cached_results = {}
+
+        if is_list:
+            for s in symbol:
+                cache_key = f"{s}_{exchange}"
+                if cache_key in self.quote_cache:
+                    ts, data = self.quote_cache[cache_key]
+                    if now - ts < self.quote_ttl:
+                        cached_results[s] = data
+                    else:
+                        symbols_to_fetch.append(s)
+                else:
+                    symbols_to_fetch.append(s)
+
+            # If everything is cached, return early
+            if not symbols_to_fetch:
+                return cached_results
+
+            # Fetch only missing
+            payload_symbol = symbols_to_fetch
+        else:
             cache_key = f"{symbol}_{exchange}"
             if cache_key in self.quote_cache:
                 ts, data = self.quote_cache[cache_key]
                 if now - ts < self.quote_ttl:
                     return data
+            payload_symbol = symbol
 
         url = f"{self.host}/api/v1/quotes"
-        payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
+        payload = {"symbol": payload_symbol, "exchange": exchange, "apikey": self.api_key}
 
         try:
             response = httpx_client.post(
@@ -710,51 +742,46 @@ class APIClient:
             if response.status_code == 200:
                 # Check if response has content
                 if not response.text or len(response.text.strip()) == 0:
-                    logger.error(
-                        f"Quote API returned empty response for {symbol}"
-                    )
-                    return None
+                    logger.error(f"Quote API returned empty response for {payload_symbol}")
+                    return cached_results if is_list and cached_results else None
 
                 try:
                     data = response.json()
                 except ValueError:
                     error_text = response.text[:200] if response.text else "(empty)"
-                    logger.error(
-                        f"Quote API returned non-JSON for {symbol}: {error_text}"
-                    )
-                    return None
+                    logger.error(f"Quote API returned non-JSON for {payload_symbol}: {error_text}")
+                    return cached_results if is_list and cached_results else None
 
                 if data.get("status") == "success" and "data" in data:
-                    # If input was a list, return the data directly (it's a dict of symbols)
-                    if isinstance(symbol, list):
-                        return data["data"]
+                    fetched_data = data["data"]
 
-                    quote_data = data["data"]
-                    # Ensure ltp is available
-                    if "ltp" in quote_data:
-                        # Update Cache
-                        if not isinstance(symbol, list):
-                            self.quote_cache[cache_key] = (now, quote_data)
-                        return quote_data
+                    if is_list:
+                        # Update cache for all fetched symbols
+                        for s, s_data in fetched_data.items():
+                            if isinstance(s_data, dict) and "ltp" in s_data:
+                                self.quote_cache[f"{s}_{exchange}"] = (now, s_data)
+                                cached_results[s] = s_data
+                        return cached_results
                     else:
-                        logger.warning(
-                            f"Quote for {symbol} missing 'ltp' field. Available fields: {list(quote_data.keys())}"
-                        )
-                        return None
+                        # Ensure ltp is available
+                        if "ltp" in fetched_data:
+                            self.quote_cache[cache_key] = (now, fetched_data)
+                            return fetched_data
+                        else:
+                            logger.warning(
+                                f"Quote for {symbol} missing 'ltp' field. Available fields: {list(fetched_data.keys())}"
+                            )
+                            return None
                 else:
                     error_msg = data.get("message", "Unknown error")
-                    logger.error(
-                        f"Quote fetch failed: {error_msg}"
-                    )
+                    logger.error(f"Quote fetch failed: {error_msg}")
             else:
                 error_text = response.text[:500] if response.text else "(empty)"
-                logger.error(
-                    f"Quote fetch failed (HTTP {response.status_code}): {error_text}"
-                )
+                logger.error(f"Quote fetch failed (HTTP {response.status_code}): {error_text}")
         except Exception as e:
-            logger.error(f"Quote API Error for {symbol}: {e}")
+            logger.error(f"Quote API Error for {payload_symbol}: {e}")
 
-        return None  # Failed to fetch quote
+        return cached_results if is_list and cached_results else None
 
     def get_instruments(self, exchange="NSE", max_retries=3):
         """Fetch instruments list"""
