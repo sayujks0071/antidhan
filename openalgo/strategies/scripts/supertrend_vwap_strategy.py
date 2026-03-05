@@ -77,6 +77,18 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         is_above_poc = last['close'] > poc_price
         is_not_overextended = abs(last['vwap_dev']) < dev_threshold
 
+        # Additional robust checks
+        df['ema200'] = self.calculate_ema(df['close'], period=200)
+        is_uptrend = True
+        last_ema200 = df['ema200'].iloc[-1]
+        if not pd.isna(last_ema200):
+            is_uptrend = last['close'] > last_ema200
+
+        adx_period = getattr(self, "adx_period", 14)
+        adx_threshold = getattr(self, "adx_threshold", 20)
+        adx = self.calculate_adx(df, period=adx_period)
+        is_strong_trend = adx > adx_threshold
+
         if self.pm and self.pm.has_position():
             # Manage Position
             sl_mult = getattr(self, 'ATR_SL_MULTIPLIER', 3.0)
@@ -101,7 +113,7 @@ class SuperTrendVWAPStrategy(BaseStrategy):
             # Entry Logic
             sector_bullish = self.check_sector_correlation(self.sector or "NIFTY BANK")
 
-            if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish:
+            if is_above_vwap and is_volume_spike and is_above_poc and is_not_overextended and sector_bullish and is_strong_trend and is_uptrend:
                 # Use base_qty calculated from adaptive sizing
                 adj_qty = int(base_qty * size_multiplier)
                 if adj_qty < 1: adj_qty = 1
@@ -138,8 +150,9 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         last = df.iloc[-1]
         df['ema200'] = self.calculate_ema(df['close'], period=200)
         is_uptrend = True
-        if not pd.isna(last['ema200']):
-            is_uptrend = last['close'] > last['ema200']
+        last_ema200 = df['ema200'].iloc[-1]
+        if not pd.isna(last_ema200):
+            is_uptrend = last['close'] > last_ema200
 
         is_above_vwap = last['close'] > last['vwap']
 
@@ -151,8 +164,10 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         is_above_poc = last['close'] > poc_price
         is_not_overextended = abs(last['vwap_dev']) < dev_threshold
 
-        adx = self.calculate_adx(df, period=self.adx_period)
-        is_strong_trend = adx > self.adx_threshold
+        adx_period = getattr(self, "adx_period", 14)
+        adx_threshold = getattr(self, "adx_threshold", 20)
+        adx = self.calculate_adx(df, period=adx_period)
+        is_strong_trend = adx > adx_threshold
 
         sector_bullish = True # Assumed for backtest
 

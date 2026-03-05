@@ -63,16 +63,17 @@ def parse_text_log(filepath):
                             current_trade = {}
 
                 # Legacy Logic (keep for backward compatibility if other logs use it)
-                elif "Entry signal detected" in line:
+                elif "Entry signal detected" in line or "Signal Buy" in line or "Signal Sell" in line:
                     price_match = re.search(r'Price: ([\d\.]+)', line)
                     if price_match:
+                         direction = 'LONG' if "Buy" in line or "Entry signal detected" in line else 'SHORT'
                          current_trade = {
                             'entry_time': dt,
                             'entry_price': float(price_match.group(1)),
-                            'direction': 'LONG',
+                            'direction': direction,
                             'status': 'OPEN'
                         }
-                elif "Exiting position" in line:
+                elif "Exiting position" in line or "Exiting at" in line:
                      price_match = re.search(r'at ([\d\.]+)', line)
                      if not price_match:
                          price_match = re.search(r'Price: ([\d\.]+)', line)
@@ -82,7 +83,10 @@ def parse_text_log(filepath):
                             current_trade['exit_time'] = dt
                             current_trade['exit_price'] = exit_price
                             current_trade['status'] = 'CLOSED'
-                            current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+                            if current_trade['direction'] == 'LONG':
+                                current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+                            else:
+                                current_trade['pnl'] = (current_trade['entry_price'] - exit_price)
                             trades.append(current_trade)
                             current_trade = {}
 
@@ -256,6 +260,25 @@ def main():
                 markdown_content += "- **Improvement**: Add ADX Filter (ADX > 25) to ensure trend strength and inherit from BaseStrategy for robust execution.\n"
             else:
                 markdown_content += "- **Suggestion**: Analyze entry conditions. Check log for rejections or stop loss tightness.\n"
+
+    # Add extracted trades table
+    markdown_content += "\n## All Trades Executed Today\n\n"
+    markdown_content += "| Strategy | Entry Time | Entry Price | Exit Time | Exit Price | PnL | Status |\n"
+    markdown_content += "|----------|------------|-------------|-----------|------------|-----|--------|\n"
+
+    # Sort trades by entry time
+    sorted_trades = sorted(today_trades, key=lambda x: x.get('entry_time', datetime.min))
+
+    for t in sorted_trades:
+        entry_time_str = t['entry_time'].strftime("%Y-%m-%d %H:%M:%S") if 'entry_time' in t and isinstance(t['entry_time'], datetime) else "N/A"
+        exit_time_str = t['exit_time'].strftime("%Y-%m-%d %H:%M:%S") if 'exit_time' in t and isinstance(t['exit_time'], datetime) else "N/A"
+        entry_price = f"{t.get('entry_price', 0.0):.2f}"
+        exit_price = f"{t.get('exit_price', 0.0):.2f}"
+        pnl = f"{t.get('pnl', 0.0):.2f}"
+        status = t.get('status', 'UNKNOWN')
+        strategy = t.get('strategy', 'Unknown')
+
+        markdown_content += f"| {strategy} | {entry_time_str} | {entry_price} | {exit_time_str} | {exit_price} | {pnl} | {status} |\n"
 
     with open("SANDBOX_LEADERBOARD.md", "w") as f:
         f.write(markdown_content)
