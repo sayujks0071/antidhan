@@ -185,18 +185,19 @@ def request(
 
 
 # Shortcut methods for common HTTP methods
+@retry_with_backoff(max_retries=3, backoff_factor=0.5)
 def get(url: str, **kwargs) -> httpx.Response:
     return request("GET", url, **kwargs)
 
-
+@retry_with_backoff(max_retries=3, backoff_factor=0.5)
 def post(url: str, **kwargs) -> httpx.Response:
     return request("POST", url, **kwargs)
 
-
+@retry_with_backoff(max_retries=3, backoff_factor=0.5)
 def put(url: str, **kwargs) -> httpx.Response:
     return request("PUT", url, **kwargs)
 
-
+@retry_with_backoff(max_retries=3, backoff_factor=0.5)
 def delete(url: str, **kwargs) -> httpx.Response:
     return request("DELETE", url, **kwargs)
 
