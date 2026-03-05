@@ -1,0 +1,338 @@
+#!/usr/bin/env python3
+"""
+Nifty Smart Options - NIFTY Options (OpenAlgo Web UI Compatible)
+Hybrid strategy that uses EMA(20) and PCR to detect market regimes (Bullish/Bearish/Neutral) and trades Bull Put Spreads, Bear Call Spreads, or Iron Condors accordingly.
+CHANGELOG:
+- 2024-05-20: Initial version with enterprise risk management
+"""
+import os
+import sys
+import time
+from datetime import datetime
+
+# Line-buffered output (required for real-time log capture)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(line_buffering=True)
+
+# Path setup for utility imports
+script_dir = os.path.dirname(os.path.abspath(__file__))
+strategies_dir = os.path.dirname(script_dir)
+utils_dir = os.path.join(strategies_dir, "utils")
+sys.path.insert(0, utils_dir)
+
+try:
+    from trading_utils import is_market_open, APIClient
+    from optionchain_utils import (
+        OptionChainClient,
+        OptionPositionTracker,
+        choose_nearest_expiry,
+        is_chain_valid,
+        normalize_expiry,
+        safe_float,
+        safe_int,
+    )
+    from strategy_common import SignalDebouncer, TradeLedger, TradeLimiter, format_kv
+except ImportError:
+    print("ERROR: Could not import strategy utilities.", flush=True)
+    sys.exit(1)
+
+
+class PrintLogger:
+    def info(self, msg): print(msg, flush=True)
+    def warning(self, msg): print(msg, flush=True)
+    def error(self, msg, exc_info=False): print(msg, flush=True)
+    def debug(self, msg): print(msg, flush=True)
+
+# Configuration Section
+STRATEGY_NAME = os.getenv("STRATEGY_NAME", "NiftySmartOptions")
+UNDERLYING = os.getenv("UNDERLYING", "NIFTY")
+UNDERLYING_EXCHANGE = os.getenv("UNDERLYING_EXCHANGE", "NSE_INDEX")
+OPTIONS_EXCHANGE = os.getenv("OPTIONS_EXCHANGE", "NFO")
+PRODUCT = os.getenv("PRODUCT", "MIS")
+QUANTITY = safe_int(os.getenv("QUANTITY", "1"))
+STRIKE_COUNT = safe_int(os.getenv("STRIKE_COUNT", "12"))
+
+SL_PCT = safe_float(os.getenv("SL_PCT", "40.0"))
+TP_PCT = safe_float(os.getenv("TP_PCT", "50.0"))
+MAX_HOLD_MIN = safe_int(os.getenv("MAX_HOLD_MIN", "45"))
+
+COOLDOWN_SECONDS = safe_int(os.getenv("COOLDOWN_SECONDS", "300"))
+SLEEP_SECONDS = safe_int(os.getenv("SLEEP_SECONDS", "20"))
+EXPIRY_REFRESH_SEC = safe_int(os.getenv("EXPIRY_REFRESH_SEC", "3600"))
+
+MAX_ORDERS_PER_DAY = safe_int(os.getenv("MAX_ORDERS_PER_DAY", "3"))
+MAX_ORDERS_PER_HOUR = safe_int(os.getenv("MAX_ORDERS_PER_HOUR", "2"))
+
+ENTRY_START_TIME = os.getenv("ENTRY_START_TIME", "10:00")
+ENTRY_END_TIME = os.getenv("ENTRY_END_TIME", "14:30")
+EXIT_TIME = os.getenv("EXIT_TIME", "15:15")
+
+API_KEY = os.getenv("OPENALGO_APIKEY")
+HOST = os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000")
+
+root_dir = os.path.dirname(strategies_dir)
+sys.path.insert(0, root_dir)
+
+if not API_KEY:
+    try:
+        from database.auth_db import get_first_available_api_key
+        API_KEY = get_first_available_api_key()
+        if API_KEY:
+            print("Successfully retrieved API Key from database.", flush=True)
+    except Exception as e:
+        print(f"Warning: Could not retrieve API key from database: {e}", flush=True)
+
+if not API_KEY:
+    raise ValueError("API Key must be set in OPENALGO_APIKEY environment variable")
+
+class NiftySmartOptionsStrategy:
+    def __init__(self):
+        self.logger = PrintLogger()
+        self.client = OptionChainClient(api_key=API_KEY, host=HOST)
+        self.api_client = APIClient(api_key=API_KEY, host=HOST)
+
+        self.tracker = OptionPositionTracker(
+            sl_pct=SL_PCT,
+            tp_pct=TP_PCT,
+            max_hold_min=MAX_HOLD_MIN
+        )
+        self.limiter = TradeLimiter(
+            max_per_day=MAX_ORDERS_PER_DAY,
+            max_per_hour=MAX_ORDERS_PER_HOUR,
+            cooldown_seconds=COOLDOWN_SECONDS
+        )
+        self.debouncer = SignalDebouncer()
+
+        self.expiry = None
+        self.last_expiry_check = 0
+
+        self.logger.info(f"Strategy Initialized: {STRATEGY_NAME}")
+
+    def ensure_expiry(self):
+        now = time.time()
+        if not self.expiry or (now - self.last_expiry_check > EXPIRY_REFRESH_SEC):
+            try:
+                res = self.client.expiry(UNDERLYING, OPTIONS_EXCHANGE, "options")
+                if res.get("status") == "success":
+                    dates = res.get("data", [])
+                    if dates:
+                        self.expiry = choose_nearest_expiry(dates)
+                        self.last_expiry_check = now
+                        self.logger.info(f"Selected Expiry: {self.expiry}")
+                    else:
+                        self.logger.warning("No expiry dates found.")
+                else:
+                    self.logger.warning(f"Expiry fetch failed: {res.get('message')}")
+            except Exception as e:
+                self.logger.error(f"Error fetching expiry: {e}")
+
+    def is_entry_window_open(self):
+        now = datetime.now().time()
+        try:
+            start = datetime.strptime(ENTRY_START_TIME, "%H:%M").time()
+            end = datetime.strptime(ENTRY_END_TIME, "%H:%M").time()
+            return start <= now <= end
+        except ValueError:
+            return False
+
+    def should_terminate(self):
+        now = datetime.now().time()
+        try:
+            exit_time = datetime.strptime(EXIT_TIME, "%H:%M").time()
+            return now >= exit_time
+        except ValueError:
+            return False
+
+    def get_leg_details(self, chain, offset, option_type):
+        for item in chain:
+            opt = item.get(option_type.lower(), {})
+            if opt.get("label") == offset:
+                return {
+                    "symbol": opt.get("symbol"),
+                    "ltp": safe_float(opt.get("ltp", 0)),
+                    "quantity": QUANTITY,
+                    "product": PRODUCT
+                }
+        return None
+
+    def _close_position(self, chain, reason):
+        self.logger.info(f"Closing position. Reason: {reason}")
+        exit_orders = []
+        for leg in self.tracker.open_legs:
+            close_action = "BUY" if leg.get("action") == "SELL" else "SELL"
+            exit_orders.append({
+                "symbol": leg["symbol"],
+                "action": close_action,
+                "quantity": leg["quantity"],
+                "product": PRODUCT,
+                "pricetype": "MARKET"
+            })
+
+        if not exit_orders:
+            self.tracker.clear()
+            return
+
+        exit_orders.sort(key=lambda x: 0 if x['action'] == 'BUY' else 1)
+
+        for order in exit_orders:
+            try:
+                res = self.api_client.placesmartorder(
+                    strategy=STRATEGY_NAME,
+                    symbol=order["symbol"],
+                    action=order["action"],
+                    exchange=OPTIONS_EXCHANGE,
+                    pricetype="MARKET",
+                    product=order["product"],
+                    quantity=order["quantity"],
+                    position_size=0
+                )
+                self.logger.info(f"Exit Order: {order['symbol']} {order['action']} -> {res}")
+            except Exception as e:
+                self.logger.error(f"Exit failed for {order['symbol']}: {e}")
+
+        self.tracker.clear()
+        self.logger.info("Position closed and tracker cleared.")
+
+    def run(self):
+        self.logger.info("Starting Strategy Loop...")
+
+        while True:
+            try:
+                if not is_market_open():
+                    time.sleep(SLEEP_SECONDS)
+                    continue
+
+                self.ensure_expiry()
+                if not self.expiry:
+                    time.sleep(SLEEP_SECONDS)
+                    continue
+
+                chain_resp = self.client.optionchain(
+                    underlying=UNDERLYING,
+                    exchange=UNDERLYING_EXCHANGE,
+                    expiry_date=self.expiry,
+                    strike_count=STRIKE_COUNT
+                )
+
+                valid, reason = is_chain_valid(chain_resp, min_strikes=8)
+                if not valid:
+                    time.sleep(SLEEP_SECONDS)
+                    continue
+
+                chain = chain_resp.get("chain", [])
+
+                if self.tracker.open_legs:
+                    exit_now, legs, exit_reason = self.tracker.should_exit(chain)
+                    if exit_now or self.should_terminate():
+                        reason = exit_reason if exit_now else "EOD Auto-Squareoff"
+                        self._close_position(chain, reason)
+                        time.sleep(SLEEP_SECONDS)
+                        continue
+
+                if not self.tracker.open_legs and self.is_entry_window_open() and not self.should_terminate():
+                    # Calculate PCR
+                    total_ce_oi = sum(safe_float(item.get("ce", {}).get("oi", 0)) for item in chain)
+                    total_pe_oi = sum(safe_float(item.get("pe", {}).get("oi", 0)) for item in chain)
+                    pcr = total_pe_oi / total_ce_oi if total_ce_oi > 0 else 1.0
+
+                    # Fetch History for EMA(20)
+                    df = self.api_client.history(symbol=UNDERLYING, exchange=UNDERLYING_EXCHANGE, interval="5m")
+                    if df is None or df.empty or len(df) < 20:
+                        time.sleep(SLEEP_SECONDS)
+                        continue
+
+                    df['ema20'] = df['close'].ewm(span=20, adjust=False).mean()
+                    last_close = float(df['close'].iloc[-1])
+                    ema20 = float(df['ema20'].iloc[-1])
+
+                    self.logger.info(format_kv(spot=last_close, ema20=round(ema20, 2), pcr=round(pcr, 2)))
+
+                    regime = "NEUTRAL"
+                    if last_close > ema20 and pcr > 1.2:
+                        regime = "BULLISH"
+                    elif last_close < ema20 and pcr < 0.8:
+                        regime = "BEARISH"
+
+                    if self.debouncer.edge("REGIME_SIGNAL", regime != "NEUTRAL" or pcr < 1.2 and pcr > 0.8):
+                        if not self.limiter.allow():
+                            self.logger.info("Trade limit reached.")
+                        else:
+                            definitions = []
+                            if regime == "BULLISH":
+                                # Bull Put Spread: Sell ATM/OTM1 PE, Buy OTM3 PE
+                                definitions = [
+                                    ("OTM3", "PE", "BUY"),
+                                    ("OTM1", "PE", "SELL")
+                                ]
+                            elif regime == "BEARISH":
+                                # Bear Call Spread: Sell ATM/OTM1 CE, Buy OTM3 CE
+                                definitions = [
+                                    ("OTM3", "CE", "BUY"),
+                                    ("OTM1", "CE", "SELL")
+                                ]
+                            else:
+                                # Neutral: Iron Condor
+                                definitions = [
+                                    ("OTM4", "CE", "BUY"),
+                                    ("OTM4", "PE", "BUY"),
+                                    ("OTM2", "CE", "SELL"),
+                                    ("OTM2", "PE", "SELL")
+                                ]
+
+                            tracking_legs = []
+                            entry_prices = []
+                            api_legs = []
+                            valid_setup = True
+
+                            for offset, otype, action in definitions:
+                                details = self.get_leg_details(chain, offset, otype)
+                                if details:
+                                    details["action"] = action
+                                    tracking_legs.append(details)
+                                    entry_prices.append(details["ltp"])
+                                    api_legs.append({
+                                        "offset": offset,
+                                        "option_type": otype,
+                                        "action": action,
+                                        "quantity": QUANTITY,
+                                        "product": PRODUCT
+                                    })
+                                else:
+                                    valid_setup = False
+                                    break
+
+                            if valid_setup:
+                                try:
+                                    response = self.client.optionsmultiorder(
+                                        strategy=STRATEGY_NAME,
+                                        underlying=UNDERLYING,
+                                        exchange=UNDERLYING_EXCHANGE,
+                                        expiry_date=self.expiry,
+                                        legs=api_legs
+                                    )
+                                    if response.get("status") == "success":
+                                        self.logger.info(f"Order Success: {response}")
+                                        self.limiter.record()
+                                        self.tracker.add_legs(legs=tracking_legs, entry_prices=entry_prices, side="SELL")
+                                        self.logger.info(f"{regime} position tracked.")
+                                    else:
+                                        self.logger.error(f"Order Failed: {response.get('message')}")
+                                except Exception as e:
+                                    self.logger.error(f"Order Execution Error: {e}")
+
+            except Exception as e:
+                self.logger.error(f"Error in main loop: {e}", exc_info=True)
+
+            time.sleep(SLEEP_SECONDS)
+
+if __name__ == "__main__":
+    try:
+        strategy = NiftySmartOptionsStrategy()
+        strategy.run()
+    except KeyboardInterrupt:
+        print("Strategy stopped by user.")
+    except Exception as e:
+        print(f"Critical Error: {e}")
+        sys.exit(1)
