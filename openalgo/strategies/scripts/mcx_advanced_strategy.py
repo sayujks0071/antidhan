@@ -37,8 +37,7 @@ except ImportError:
     from utils.symbol_resolver import SymbolResolver
 
 # Configuration
-API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
-API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
+
 SCRIPTS_DIR = Path(__file__).parent
 
 # Strategy Templates Mapping
@@ -57,7 +56,7 @@ class AdvancedMCXStrategy:
     def __init__(self, api_key, api_host):
         self.api_key = api_key
         self.api_host = api_host
-        self.client = APIClient(api_key=self.api_key, host=self.api_host)
+        self.client = APIClient()
         self.resolver = SymbolResolver()
         self.fundamental_data = self._load_fundamental_data()
 
@@ -433,7 +432,7 @@ def main():
     args = parser.parse_args()
 
     # Overwrite with env vars if present
-    api_key = os.getenv('OPENALGO_APIKEY', args.api_key)
+    api_key = args.api_key
     port = int(os.getenv('OPENALGO_PORT', args.port))
     host = f"http://127.0.0.1:{port}"
 

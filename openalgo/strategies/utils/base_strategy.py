@@ -202,32 +202,39 @@ class BaseStrategy:
         if api_key:
             return api_key
 
-        # 1. Try environment variables
+        try:
+            from trading_utils import get_api_credentials
+            ak, _ = get_api_credentials()
+            if ak:
+                return ak
+        except ImportError:
+            pass
+
         key = os.getenv('OPENALGO_APIKEY') or os.getenv('OPENALGO_API_KEY')
         if key:
             return key
 
-        # 2. Try database
-        try:
-            # Ensure project root is in path
-            self._add_project_root_to_path()
-            # This requires 'database' to be importable
-            from database.auth_db import get_first_available_api_key
-            key = get_first_available_api_key()
-            if key:
-                if hasattr(self, 'logger'):
-                    self.logger.info("Resolved API key from database.")
-                return key
-        except ImportError:
-            # Database module not available or path issue
-            pass
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.warning(f"Failed to fetch API key from DB: {e}")
-            else:
-                pass
+        return "dummy_key"
 
-        return None
+    def _resolve_host(self, host):
+        """Resolve API Host."""
+        if host:
+            return host.rstrip('/')
+
+        try:
+            from trading_utils import get_api_credentials
+            _, h = get_api_credentials()
+            if h:
+                return h.rstrip('/')
+        except ImportError:
+            pass
+
+        env_host = os.getenv('OPENALGO_HOST')
+        if env_host:
+            return env_host.rstrip('/')
+
+        port = os.getenv('OPENALGO_PORT', '5000')
+        return f"http://127.0.0.1:{port}"
 
     def setup_logging(self, log_file=None):
         self.logger = logging.getLogger(self.name)
