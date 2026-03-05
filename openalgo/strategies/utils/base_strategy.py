@@ -94,6 +94,9 @@ except ImportError:
         )
 
 class BaseStrategy:
+    params = {} # Define strategy parameters (name: default)
+    indicators = {} # Define indicators (name: params)
+
     def __init__(self, name=None, symbol=None, quantity=1, interval="5m", exchange="NSE",
                  api_key=None, host=None, ignore_time=False, log_file=None, client=None,
                  sector=None, underlying=None, type="EQUITY", product="MIS", **kwargs):
@@ -112,9 +115,14 @@ class BaseStrategy:
         self.type = type
         self.product = product
 
+        # Initialize params from kwargs or defaults
+        for param, default in self.params.items():
+            setattr(self, param, kwargs.get(param, default))
+
         # Set any additional kwargs as attributes (e.g. threshold, stop_pct)
         for k, v in kwargs.items():
-            setattr(self, k, v)
+            if not hasattr(self, k):
+                setattr(self, k, v)
 
         self.last_candle_time = None
 
@@ -199,15 +207,16 @@ class BaseStrategy:
 
     def _resolve_api_key(self, api_key):
         """Resolve API Key from multiple sources."""
-        if api_key:
-            return api_key
-
-        # 1. Try environment variables
+        # 1. Prioritize Environment Variable (from Python Strategy Host)
         key = os.getenv('OPENALGO_APIKEY') or os.getenv('OPENALGO_API_KEY')
         if key:
             return key
 
-        # 2. Try database
+        # 2. Check constructor argument
+        if api_key:
+            return api_key
+
+        # 3. Try database (Legacy fallback)
         try:
             # Ensure project root is in path
             self._add_project_root_to_path()
@@ -335,7 +344,7 @@ class BaseStrategy:
         """
         Helper to calculate common indicators if defined in self.indicators configuration.
         """
-        if not hasattr(self, 'indicators'):
+        if not self.indicators:
             return df
 
         try:
@@ -404,6 +413,10 @@ class BaseStrategy:
 
         if df.empty or len(df) < 50:
              return
+
+        # Check for new candle if strict loop
+        if not self.check_new_candle(df):
+            return
 
         # Calculate Indicators
         df = self.calculate_indicators(df)
@@ -773,6 +786,13 @@ class BaseStrategy:
     def cli(cls):
         """Standard CLI entry point for strategies."""
         parser = cls.get_standard_parser(cls.__name__)
+
+        # Add declarative params
+        if cls.params:
+            for name, default in cls.params.items():
+                arg_type = type(default) if default is not None else str
+                parser.add_argument(f"--{name}", type=arg_type, default=default, help=f"{name} (default: {default})")
+
         cls.add_arguments(parser)
         args, unknown = parser.parse_known_args() # Use parse_known_args to allow extra args
 
