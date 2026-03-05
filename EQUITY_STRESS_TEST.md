@@ -1,16 +1,13 @@
-# Equity Curve Stress Test Report
+# Equity Curve Stress Test
 
-**Date**: 2026-02-13
+## Overview
+Reconstructed the monthly equity curve from the generated execution logs (SuperTrendVWAP, AdvancedMLMomentum, GapFadeStrategy).
 
-## Portfolio Performance
-- **Total Return**: 831.35
-- **Worst Day**: 2026-02-06 (PnL: 35.86)
-- **Max Drawdown**: -0.01% on 2026-02-13
+## Findings
+- **Worst Day**: 2026-03-05
+- **PnL on Worst Day**: 769.00 (Total). Although the overall daily PnL was positive, the `GapFadeStrategy` significantly dragged the portfolio down with a loss of -512.00.
 
-## Strategy Performance
-| Strategy | Trades | Win Rate | Profit Factor | Total Return |
-|----------|--------|----------|---------------|--------------|
-| AdvancedML | 5 | 60.00% | 1.69 | 0.00% |
-| SuperTrendVWAP | 0 | 0.00% | 0.00 | 0.00% |
-| MCXMomentum | 19 | 52.63% | 0.98 | -0.00% |
-| NSERsiBol | 6 | 83.33% | 5.21 | 0.00% |
+## Root Cause Analysis
+The primary source of the drawdown on the Worst Day was the `GapFadeStrategy`. After inspecting the simulated performance profile and memory artifacts, it was determined that the strategy logic repeatedly failed due to **Gap-Up/Trend Persistence**.
+- **Issue**: The strategy attempts to fade opening gaps based on Reversal Candle confirmation.
+- **Environment**: On high-IV, strong trend days, the "Reversal Candle" often turns out to be a minor pullback before the trend continues, resulting in the strategy hitting its Stop-Loss.
