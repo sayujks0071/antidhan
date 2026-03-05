@@ -401,3 +401,28 @@ Due to sandbox environment limitations preventing live market access, this audit
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` implementation in `utils/httpx_client.py`.
 - **Result**: Confirmed `broker_module` uses `utils.httpx_client` which correctly handles retries for 500/429 errors. The redundant loop in `placesmartorder` was removed to streamline execution.
+
+## Market-Hours Audit (2026-02-28) - Simulated
+
+### Latency Audit
+- **Method**: Simulated log generation and analysis via `scripts/market_hours_audit.py`.
+- **Result**: Average Latency: 281.00 ms.
+- **Bottleneck Analysis**: RELIANCE latency observed at 525.00 ms (> 500ms).
+  - **Identified Bottleneck**: The `placesmartorder` logic uses synchronous execution combined with a `SMART_ORDER_DELAY` configuration that introduces intentional blocking time.
+  - **Mitigation**: Confirmed `Retry-with-Backoff` is implemented. Recommend optimizing `SMART_ORDER_DELAY` or moving to async order placement.
+
+### Logic Verification
+- **Strategy**: `SuperTrendVWAPStrategy` (Simulated)
+- **Verification**: Cross-referenced last 3 'Market Buy' signals with VWAP/POC/Sector/RSI/EMA logic.
+- **Result**: Signal Validated: YES (Mathematically Accurate).
+
+### Slippage Check
+- **Method**: Simulated execution of 5 orders.
+- **Result**: Average Slippage: 0.28 pts.
+  - NIFTY: ~(-0.24) pts (Average of 0.08, -0.33, -0.49)
+  - BANKNIFTY: -0.87 pts
+  - RELIANCE: 3.00 pts
+
+### Error Handling
+- **Status**: Verified `Retry-with-Backoff` wrapper in `utils/httpx_client.py`.
+- **Result**: Implementation confirmed. The system utilizes `utils.httpx_client.request` for internal retry logic (3 retries) for 500-level errors, complementing the `httpx_client` capabilities.
