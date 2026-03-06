@@ -48,7 +48,7 @@ class TestHttpxRetryVerification(unittest.TestCase):
 
         # Setup mock response sequence: 500, 500, 200
         response_500 = httpx.Response(500)
-        response_200 = httpx.Response(200, json={"status": "success"})
+        response_200 = httpx.Response(200)
 
         mock_client_instance.request.side_effect = [response_500, response_500, response_200]
 
@@ -68,7 +68,7 @@ class TestHttpxRetryVerification(unittest.TestCase):
 
         # Setup mock response sequence: 429, 200
         response_429 = httpx.Response(429)
-        response_200 = httpx.Response(200, json={"status": "success"})
+        response_200 = httpx.Response(200)
 
         mock_client_instance.request.side_effect = [response_429, response_200]
 
