@@ -1,0 +1,50 @@
+Generating mock logs at logs/mock_openalgo.log...
+
+Analyzing logs from logs/mock_openalgo.log...
+
+--- Latency Audit ---
+[10:00:00] Symbol: NIFTY, Latency: 132.00 ms
+[10:10:00] Symbol: BANKNIFTY, Latency: 450.00 ms
+[10:30:00] Symbol: NIFTY, Latency: 82.00 ms
+[10:45:00] Symbol: RELIANCE, Latency: 566.00 ms
+  [WARNING] Latency > 500ms! Bottleneck investigation required.
+[11:00:00] Symbol: NIFTY, Latency: 265.00 ms
+Average Latency: 299.00 ms
+
+--- Slippage Check ---
+Symbol: NIFTY, Slippage: -0.56 pts
+Symbol: BANKNIFTY, Slippage: 0.85 pts
+Symbol: NIFTY, Slippage: 1.83 pts
+Symbol: RELIANCE, Slippage: 1.13 pts
+Symbol: NIFTY, Slippage: 0.65 pts
+Average Slippage: 0.78 pts
+
+--- Logic Verification ---
+Strategy: SuperTrendVWAPStrategy (NIFTY) - Verifying 3 signals
+
+Signal #1 at 10:00:00
+  Close: 24500.00, Inferred VWAP: 24451.10
+  POC: 24480.00 (Above: True)
+  Sector: Bullish (Bullish: True)
+  Dev: 0.0020 (Within 0.03: True)
+  RSI: 55.00 (Bullish > 50: True)
+  EMA Trend: True (Fast 24490.00 > Slow 24460.00)
+  Result: Signal Validated: YES (Mathematically Accurate)
+
+Signal #2 at 10:30:00
+  Close: 24600.00, Inferred VWAP: 24501.99
+  POC: 24580.00 (Above: True)
+  Sector: Bullish (Bullish: True)
+  Dev: 0.0040 (Within 0.03: True)
+  RSI: 57.00 (Bullish > 50: True)
+  EMA Trend: True (Fast 24590.00 > Slow 24560.00)
+  Result: Signal Validated: YES (Mathematically Accurate)
+
+Signal #3 at 11:00:00
+  Close: 24700.00, Inferred VWAP: 24552.68
+  POC: 24680.00 (Above: True)
+  Sector: Bullish (Bullish: True)
+  Dev: 0.0060 (Within 0.03: True)
+  RSI: 59.00 (Bullish > 50: True)
+  EMA Trend: True (Fast 24690.00 > Slow 24660.00)
+  Result: Signal Validated: YES (Mathematically Accurate)
