@@ -230,19 +230,41 @@ def place_smart_order_with_auth(
     response_data = {}
     order_id = None
 
-    try:
-        res, response_data, order_id = broker_module.place_smartorder_api(
-            order_data, auth_token
-        )
-    except Exception as e:
-        logger.error(f"Error in broker_module.place_smartorder_api: {e}")
-        traceback.print_exc()
-        error_response = {
-            "status": "error",
-            "message": "Failed to place smart order due to internal error",
-        }
-        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
-        return False, error_response, 500
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            res, response_data, order_id = broker_module.place_smartorder_api(
+                order_data, auth_token
+            )
+
+            # Robustly extract HTTP status code
+            status_code = None
+            if res is not None:
+                if hasattr(res, "status"):
+                    status_code = res.status
+                elif hasattr(res, "status_code"):
+                    status_code = res.status_code
+
+            # Check for 500-level errors
+            if status_code and 500 <= status_code < 600:
+                if attempt < max_retries - 1:
+                    sleep_time = 2 ** attempt
+                    logger.warning(f"Broker API returned {status_code}. Retrying in {sleep_time}s (Attempt {attempt + 1}/{max_retries})")
+                    time.sleep(sleep_time)
+                    continue
+
+            # Break out of loop if success or non-500 response
+            break
+
+        except Exception as e:
+            logger.error(f"Error in broker_module.place_smartorder_api: {e}")
+            traceback.print_exc()
+            error_response = {
+                "status": "error",
+                "message": "Failed to place smart order due to internal error",
+            }
+            executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+            return False, error_response, 500
 
     try:
         # Handle case where position size matches current position
