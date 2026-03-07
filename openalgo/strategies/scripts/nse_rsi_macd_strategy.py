@@ -6,8 +6,16 @@ Entry: Buy when MACD Line crosses above Signal Line AND RSI > 50 AND ADX > 25.
 Exit: Sell when MACD Line crosses below Signal Line OR RSI > 70.
 Inherits from BaseStrategy for code reduction.
 """
-import strategy_preamble
-from base_strategy import BaseStrategy
+import os
+import sys
+
+# Ensure openalgo is in the path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+try:
+    from strategies.utils.base_strategy import BaseStrategy
+except ImportError:
+    from openalgo.strategies.utils.base_strategy import BaseStrategy
 
 class NSERsiMacdStrategy(BaseStrategy):
     def setup(self):
@@ -139,6 +147,9 @@ class NSERsiMacdStrategy(BaseStrategy):
         except:
              return 'HOLD', 0.0, {}
 
+
+
+generate_signal = NSERsiMacdStrategy.backtest_signal
 
 if __name__ == "__main__":
     NSERsiMacdStrategy.cli()

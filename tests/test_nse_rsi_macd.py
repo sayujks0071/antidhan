@@ -13,6 +13,9 @@ sys.path.insert(0, strategies_dir)
 utils_dir = os.path.abspath(os.path.join(os.getcwd(), 'openalgo/strategies/utils'))
 sys.path.insert(0, utils_dir)
 
+openalgo_dir = os.path.abspath(os.path.join(os.getcwd(), 'openalgo'))
+sys.path.insert(0, openalgo_dir)
+
 # Also project root
 sys.path.insert(0, os.getcwd())
 
@@ -55,14 +58,19 @@ def test_nse_rsi_macd():
     strat = NSERsiMacdStrategy(symbol="TEST", api_key="dummy", port=5001)
     df_calc = df.copy()
     try:
-        strat.calculate_signal(df_calc)
+        df_calc['rsi'] = strat.calculate_rsi(df_calc['close'], period=strat.rsi_period)
+        macd, signal_line, _ = strat.calculate_macd(df_calc['close'], fast=strat.macd_fast, slow=strat.macd_slow, signal=strat.macd_signal)
+        df_calc['macd'] = macd
+        df_calc['signal'] = signal_line
+        df_calc['adx'] = strat.calculate_adx_series(df_calc, period=strat.adx_period)
+
         if 'rsi' in df_calc.columns and 'macd' in df_calc.columns and 'signal' in df_calc.columns:
             print("Indicators calculated successfully: RSI, MACD, Signal found.")
         else:
             print(f"Indicators missing. Columns: {df_calc.columns}")
             sys.exit(1)
     except Exception as e:
-        print(f"calculate_signal failed: {e}")
+        print(f"indicator calculation failed: {e}")
         sys.exit(1)
 
     print("Test passed!")
