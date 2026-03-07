@@ -646,7 +646,7 @@ class BaseStrategy:
 
         monthly_atr = self.get_monthly_atr()
         if monthly_atr > 0:
-            qty = self.pm.calculate_adaptive_quantity_monthly_atr(capital, risk_pct, monthly_atr, price)
+            qty = self.pm.calculate_adaptive_quantity(capital, risk_pct, monthly_atr, price, client=self.client, exchange=self.exchange)
             self.logger.info(f"Adaptive Quantity: {qty} (Monthly ATR: {monthly_atr:.2f})")
             return qty
 
