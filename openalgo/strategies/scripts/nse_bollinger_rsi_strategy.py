@@ -137,7 +137,14 @@ class NSEBollingerRSIStrategy(BaseStrategy):
                     # Use PM's adaptive quantity logic
                     # Using placeholder capital 100000 and 1.0 volatility (ATR placeholder if not available)
 
-                    qty = self.pm.calculate_adaptive_quantity(100000, self.risk_pct, 1.0, current_price)
+                    qty = self.pm.calculate_adaptive_quantity(
+                        100000,
+                        self.risk_pct,
+                        1.0,
+                        current_price,
+                        client=self.client,
+                        exchange="NSE"
+                    )
                     qty = max(1, qty)
 
                     self.logger.info(f"Entry signal detected: {metadata}. Buying {qty} at {current_price}")

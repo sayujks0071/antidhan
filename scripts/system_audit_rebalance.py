@@ -146,6 +146,29 @@ def analyze_equity_curve(df):
         # PnL = (Exit - Entry) * Qty * Direction
         pass # Assuming JSON has PnL
 
+    # Clean up PnL values if they exist
+    if 'pnl' in df.columns:
+        # PnL should be calculated accurately. If negative string, handle it.
+        df['pnl'] = pd.to_numeric(df['pnl'], errors='coerce').fillna(0)
+
+    # Calculate exact PnL based on formula to be safe: PnL = (Exit - Entry) * Qty * Direction
+    # If a trade has entry_price and exit_price, we can calculate.
+    for idx, row in df.iterrows():
+        try:
+            entry_p = float(row.get('entry_price', 0))
+            exit_p = float(row.get('exit_price', 0))
+            if pd.isna(entry_p) or pd.isna(exit_p) or entry_p == 0 or exit_p == 0:
+                continue
+
+            qty = float(row.get('quantity', 1))
+            direction = 1 if str(row.get('direction', 'BUY')).upper() == 'BUY' else -1
+
+            # Recalculate PnL
+            calc_pnl = (exit_p - entry_p) * qty * direction
+            df.at[idx, 'pnl'] = calc_pnl
+        except ValueError:
+            pass
+
     # Aggregate by Day
     df['date'] = df['exit_time'].dt.date
     daily_pnl = df.groupby('date')['pnl'].sum()

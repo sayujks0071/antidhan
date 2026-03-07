@@ -210,17 +210,17 @@ Based on the audit, the following areas are prioritized for the next iteration:
 ### Audit Findings
 - **Cross-Strategy Correlation:**
   - **Active Strategies:** `SuperTrendVWAPStrategy`, `NSE_RSI_MACD_Strategy`, `MCX_CrudeOil_Trend_Strategy`.
-  - **Correlation:** All active strategies show low correlation (< 0.1). No merging required.
+  - **Correlation:** System audit is complete. All active strategies show low correlation (< 0.70). No >70% correlations exist among active strategies, requiring no merges.
 - **Equity Curve Stress Test:**
-  - **Worst Day:** 2026-02-16 (Simulated).
-  - **Root Cause:** Intraday Volatility spike affecting multiple strategies.
-  - **Action Items:** Implementing VIX-based volatility filters in `NSE_RSI_MACD_Strategy` and enhancing position sizing in `MCX_CrudeOil_Trend_Strategy`.
+  - **Worst Day:** 2026-01-19 (Based on logs/trades_*.json).
+  - **Root Cause:** A massive intraday gap-up and volatility spike caused multiple early morning stop-losses to hit (e.g., BANKNIFTY short positions and NIFTY pullbacks). The system eventually recovered, but the simultaneous sector-wide shocks caused significant immediate drawdown.
+  - **Action Items:** Implementing VIX-based volatility filters in `NSE_RSI_MACD_Strategy` and enhancing position sizing across all strategies using Monthly ATR.
 - **Infrastructure Upgrades:**
   - **Data Fetching:** Verified batch-requesting capability and optimized caching.
   - **Position Sizing:** Transitioning all strategies to Adaptive ATR-based sizing.
 
 ### 🚀 Ahead Roadmap
 
-1.  **Volume Profile Imbalance:** Detecting institutional absorption/exhaustion at key levels.
-2.  **Gamma Exposure (GEX):** Analyzing option market maker hedging flows to predict volatility.
-3.  **Market Regime Hidden Markov Models (HMM):** Using ML to classify market regimes dynamically.
+1.  **ADX Trend Filter Integrations:** Expanding ADX (>25) confirmation logic to all mean-reverting strategies to prevent false entries during strong trends.
+2.  **RSI Divergence Engine:** Implementing a robust multi-timeframe RSI divergence detector (price making lower lows, RSI making higher lows) to optimize turning point entries.
+3.  **VWAP Mean Reversion Enhancements:** Further tuning the SuperTrendVWAP strategy to dynamically adapt standard deviation thresholds based on early morning opening range behavior.
