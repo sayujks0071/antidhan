@@ -21,24 +21,11 @@ except ImportError:
     print("Warning: yfinance not found. Global market data will be simulated.")
     yf = None
 
-# Add repo root to path for imports
-script_dir = Path(__file__).parent
-strategies_dir = script_dir.parent
-utils_dir = strategies_dir / 'utils'
-sys.path.insert(0, str(utils_dir))
-
-try:
-    from trading_utils import APIClient, is_market_open, calculate_rsi, calculate_atr, calculate_adx
-    from symbol_resolver import SymbolResolver
-except ImportError:
-    # Fallback for direct execution
-    sys.path.insert(0, str(strategies_dir))
-    from utils.trading_utils import APIClient, is_market_open, calculate_rsi, calculate_atr, calculate_adx
-    from utils.symbol_resolver import SymbolResolver
+from strategy_preamble import BaseStrategy
+from symbol_resolver import SymbolResolver
 
 # Configuration
 API_HOST = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5001')
-API_KEY = os.getenv('OPENALGO_APIKEY', 'demo_key')
 SCRIPTS_DIR = Path(__file__).parent
 
 # Strategy Templates Mapping
@@ -53,11 +40,8 @@ STRATEGY_TEMPLATES = {
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("MCX_Advanced_Strategy")
 
-class AdvancedMCXStrategy:
-    def __init__(self, api_key, api_host):
-        self.api_key = api_key
-        self.api_host = api_host
-        self.client = APIClient(api_key=self.api_key, host=self.api_host)
+class AdvancedMCXStrategy(BaseStrategy):
+    def setup(self):
         self.resolver = SymbolResolver()
         self.fundamental_data = self._load_fundamental_data()
 
@@ -84,7 +68,7 @@ class AdvancedMCXStrategy:
 
     def _load_fundamental_data(self):
         """Load fundamental data from JSON file or return default."""
-        data_path = strategies_dir / 'data' / 'fundamental_data.json'
+        data_path = SCRIPTS_DIR.parent / 'data' / 'fundamental_data.json'
         if data_path.exists():
             try:
                 with open(data_path, 'r') as f:
@@ -208,15 +192,15 @@ class AdvancedMCXStrategy:
         if df.empty: return {}
 
         # RSI
-        df['rsi'] = calculate_rsi(df['close'])
+        df['rsi'] = self.calculate_rsi(df['close'])
 
         # ATR (Scalar last value)
-        atr_series = calculate_atr(df)
+        atr_series = self.calculate_atr_series(df)
         df['atr'] = atr_series # Store series for usage if needed
         atr_val = atr_series.iloc[-1]
 
         # ADX (Scalar last value)
-        adx_series = calculate_adx(df)
+        adx_series = self.calculate_adx_series(df)
         df['adx'] = adx_series
         adx_val = adx_series.iloc[-1]
 
@@ -426,22 +410,11 @@ class AdvancedMCXStrategy:
 
         return deploy_cmds
 
-def main():
-    parser = argparse.ArgumentParser(description='Advanced MCX Strategy Analyzer')
-    parser.add_argument('--port', type=int, default=5001, help='API Port')
-    parser.add_argument('--api_key', type=str, default='demo_key', help='API Key')
-    args = parser.parse_args()
-
-    # Overwrite with env vars if present
-    api_key = os.getenv('OPENALGO_APIKEY', args.api_key)
-    port = int(os.getenv('OPENALGO_PORT', args.port))
-    host = f"http://127.0.0.1:{port}"
-
-    analyzer = AdvancedMCXStrategy(api_key, host)
-    analyzer.fetch_global_context()
-    analyzer.fetch_mcx_data()
-    analyzer.analyze_commodities()
-    analyzer.generate_report()
+    def run(self):
+        self.fetch_global_context()
+        self.fetch_mcx_data()
+        self.analyze_commodities()
+        self.generate_report()
 
 if __name__ == "__main__":
-    main()
+    AdvancedMCXStrategy.cli()
