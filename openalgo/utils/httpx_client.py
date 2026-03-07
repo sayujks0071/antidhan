@@ -55,7 +55,16 @@ def retry_with_backoff(max_retries: int = 3, backoff_factor: float = 0.5):
             last_exception = None
             for attempt in range(max_retries + 1):
                 try:
-                    return func(*args, **kwargs)
+                    response = func(*args, **kwargs)
+                    if isinstance(response, httpx.Response):
+                        if response.status_code in [429, 500, 502, 503, 504]:
+                            raise httpx.HTTPStatusError(
+                                f"HTTP {response.status_code}",
+                                request=response.request,
+                                response=response
+                            )
+                    last_exception = None
+                    return response
                 except Exception as e:
                     last_exception = e
                     if attempt < max_retries:
@@ -66,7 +75,8 @@ def retry_with_backoff(max_retries: int = 3, backoff_factor: float = 0.5):
                         time.sleep(wait_time)
             # If we exhausted retries, raise the last exception
             logger.error(f"Function {func.__name__} failed after {max_retries} retries: {last_exception}")
-            raise last_exception
+            if last_exception:
+                raise last_exception
         return wrapper
     return decorator
 
