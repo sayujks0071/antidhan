@@ -5,52 +5,33 @@ MCX Smart Breakout Strategy
 Innovative volatility-adjusted breakout strategy with dynamic risk management.
 Uses Bollinger Bands Squeeze/Expansion logic and ATR-based exits.
 """
-import os
-import sys
 import logging
 import pandas as pd
-from datetime import datetime, timedelta
-
-# Add repo root to path
-try:
-    from base_strategy import BaseStrategy
-except ImportError:
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    strategies_dir = os.path.dirname(script_dir)
-    utils_dir = os.path.join(strategies_dir, "utils")
-    if utils_dir not in sys.path:
-        sys.path.insert(0, utils_dir)
-    from base_strategy import BaseStrategy
+from strategy_preamble import BaseStrategy
 
 class MCXSmartStrategy(BaseStrategy):
-    def __init__(self, symbol, api_key=None, host=None, **kwargs):
-        super().__init__(
-            name=f"MCX_Smart_{symbol}",
-            symbol=symbol,
-            api_key=api_key,
-            host=host,
-            exchange="MCX", # Default exchange
-            interval="15m", # Default interval
-            **kwargs
-        )
+    def setup(self):
+        """Initialize custom parameters and configure strategy."""
+        if self.symbol:
+            self.name = f"MCX_Smart_{self.symbol}"
+
+        # Ensure correct interval and exchange for MCX strategies
+        self.interval = getattr(self, "interval", "15m")
+        self.exchange = getattr(self, "exchange", "MCX")
 
         # Custom Parameters
-        self.params = {
-            "period_rsi": kwargs.get("period_rsi", 14),
-            "period_atr": kwargs.get("period_atr", 14),
-            "usd_inr_trend": kwargs.get("usd_inr_trend", "Neutral"),
-            "usd_inr_volatility": float(kwargs.get("usd_inr_volatility", 0.0)),
-            "seasonality_score": int(kwargs.get("seasonality_score", 50)),
-            "global_alignment_score": int(kwargs.get("global_alignment_score", 50)),
-        }
+        self.period_rsi = getattr(self, "period_rsi", 14)
+        self.period_atr = getattr(self, "period_atr", 14)
+        self.usd_inr_trend = getattr(self, "usd_inr_trend", "Neutral")
+        self.usd_inr_volatility = float(getattr(self, "usd_inr_volatility", 0.0))
+        self.seasonality_score = int(getattr(self, "seasonality_score", 50))
+        self.global_alignment_score = int(getattr(self, "global_alignment_score", 50))
 
-        self.last_candle_time = None
-        self.data = pd.DataFrame()
-
-        self.logger.info(f"Filters: Seasonality={self.params['seasonality_score']}, USD_Vol={self.params['usd_inr_volatility']}")
+        self.logger.info(f"Filters: Seasonality={self.seasonality_score}, USD_Vol={self.usd_inr_volatility}")
 
     @classmethod
     def add_arguments(cls, parser):
+        """Add custom CLI arguments for multi-factor checks."""
         parser.add_argument("--usd_inr_trend", type=str, default="Neutral", help="USD/INR Trend")
         parser.add_argument("--usd_inr_volatility", type=float, default=0.0, help="USD/INR Volatility %%")
         parser.add_argument("--seasonality_score", type=int, default=50, help="Seasonality Score (0-100)")
@@ -62,36 +43,25 @@ class MCXSmartStrategy(BaseStrategy):
     @classmethod
     def parse_arguments(cls, args):
         kwargs = super().parse_arguments(args)
-        # Pass custom args to kwargs
-        if hasattr(args, 'usd_inr_trend'): kwargs['usd_inr_trend'] = args.usd_inr_trend
-        if hasattr(args, 'usd_inr_volatility'): kwargs['usd_inr_volatility'] = args.usd_inr_volatility
-        if hasattr(args, 'seasonality_score'): kwargs['seasonality_score'] = args.seasonality_score
-        if hasattr(args, 'global_alignment_score'): kwargs['global_alignment_score'] = args.global_alignment_score
-        if hasattr(args, 'period_rsi'): kwargs['period_rsi'] = args.period_rsi
-
         # Support legacy --port arg by constructing host
         if hasattr(args, 'port') and args.port:
             kwargs['host'] = f"http://127.0.0.1:{args.port}"
-
         return kwargs
 
     def cycle(self):
         """Check entry and exit conditions"""
         # Fetch Data
-        df = self.fetch_history(days=5, interval="15m")
-        if df.empty or len(df) < 50:
-            self.logger.warning(f"Insufficient data for {self.symbol}.")
+        df = self.fetch_and_prepare_data(days=5, min_rows=50)
+        if df is None:
             return
 
         # Check if we have a new candle
         if not self.check_new_candle(df):
             return
 
-        self.data = df
-
         # Calculate Indicators locally
         df['sma_50'] = self.calculate_sma(df['close'], period=50)
-        df['rsi'] = self.calculate_rsi(df['close'], period=self.params.get("period_rsi", 14))
+        df['rsi'] = self.calculate_rsi(df['close'], period=self.period_rsi)
         df['bb_mid'], df['bb_upper'], df['bb_lower'] = self.calculate_bollinger_bands(df['close'], window=20, num_std=2)
 
         # ATR 14
@@ -105,8 +75,8 @@ class MCXSmartStrategy(BaseStrategy):
             has_position = self.pm.has_position()
 
         # Multi-Factor Checks
-        seasonality_ok = self.params["seasonality_score"] > 40
-        usd_vol_high = self.params["usd_inr_volatility"] > 1.0
+        seasonality_ok = self.seasonality_score > 40
+        usd_vol_high = self.usd_inr_volatility > 1.0
 
         # Position sizing adjustment for volatility
         base_qty = self.quantity
@@ -194,7 +164,7 @@ class MCXSmartStrategy(BaseStrategy):
         # We need indicators.
         df = df.copy()
         df['sma_50'] = self.calculate_sma(df['close'], period=50)
-        df['rsi'] = self.calculate_rsi(df['close'], period=self.params.get("period_rsi", 14))
+        df['rsi'] = self.calculate_rsi(df['close'], period=self.period_rsi)
         df['bb_mid'], df['bb_upper'], df['bb_lower'] = self.calculate_bollinger_bands(df['close'], window=20, num_std=2)
         df['atr'] = self.calculate_atr_series(df, period=14)
         df['atr_ma'] = self.calculate_sma(df['atr'], period=10)
