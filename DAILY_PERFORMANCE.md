@@ -396,7 +396,10 @@ Due to sandbox environment limitations preventing live market access, this audit
 
 ### Slippage Check
 - **Method**: Simulated execution of orders.
-- **Result**: Average Slippage: 1.09 pts.
+- **Result**: Average Slippage: 1.72 pts.
+  - NIFTY: ~1.11 pts
+  - BANKNIFTY: 2.28 pts
+  - RELIANCE: 2.99 pts
 
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` implementation in `utils/httpx_client.py`.
