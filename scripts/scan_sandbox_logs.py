@@ -35,6 +35,8 @@ def parse_text_log(filepath):
                 # Parse Executing line (simpler format from dummy log)
                 # [2026-02-14 10:00:00] INFO in nse_rsi_macd_strategy: Executing BUY 10 INFY @ 1500.00
                 exec_match = re.search(r'Executing (BUY|SELL) \d+ \w+ @ ([\d\.]+)', line)
+                signal_match = re.search(r'Signal (Buy|Sell) \w+ Price: ([\d\.]+)', line)
+                exit_match = re.search(r'Exiting at ([\d\.]+)', line)
 
                 if exec_match:
                     action = exec_match.group(1)
@@ -61,6 +63,39 @@ def parse_text_log(filepath):
                             current_trade['pnl'] = (price - current_trade['entry_price'])
                             trades.append(current_trade)
                             current_trade = {}
+
+                # Mock trade log parsing
+                elif signal_match:
+                    action = signal_match.group(1).upper()
+                    price = float(signal_match.group(2))
+                    if action == "BUY":
+                         current_trade = {
+                            'entry_time': dt,
+                            'entry_price': price,
+                            'direction': 'LONG',
+                            'status': 'OPEN'
+                        }
+                    elif action == "SELL":
+                        current_trade = {
+                            'entry_time': dt,
+                            'entry_price': price,
+                            'direction': 'SHORT',
+                            'status': 'OPEN'
+                        }
+
+                elif exit_match:
+                     if current_trade.get('status') == 'OPEN':
+                            exit_price = float(exit_match.group(1))
+                            current_trade['exit_time'] = dt
+                            current_trade['exit_price'] = exit_price
+                            current_trade['status'] = 'CLOSED'
+                            if current_trade['direction'] == 'LONG':
+                                current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+                            else:
+                                current_trade['pnl'] = (current_trade['entry_price'] - exit_price)
+                            trades.append(current_trade)
+                            current_trade = {}
+
 
                 # Legacy Logic (keep for backward compatibility if other logs use it)
                 elif "Entry signal detected" in line:
