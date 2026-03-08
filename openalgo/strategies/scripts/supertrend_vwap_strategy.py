@@ -8,8 +8,17 @@ VWAP mean reversion with volume profile analysis, Enhanced Sector RSI Filter, an
 import logging
 import pandas as pd
 
-# Simplified Import using strategy_preamble
-from strategy_preamble import BaseStrategy
+import sys
+import os
+try:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    strategies_dir = os.path.dirname(current_dir)
+    if strategies_dir not in sys.path:
+        sys.path.insert(0, strategies_dir)
+except Exception:
+    pass
+
+from utils.base_strategy import BaseStrategy
 
 class SuperTrendVWAPStrategy(BaseStrategy):
     def setup(self):
@@ -64,6 +73,12 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 
         # Dynamic Deviation based on VIX
         vix = self.get_vix()
+
+        # Circuit Breaker: Skip if VIX is exceptionally high indicating market crash
+        if vix and vix > 25:
+            self.logger.warning(f"CIRCUIT BREAKER: VIX ({vix}) > 25. Skipping entry to avoid systemic risk.")
+            return
+
         size_multiplier, dev_threshold = self.calculate_vix_volatility_multiplier(vix)
 
         # Indicators

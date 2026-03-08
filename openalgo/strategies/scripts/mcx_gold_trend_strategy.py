@@ -4,8 +4,17 @@ MCX Gold Trend Strategy
 MCX Commodity trading strategy with SMA (20/50), RSI, and ADX analysis
 Inherits from BaseStrategy for consistent infrastructure usage.
 """
-import strategy_preamble
-from base_strategy import BaseStrategy
+import sys
+import os
+try:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    strategies_dir = os.path.dirname(current_dir)
+    if strategies_dir not in sys.path:
+        sys.path.insert(0, strategies_dir)
+except Exception:
+    pass
+
+from utils.base_strategy import BaseStrategy
 
 class MCXGoldTrendStrategy(BaseStrategy):
     def setup(self):
