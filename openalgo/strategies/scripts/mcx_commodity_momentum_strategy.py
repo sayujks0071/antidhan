@@ -4,21 +4,9 @@ MCX Commodity Momentum Strategy
 Momentum strategy using ADX and RSI with proper API integration.
 Enhanced with Multi-Factor inputs (USD/INR, Seasonality).
 """
-import os
-import sys
 import logging
-
-# Add repo root to path to allow imports (if running as script)
-try:
-    from base_strategy import BaseStrategy
-except ImportError:
-    # Try setting path to find utils
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    strategies_dir = os.path.dirname(script_dir)
-    utils_dir = os.path.join(strategies_dir, 'utils')
-    if utils_dir not in sys.path:
-        sys.path.insert(0, utils_dir)
-    from base_strategy import BaseStrategy
+# Simplified Import using strategy_preamble
+from strategy_preamble import BaseStrategy
 
 class MCXMomentumStrategy(BaseStrategy):
     def __init__(self, **kwargs):

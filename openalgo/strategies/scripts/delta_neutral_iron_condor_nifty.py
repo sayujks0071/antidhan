@@ -3,40 +3,28 @@ import sys
 import os
 import argparse
 import logging
-from pathlib import Path
-
-# Add project root to path
-current_file = Path(__file__).resolve()
-project_root = current_file.parent.parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.append(str(project_root))
-
-from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open
-from openalgo.strategies.utils.option_analytics import calculate_greeks, calculate_max_pain
+from strategy_preamble import BaseStrategy
+from option_analytics import calculate_greeks, calculate_max_pain
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(project_root / "openalgo" / "strategies" / "logs" / "iron_condor.log")
-    ]
-)
 logger = logging.getLogger("DeltaNeutralIronCondor")
 
-class DeltaNeutralIronCondor:
-    def __init__(self, api_client, symbol="NIFTY", qty=50, max_vix=30, sentiment_score=None):
-        self.client = api_client
-        self.symbol = symbol
-        self.qty = qty
-        self.max_vix = max_vix
-        self.sentiment_score = sentiment_score
-        self.pm = PositionManager(f"{symbol}_IC")
+class DeltaNeutralIronCondor(BaseStrategy):
+    def __init__(self, **kwargs):
+        kwargs.setdefault("symbol", "NIFTY")
+        super().__init__(**kwargs)
+        self.qty = getattr(self, "qty", 50)
+        self.max_vix = getattr(self, "max_vix", 30)
+        self.sentiment_score = getattr(self, "sentiment_score", None)
+
+    @classmethod
+    def add_arguments(cls, parser):
+        parser.add_argument("--sentiment_score", type=float, default=None, help="External Sentiment Score (0.0-1.0)")
+        parser.add_argument("--max_vix", type=float, default=30.0, help="Max VIX threshold")
 
     def get_vix(self):
         q = self.client.get_quote("INDIA VIX", "NSE")
-        return float(q['ltp']) if q else 15.0
+        return float(q['ltp']) if q and 'ltp' in q else 15.0
 
     def select_strikes(self, spot, vix, chain_data):
         """
@@ -44,12 +32,12 @@ class DeltaNeutralIronCondor:
         """
         # Calculate Max Pain
         max_pain = calculate_max_pain(chain_data)
-        logger.info(f"Max Pain Strike: {max_pain}")
+        self.logger.info(f"Max Pain Strike: {max_pain}")
 
         # Use Max Pain as center if close to Spot (within 1%)
         center_price = spot
         if max_pain and abs(spot - max_pain) < (spot * 0.01):
-            logger.info("Using Max Pain as Center Price for Strike Selection")
+            self.logger.info("Using Max Pain as Center Price for Strike Selection")
             center_price = max_pain
 
         # Target Delta for Shorts
@@ -59,12 +47,12 @@ class DeltaNeutralIronCondor:
         wing_width = 200 # Default
         if vix >= 20:
             wing_width = 400
-            logger.info(f"High VIX ({vix}) -> Widening Wings to {wing_width}")
+            self.logger.info(f"High VIX ({vix}) -> Widening Wings to {wing_width}")
         elif vix < 12:
             wing_width = 100
-            logger.info(f"Low VIX ({vix}) -> Narrowing Wings to {wing_width}")
+            self.logger.info(f"Low VIX ({vix}) -> Narrowing Wings to {wing_width}")
         else:
-            logger.info(f"Medium VIX ({vix}) -> Default Wings {wing_width}")
+            self.logger.info(f"Medium VIX ({vix}) -> Default Wings {wing_width}")
 
         # Delta-Based Selection Logic
         ce_short = None
@@ -106,10 +94,10 @@ class DeltaNeutralIronCondor:
                     best_pe_diff = abs(pe_delta - target_delta)
                     pe_short = strike
 
-            logger.info(f"Delta Search Results: CE Short {ce_short} (Diff: {best_ce_diff:.4f}), PE Short {pe_short} (Diff: {best_pe_diff:.4f})")
+            self.logger.info(f"Delta Search Results: CE Short {ce_short} (Diff: {best_ce_diff:.4f}), PE Short {pe_short} (Diff: {best_pe_diff:.4f})")
 
         except Exception as e:
-            logger.error(f"Delta calculation failed: {e}")
+            self.logger.error(f"Delta calculation failed: {e}")
             ce_short = None
             pe_short = None
 
@@ -133,66 +121,62 @@ class DeltaNeutralIronCondor:
         }
 
     def execute(self):
-        logger.info(f"Starting execution for {self.symbol}")
+        self.logger.info(f"Starting execution for {self.symbol}")
+
+        if not self.client:
+            self.logger.error("No API client available. Cannot execute strategy.")
+            return
 
         vix = self.get_vix()
-        logger.info(f"Current VIX: {vix}")
+        self.logger.info(f"Current VIX: {vix}")
 
         # VIX Filters
         if vix < 12:
-            logger.warning(f"VIX {vix} < 12. Too low for Iron Condor (Low Premium/High Gamma Risk). Skipping.")
+            self.logger.warning(f"VIX {vix} < 12. Too low for Iron Condor (Low Premium/High Gamma Risk). Skipping.")
             return
 
         if vix > self.max_vix:
-            logger.warning(f"VIX {vix} > {self.max_vix}. Reducing Quantity by 50%.")
+            self.logger.warning(f"VIX {vix} > {self.max_vix}. Reducing Quantity by 50%.")
             self.qty = int(self.qty * 0.5)
 
         # Sentiment Filter
         if self.sentiment_score is not None:
-            logger.info(f"Checking Sentiment Score: {self.sentiment_score}")
+            self.logger.info(f"Checking Sentiment Score: {self.sentiment_score}")
             # Score 0 (Negative) to 1 (Positive), 0.5 Neutral
             # Iron Condor is Neutral. Avoid if sentiment is extreme.
             dist_from_neutral = abs(self.sentiment_score - 0.5)
             if dist_from_neutral > 0.3: # < 0.2 or > 0.8
-                logger.warning(f"Sentiment Score {self.sentiment_score} is strongly directional. Iron Condor risk is high. Skipping.")
+                self.logger.warning(f"Sentiment Score {self.sentiment_score} is strongly directional. Iron Condor risk is high. Skipping.")
                 return
 
-        quote = self.client.get_quote(f"{self.symbol} 50", "NSE")
-        spot = float(quote['ltp']) if quote else 0
+        quote = self.client.get_quote(self.symbol, "NSE")
+        spot = float(quote['ltp']) if quote and 'ltp' in quote else 0
         if spot == 0:
-            logger.error("Could not fetch spot price.")
+            self.logger.error("Could not fetch spot price.")
             return
 
-        logger.info(f"Spot: {spot}")
+        self.logger.info(f"Spot: {spot}")
 
         # Fetch Chain
-        chain = self.client.get_option_chain(self.symbol)
+        chain_response = self.client.option_chain(self.symbol)
+        chain = chain_response.get("chain", []) if isinstance(chain_response, dict) else []
         if not chain:
-            logger.error("Could not fetch option chain.")
+            self.logger.error("Could not fetch option chain.")
             return
 
         strikes = self.select_strikes(spot, vix, chain)
-        logger.info(f"Selected Strikes: {strikes}")
+        self.logger.info(f"Selected Strikes: {strikes}")
 
         # Place Orders (Mock)
-        logger.info(f"Placing orders for {self.qty} qty...")
+        self.logger.info(f"Placing orders for {self.qty} qty...")
 
         # In real scenario:
         # self.client.placesmartorder(...)
 
-        logger.info("Strategy execution completed (Simulation).")
+        self.logger.info("Strategy execution completed (Simulation).")
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--symbol", default="NIFTY", help="Index Symbol")
-    parser.add_argument("--qty", type=int, default=50, help="Quantity")
-    parser.add_argument("--port", type=int, default=5002, help="Broker API Port")
-    parser.add_argument("--sentiment_score", type=float, default=None, help="External Sentiment Score (0.0-1.0)")
-    args = parser.parse_args()
-
-    client = APIClient(api_key=os.getenv("OPENALGO_API_KEY"), host=f"http://127.0.0.1:{args.port}")
-    strategy = DeltaNeutralIronCondor(client, args.symbol, args.qty, sentiment_score=args.sentiment_score)
-    strategy.execute()
+    def run(self):
+        self.execute()
 
 if __name__ == "__main__":
-    main()
+    DeltaNeutralIronCondor.cli()
