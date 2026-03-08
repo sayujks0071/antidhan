@@ -18,6 +18,11 @@ sys.modules['broker.dhan.mapping.transform_data'] = MagicMock()
 sys.modules['httpx'] = MagicMock()
 mock_httpx_client_module = MagicMock()
 sys.modules['utils.httpx_client'] = mock_httpx_client_module
+def dummy_retry(*args, **kwargs):
+    def decorator(func):
+        return func
+    return decorator
+mock_httpx_client_module.retry_with_backoff = dummy_retry
 
 # Now import the module under test
 # We need to make sure we import it freshly if it was already imported (it shouldn't be in this process)

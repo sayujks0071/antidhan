@@ -14,7 +14,7 @@ from broker.dhan.mapping.transform_data import (
 )
 from database.auth_db import get_auth_token, get_user_id, verify_api_key
 from database.token_db import get_br_symbol, get_oa_symbol, get_symbol, get_token
-from utils.httpx_client import get_httpx_client, get, post, put, delete, request
+from utils.httpx_client import get_httpx_client, get, post, put, delete, request, retry_with_backoff
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -121,6 +121,7 @@ def get_open_position(tradingsymbol, exchange, product, auth):
     return net_qty
 
 
+@retry_with_backoff(max_retries=3, backoff_factor=0.5)
 def place_order_api(data, auth):
     AUTH_TOKEN = auth
     BROKER_API_KEY = os.getenv("BROKER_API_KEY")
