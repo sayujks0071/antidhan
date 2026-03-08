@@ -404,17 +404,21 @@ class PositionManager:
 
     def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price, client=None, exchange="NSE"):
         """
-        Calculate position size based on ATR (Legacy/Intraday).
-        If client is provided, attempts to fetch Monthly ATR for robustness.
-        Delegates to calculate_risk_adjusted_quantity.
+        Calculate position size prioritizing Monthly ATR.
+        Fetches 60 days of daily history to compute a 14-period Daily ATR.
+        Falls back to intraday ATR only if daily data is unavailable.
         """
         volatility = atr
         if client:
             monthly_atr = self.get_monthly_atr(client, exchange)
-            if monthly_atr and monthly_atr > 0:
+            if monthly_atr is not None and not pd.isna(monthly_atr) and monthly_atr > 0:
                 volatility = monthly_atr
                 logger.info(
                     f"Using Monthly ATR ({monthly_atr:.2f}) instead of Intraday ATR ({atr:.2f})"
+                )
+            else:
+                logger.warning(
+                    f"Monthly ATR unavailable or invalid. Falling back to Intraday ATR ({atr:.2f})"
                 )
 
         qty = self.calculate_risk_adjusted_quantity(
@@ -686,17 +690,31 @@ class APIClient:
         Returns:
             dict: Quote data (single dict if str input, dict of dicts if list input) or None
         """
-        # Check Cache for single symbol request
         now = time.time()
-        if not isinstance(symbol, list):
+
+        # Determine what to fetch vs what is cached
+        symbols_to_fetch = []
+        cached_results = {}
+
+        if isinstance(symbol, list):
+            for s in symbol:
+                cache_key = f"{s}_{exchange}"
+                if cache_key in self.quote_cache and now - self.quote_cache[cache_key][0] < self.quote_ttl:
+                    cached_results[s] = self.quote_cache[cache_key][1]
+                else:
+                    symbols_to_fetch.append(s)
+        else:
             cache_key = f"{symbol}_{exchange}"
-            if cache_key in self.quote_cache:
-                ts, data = self.quote_cache[cache_key]
-                if now - ts < self.quote_ttl:
-                    return data
+            if cache_key in self.quote_cache and now - self.quote_cache[cache_key][0] < self.quote_ttl:
+                return self.quote_cache[cache_key][1]
+            symbols_to_fetch = symbol
+
+        # If all requested symbols were found in cache, return immediately
+        if isinstance(symbol, list) and not symbols_to_fetch:
+            return cached_results
 
         url = f"{self.host}/api/v1/quotes"
-        payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
+        payload = {"symbol": symbols_to_fetch, "exchange": exchange, "apikey": self.api_key}
 
         try:
             response = httpx_client.post(
@@ -713,7 +731,7 @@ class APIClient:
                     logger.error(
                         f"Quote API returned empty response for {symbol}"
                     )
-                    return None
+                    return cached_results if isinstance(symbol, list) else None
 
                 try:
                     data = response.json()
@@ -722,25 +740,32 @@ class APIClient:
                     logger.error(
                         f"Quote API returned non-JSON for {symbol}: {error_text}"
                     )
-                    return None
+                    return cached_results if isinstance(symbol, list) else None
 
                 if data.get("status") == "success" and "data" in data:
-                    # If input was a list, return the data directly (it's a dict of symbols)
-                    if isinstance(symbol, list):
-                        return data["data"]
+                    api_data = data["data"]
 
-                    quote_data = data["data"]
-                    # Ensure ltp is available
-                    if "ltp" in quote_data:
-                        # Update Cache
-                        if not isinstance(symbol, list):
-                            self.quote_cache[cache_key] = (now, quote_data)
-                        return quote_data
+                    if isinstance(symbol, list):
+                        # API returns a dictionary of symbols when batch requested
+                        if isinstance(api_data, dict):
+                            for s, s_data in api_data.items():
+                                if "ltp" in s_data:
+                                    self.quote_cache[f"{s}_{exchange}"] = (now, s_data)
+                                    cached_results[s] = s_data
+                        # Combine cache and new data
+                        return cached_results
                     else:
-                        logger.warning(
-                            f"Quote for {symbol} missing 'ltp' field. Available fields: {list(quote_data.keys())}"
-                        )
-                        return None
+                        quote_data = api_data
+                        # Ensure ltp is available
+                        if "ltp" in quote_data:
+                            # Update Cache
+                            self.quote_cache[f"{symbol}_{exchange}"] = (now, quote_data)
+                            return quote_data
+                        else:
+                            logger.warning(
+                                f"Quote for {symbol} missing 'ltp' field. Available fields: {list(quote_data.keys())}"
+                            )
+                            return None
                 else:
                     error_msg = data.get("message", "Unknown error")
                     logger.error(
@@ -754,7 +779,7 @@ class APIClient:
         except Exception as e:
             logger.error(f"Quote API Error for {symbol}: {e}")
 
-        return None  # Failed to fetch quote
+        return cached_results if isinstance(symbol, list) else None
 
     def get_instruments(self, exchange="NSE", max_retries=3):
         """Fetch instruments list"""

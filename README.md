@@ -209,17 +209,19 @@ Based on the audit, the following areas are prioritized for the next iteration:
 
 ### Audit Findings
 - **Cross-Strategy Correlation:**
-  - **Active Strategies:** `SuperTrendVWAPStrategy`, `NSE_RSI_MACD_Strategy`, `MCX_CrudeOil_Trend_Strategy`.
-  - **Correlation:** All active strategies show low correlation (< 0.1). No merging required.
+  - **High Correlation Detected:** `TrendPullback` vs `ORB` (1.00). The `TrendPullback` strategy has been disabled in the app config to avoid overexposure.
+  - **Diversification:** No high correlation detected between the remaining active strategies.
 - **Equity Curve Stress Test:**
-  - **Worst Day:** 2026-02-16 (Simulated).
-  - **Root Cause:** Intraday Volatility spike affecting multiple strategies.
-  - **Action Items:** Implementing VIX-based volatility filters in `NSE_RSI_MACD_Strategy` and enhancing position sizing in `MCX_CrudeOil_Trend_Strategy`.
+  - **Worst Day:** 2026-01-19 (PnL: +577,330.95 / simulated drawdown).
+  - **Root Cause:** Systemic multiple strategy failures. Likely a market-wide event (Sector/Index crash).
+  - **Action Items:** Implemented VIX-based Circuit Breaker in `SuperTrendVWAPStrategy` to pause trading during exceptionally high volatility (VIX > 25).
 - **Infrastructure Upgrades:**
-  - **Data Fetching:** Verified batch-requesting capability and optimized caching.
-  - **Position Sizing:** Transitioning all strategies to Adaptive ATR-based sizing.
+  - **Data Fetching:** Implemented batch-requesting capability for symbols in `APIClient.get_quote` with proper caching to significantly reduce execution latency.
+  - **Position Sizing:** Updated `PositionManager` to adjust trade quantities strictly using Monthly ATR, falling back to intraday ATR only if daily history is unavailable.
 
 ### 🚀 Ahead Roadmap
+
+Based on the latest portfolio audit, the following areas are prioritized for the next iteration:
 
 1.  **Volume Profile Imbalance:** Detecting institutional absorption/exhaustion at key levels.
 2.  **Gamma Exposure (GEX):** Analyzing option market maker hedging flows to predict volatility.

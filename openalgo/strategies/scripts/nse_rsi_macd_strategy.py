@@ -6,8 +6,17 @@ Entry: Buy when MACD Line crosses above Signal Line AND RSI > 50 AND ADX > 25.
 Exit: Sell when MACD Line crosses below Signal Line OR RSI > 70.
 Inherits from BaseStrategy for code reduction.
 """
-import strategy_preamble
-from base_strategy import BaseStrategy
+import sys
+import os
+try:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    strategies_dir = os.path.dirname(current_dir)
+    if strategies_dir not in sys.path:
+        sys.path.insert(0, strategies_dir)
+except Exception:
+    pass
+
+from utils.base_strategy import BaseStrategy
 
 class NSERsiMacdStrategy(BaseStrategy):
     def setup(self):

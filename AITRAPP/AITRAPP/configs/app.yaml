@@ -60,7 +60,7 @@ strategies:
       max_positions: 3
       
   - name: TrendPullback
-    enabled: true
+    enabled: false
     priority: 1
     params:
       ema_fast: 34
