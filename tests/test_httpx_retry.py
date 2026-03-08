@@ -55,9 +55,9 @@ class TestHttpxRetry(unittest.TestCase):
         response_500 = httpx.Response(500, request=httpx.Request("GET", "http://test.com"))
         mock_request.return_value = response_500
 
-        response = request("GET", "http://test.com", max_retries=2, backoff_factor=0.01)
+        with self.assertRaises(httpx.HTTPStatusError):
+            request("GET", "http://test.com", max_retries=2, backoff_factor=0.01)
 
-        self.assertEqual(response.status_code, 500)
         self.assertEqual(mock_request.call_count, 3) # Initial + 2 retries
         print("✅ Failure after retries: Passed")
 
