@@ -12,7 +12,7 @@ from services.place_smart_order_service import emit_analyzer_error, place_smart_
 from utils.logging import get_logger
 
 SMART_ORDER_RATE_LIMIT = os.getenv("SMART_ORDER_RATE_LIMIT", "2 per second")
-SMART_ORDER_DELAY = os.getenv("SMART_ORDER_DELAY", "0.5")
+SMART_ORDER_DELAY = os.getenv("SMART_ORDER_DELAY", "0")
 api = Namespace("place_smart_order", description="Place Smart Order API")
 
 # Initialize logger
