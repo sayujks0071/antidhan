@@ -62,17 +62,22 @@ def parse_text_log(filepath):
                             trades.append(current_trade)
                             current_trade = {}
 
-                # Legacy Logic (keep for backward compatibility if other logs use it)
-                elif "Entry signal detected" in line:
+                # Match legacy "Entry signal detected" or new "Signal Buy" / "Signal Sell"
+                elif "Entry signal detected" in line or "Signal Buy" in line or "Signal Sell" in line:
                     price_match = re.search(r'Price: ([\d\.]+)', line)
                     if price_match:
+                         # Assume LONG for simplicity here, logic can be expanded
+                         direction = "LONG"
+                         if "Sell" in line:
+                             direction = "SHORT"
+
                          current_trade = {
                             'entry_time': dt,
                             'entry_price': float(price_match.group(1)),
-                            'direction': 'LONG',
+                            'direction': direction,
                             'status': 'OPEN'
                         }
-                elif "Exiting position" in line:
+                elif "Exiting position" in line or "Exiting at" in line:
                      price_match = re.search(r'at ([\d\.]+)', line)
                      if not price_match:
                          price_match = re.search(r'Price: ([\d\.]+)', line)
@@ -82,7 +87,12 @@ def parse_text_log(filepath):
                             current_trade['exit_time'] = dt
                             current_trade['exit_price'] = exit_price
                             current_trade['status'] = 'CLOSED'
-                            current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+
+                            if current_trade['direction'] == 'LONG':
+                                current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+                            else:
+                                current_trade['pnl'] = (current_trade['entry_price'] - exit_price)
+
                             trades.append(current_trade)
                             current_trade = {}
 
@@ -120,7 +130,10 @@ def parse_json_log(filepath):
 
                     # Ensure PnL
                     if 'pnl' not in item and 'entry_price' in item and 'exit_price' in item:
-                        item['pnl'] = float(item['exit_price']) - float(item['entry_price'])
+                        if item.get('direction', 'LONG') == 'LONG':
+                            item['pnl'] = float(item['exit_price']) - float(item['entry_price'])
+                        else:
+                            item['pnl'] = float(item['entry_price']) - float(item['exit_price'])
 
                     # Ensure datetime is present for filtering
                     if 'entry_time' in item and isinstance(item['entry_time'], datetime):
@@ -241,6 +254,15 @@ def main():
         for rank, (strategy, m) in enumerate(ranked_strategies, 1):
             pf_str = f"{m['Profit Factor']:.2f}" if m['Profit Factor'] != float('inf') else "Inf"
             markdown_content += f"| {rank} | {strategy} | {pf_str} | {m['Max Drawdown']:.2f} | {m['Win Rate']:.1f}% | {m['Total Trades']} |\n"
+
+        markdown_content += "\n## Today's Trades\n\n"
+        markdown_content += "| Strategy | Entry Time | Entry Price | Exit Time | Exit Price | PnL |\n"
+        markdown_content += "|----------|------------|-------------|-----------|------------|-----|\n"
+        for t in sorted(today_trades, key=lambda x: x['entry_time']):
+            exit_time_str = t['exit_time'].strftime("%Y-%m-%d %H:%M:%S") if 'exit_time' in t else "N/A"
+            exit_price_str = f"{t['exit_price']:.2f}" if 'exit_price' in t else "N/A"
+            pnl_str = f"{t['pnl']:.2f}" if 'pnl' in t else "N/A"
+            markdown_content += f"| {t['strategy']} | {t['entry_time'].strftime('%Y-%m-%d %H:%M:%S')} | {t['entry_price']:.2f} | {exit_time_str} | {exit_price_str} | {pnl_str} |\n"
 
     markdown_content += "\n## Analysis & Improvements\n"
 
