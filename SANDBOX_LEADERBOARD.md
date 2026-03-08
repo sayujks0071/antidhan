@@ -1,12 +1,44 @@
-# SANDBOX LEADERBOARD (2026-02-17)
+# SANDBOX LEADERBOARD (2026-03-08)
 
 | Rank | Strategy | Profit Factor | Max Drawdown | Win Rate | Total Trades |
 |------|----------|---------------|--------------|----------|--------------|
-| 1 | NSE_RSI_MACD_Strategy | 0.00 | 65.00 | 0.0% | 3 |
+| 1 | AdvancedMLMomentum | 2.54 | 87.00 | 60.0% | 5 |
+| 2 | SuperTrendVWAP | 1.34 | 225.00 | 60.0% | 10 |
+| 3 | GapFadeStrategy | 0.35 | 939.00 | 30.0% | 10 |
+
+## Today's Trades
+
+| Strategy | Entry Time | Entry Price | Exit Time | Exit Price | PnL |
+|----------|------------|-------------|-----------|------------|-----|
+| AdvancedMLMomentum | 2026-03-08 09:29:00 | 24263.00 | 2026-03-08 10:19:00 | 24176.00 | -87.00 |
+| GapFadeStrategy | 2026-03-08 09:36:00 | 24075.00 | 2026-03-08 09:57:00 | 24156.00 | 81.00 |
+| SuperTrendVWAP | 2026-03-08 09:38:00 | 24121.00 | 2026-03-08 10:24:00 | 24000.00 | -121.00 |
+| GapFadeStrategy | 2026-03-08 10:15:00 | 24395.00 | 2026-03-08 10:50:00 | 24490.00 | 95.00 |
+| SuperTrendVWAP | 2026-03-08 10:22:00 | 24111.00 | 2026-03-08 11:12:00 | 24007.00 | -104.00 |
+| AdvancedMLMomentum | 2026-03-08 10:36:00 | 24280.00 | 2026-03-08 11:20:00 | 24464.00 | 184.00 |
+| AdvancedMLMomentum | 2026-03-08 11:21:00 | 24395.00 | 2026-03-08 12:16:00 | 24503.00 | 108.00 |
+| GapFadeStrategy | 2026-03-08 11:41:00 | 24416.00 | 2026-03-08 12:33:00 | 24566.00 | 150.00 |
+| SuperTrendVWAP | 2026-03-08 11:45:00 | 24008.00 | 2026-03-08 12:05:00 | 24154.00 | 146.00 |
+| GapFadeStrategy | 2026-03-08 12:16:00 | 24181.00 | 2026-03-08 12:31:00 | 24080.00 | -101.00 |
+| AdvancedMLMomentum | 2026-03-08 12:35:00 | 24000.00 | 2026-03-08 12:58:00 | 23926.00 | -74.00 |
+| SuperTrendVWAP | 2026-03-08 12:36:00 | 24320.00 | 2026-03-08 13:25:00 | 24434.00 | 114.00 |
+| GapFadeStrategy | 2026-03-08 13:34:00 | 24106.00 | 2026-03-08 14:16:00 | 24008.00 | -98.00 |
+| AdvancedMLMomentum | 2026-03-08 13:39:00 | 24087.00 | 2026-03-08 13:44:00 | 24204.00 | 117.00 |
+| SuperTrendVWAP | 2026-03-08 13:40:00 | 24260.00 | 2026-03-08 14:25:00 | 24345.00 | 85.00 |
+| SuperTrendVWAP | 2026-03-08 14:27:00 | 24192.00 | 2026-03-08 15:01:00 | 24004.00 | -188.00 |
+| GapFadeStrategy | 2026-03-08 14:27:00 | 24013.00 | 2026-03-08 14:47:00 | 23816.00 | -197.00 |
+| GapFadeStrategy | 2026-03-08 15:31:00 | 24284.00 | 2026-03-08 16:16:00 | 24091.00 | -193.00 |
+| SuperTrendVWAP | 2026-03-08 15:40:00 | 24330.00 | 2026-03-08 15:53:00 | 24471.00 | 141.00 |
+| SuperTrendVWAP | 2026-03-08 16:20:00 | 24335.00 | 2026-03-08 16:30:00 | 24416.00 | 81.00 |
+| GapFadeStrategy | 2026-03-08 16:24:00 | 24296.00 | 2026-03-08 17:01:00 | 24226.00 | -70.00 |
+| SuperTrendVWAP | 2026-03-08 17:31:00 | 24259.00 | 2026-03-08 17:56:00 | 24207.00 | -52.00 |
+| GapFadeStrategy | 2026-03-08 17:33:00 | 24162.00 | 2026-03-08 18:06:00 | 24051.00 | -111.00 |
+| SuperTrendVWAP | 2026-03-08 18:16:00 | 24053.00 | 2026-03-08 18:30:00 | 24107.00 | 54.00 |
+| GapFadeStrategy | 2026-03-08 18:22:00 | 24397.00 | 2026-03-08 19:04:00 | 24228.00 | -169.00 |
 
 ## Analysis & Improvements
 
-### NSE_RSI_MACD_Strategy
-- **Win Rate**: 0.0% (< 40%)
-- **Analysis**: Basic MACD crossover in choppy markets generates false signals. RSI alone is insufficient filter.
-- **Improvement**: Add ADX Filter (ADX > 25) to ensure trend strength and inherit from BaseStrategy for robust execution.
+### GapFadeStrategy
+- **Win Rate**: 30.0% (< 40%)
+- **Analysis**: Fading gaps without trend confirmation often leads to losses in strong momentum markets ('Gap and Go').
+- **Improvement**: Add a 'Reversal Candle' check (e.g., Close < Open for Gap Up) and tighter Stop Loss based on the first candle's High/Low.
