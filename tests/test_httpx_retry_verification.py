@@ -152,13 +152,14 @@ class TestHttpxRetryVerification(unittest.TestCase):
         mock_get_client.return_value = mock_client_instance
 
         # Setup side effect: Always 500
-        response_500 = httpx.Response(500)
+        # Give the response a mock request to satisfy httpx's internal checks for raise_for_status()
+        mock_req = httpx.Request("GET", "http://test.com/api")
+        response_500 = httpx.Response(500, request=mock_req)
         mock_client_instance.request.return_value = response_500
 
-        response = request("GET", "http://test.com/api", max_retries=2)
+        with self.assertRaises(httpx.HTTPStatusError):
+            request("GET", "http://test.com/api", max_retries=2)
 
-        # Should return the last response (500)
-        self.assertEqual(response.status_code, 500)
         # Initial call + 2 retries = 3 calls
         self.assertEqual(mock_client_instance.request.call_count, 3)
         self.assertEqual(mock_sleep.call_count, 2)

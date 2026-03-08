@@ -146,6 +146,9 @@ def request(
                     )
                     time.sleep(wait_time)
                     continue
+                else:
+                    logger.error(f"Request to {url} failed after {max_retries} retries with HTTP {response.status_code}")
+                    response.raise_for_status()
 
             # If we get here, either success or non-retriable error
             # Store broker API time in Flask's g object for latency tracking
