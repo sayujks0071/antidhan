@@ -405,17 +405,37 @@ class PositionManager:
     def calculate_adaptive_quantity(self, capital, risk_per_trade_pct, atr, price, client=None, exchange="NSE"):
         """
         Calculate position size based on ATR (Legacy/Intraday).
-        If client is provided, attempts to fetch Monthly ATR for robustness.
+        Strictly prioritizes Monthly ATR if client is available.
+        It fetches 60 days of daily history to compute a 14-period Daily ATR,
+        falling back to intraday ATR only if daily data is unavailable.
         Delegates to calculate_risk_adjusted_quantity.
         """
         volatility = atr
         if client:
-            monthly_atr = self.get_monthly_atr(client, exchange)
-            if monthly_atr and monthly_atr > 0:
-                volatility = monthly_atr
-                logger.info(
-                    f"Using Monthly ATR ({monthly_atr:.2f}) instead of Intraday ATR ({atr:.2f})"
+            try:
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=60)
+
+                df = client.history(
+                    symbol=self.symbol,
+                    exchange=exchange,
+                    interval="D",
+                    start_date=start_date.strftime("%Y-%m-%d"),
+                    end_date=end_date.strftime("%Y-%m-%d"),
                 )
+
+                if not df.empty and len(df) > 15:
+                    atrs = calculate_atr(df, period=14)
+                    monthly_atr = atrs.iloc[-1]
+                    if monthly_atr > 0:
+                        volatility = monthly_atr
+                        logger.info(
+                            f"Using Monthly ATR ({monthly_atr:.2f}) instead of Intraday ATR ({atr:.2f})"
+                        )
+                else:
+                    logger.warning(f"Insufficient daily data to calculate Monthly ATR for {self.symbol}. Falling back to Intraday ATR ({atr:.2f}).")
+            except Exception as e:
+                logger.warning(f"Failed to fetch or calculate Monthly ATR for {self.symbol}: {e}. Falling back to Intraday ATR ({atr:.2f}).")
 
         qty = self.calculate_risk_adjusted_quantity(
             capital, risk_per_trade_pct, volatility, price
@@ -686,17 +706,36 @@ class APIClient:
         Returns:
             dict: Quote data (single dict if str input, dict of dicts if list input) or None
         """
-        # Check Cache for single symbol request
         now = time.time()
+
+        # Check Cache for single or batch request
         if not isinstance(symbol, list):
             cache_key = f"{symbol}_{exchange}"
             if cache_key in self.quote_cache:
                 ts, data = self.quote_cache[cache_key]
                 if now - ts < self.quote_ttl:
                     return data
+            symbols_to_fetch = symbol
+        else:
+            symbols_to_fetch = []
+            result_data = {}
+            for sym in symbol:
+                cache_key = f"{sym}_{exchange}"
+                if cache_key in self.quote_cache:
+                    ts, data = self.quote_cache[cache_key]
+                    if now - ts < self.quote_ttl:
+                        result_data[sym] = data
+                    else:
+                        symbols_to_fetch.append(sym)
+                else:
+                    symbols_to_fetch.append(sym)
+
+            # If all symbols were in cache, return immediately
+            if not symbols_to_fetch:
+                return result_data
 
         url = f"{self.host}/api/v1/quotes"
-        payload = {"symbol": symbol, "exchange": exchange, "apikey": self.api_key}
+        payload = {"symbol": symbols_to_fetch, "exchange": exchange, "apikey": self.api_key}
 
         try:
             response = httpx_client.post(
@@ -713,7 +752,7 @@ class APIClient:
                     logger.error(
                         f"Quote API returned empty response for {symbol}"
                     )
-                    return None
+                    return result_data if isinstance(symbol, list) else None
 
                 try:
                     data = response.json()
@@ -722,25 +761,26 @@ class APIClient:
                     logger.error(
                         f"Quote API returned non-JSON for {symbol}: {error_text}"
                     )
-                    return None
+                    return result_data if isinstance(symbol, list) else None
 
                 if data.get("status") == "success" and "data" in data:
-                    # If input was a list, return the data directly (it's a dict of symbols)
                     if isinstance(symbol, list):
-                        return data["data"]
-
-                    quote_data = data["data"]
-                    # Ensure ltp is available
-                    if "ltp" in quote_data:
-                        # Update Cache
-                        if not isinstance(symbol, list):
-                            self.quote_cache[cache_key] = (now, quote_data)
-                        return quote_data
+                        fetched_data = data["data"]
+                        for sym, q_data in fetched_data.items():
+                            if "ltp" in q_data:
+                                self.quote_cache[f"{sym}_{exchange}"] = (now, q_data)
+                                result_data[sym] = q_data
+                        return result_data
                     else:
-                        logger.warning(
-                            f"Quote for {symbol} missing 'ltp' field. Available fields: {list(quote_data.keys())}"
-                        )
-                        return None
+                        quote_data = data["data"]
+                        if "ltp" in quote_data:
+                            self.quote_cache[f"{symbol}_{exchange}"] = (now, quote_data)
+                            return quote_data
+                        else:
+                            logger.warning(
+                                f"Quote for {symbol} missing 'ltp' field. Available fields: {list(quote_data.keys())}"
+                            )
+                            return None
                 else:
                     error_msg = data.get("message", "Unknown error")
                     logger.error(
@@ -754,7 +794,7 @@ class APIClient:
         except Exception as e:
             logger.error(f"Quote API Error for {symbol}: {e}")
 
-        return None  # Failed to fetch quote
+        return result_data if isinstance(symbol, list) else None
 
     def get_instruments(self, exchange="NSE", max_retries=3):
         """Fetch instruments list"""

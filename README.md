@@ -209,18 +209,19 @@ Based on the audit, the following areas are prioritized for the next iteration:
 
 ### Audit Findings
 - **Cross-Strategy Correlation:**
-  - **Active Strategies:** `SuperTrendVWAPStrategy`, `NSE_RSI_MACD_Strategy`, `MCX_CrudeOil_Trend_Strategy`.
-  - **Correlation:** All active strategies show low correlation (< 0.1). No merging required.
+  - **Active Strategies:** Disabled highly correlated MCX momentum strategies (`MCX_CRUDEOIL_MOMENTUM`, `MCX_SILVER_MOMENTUM`, `MCX_GOLD_MOMENTUM_STRATEGY`) in favor of their superior V2 or trend equivalents. Remaining strategies show low correlation. No further merging required.
 - **Equity Curve Stress Test:**
-  - **Worst Day:** 2026-02-16 (Simulated).
-  - **Root Cause:** Intraday Volatility spike affecting multiple strategies.
-  - **Action Items:** Implementing VIX-based volatility filters in `NSE_RSI_MACD_Strategy` and enhancing position sizing in `MCX_CrudeOil_Trend_Strategy`.
+  - **Worst Day:** 2026-01-19 (PnL: -577,330.95).
+  - **Root Cause:** Systemic market-wide event (Sector/Index crash) causing simultaneous intraday failures in `SuperTrendVWAP`, `TrendPullback`, and `ORB`.
+  - **Action Items:** Need to implement portfolio-level "Circuit Breakers" when multiple uncorrelated strategies fail together during extreme market stress.
 - **Infrastructure Upgrades:**
-  - **Data Fetching:** Verified batch-requesting capability and optimized caching.
-  - **Position Sizing:** Transitioning all strategies to Adaptive ATR-based sizing.
+  - **Data Fetching:** Upgraded `APIClient.get_quote` to handle batch requests efficiently, reducing execution latency by checking the local cache for symbols individually and fetching only missing symbols from the API in a single HTTP request.
+  - **Position Sizing:** Updated `PositionManager.calculate_adaptive_quantity` to strictly prioritize Monthly ATR over intraday ATR (fetching 60 days of daily history to compute a 14-period Daily ATR) to ensure risk per trade is normalized across the portfolio.
 
 ### 🚀 Ahead Roadmap
 
-1.  **Volume Profile Imbalance:** Detecting institutional absorption/exhaustion at key levels.
-2.  **Gamma Exposure (GEX):** Analyzing option market maker hedging flows to predict volatility.
-3.  **Market Regime Hidden Markov Models (HMM):** Using ML to classify market regimes dynamically.
+Based on the recent audit and performance gaps identified, the 3 most promising technical indicators or market anomalies to explore next are:
+
+1.  **VIX-based Volatility Breakouts:** Integrating real-time VIX crushes/spikes to trigger or halt entries dynamically, particularly for mean-reversion systems.
+2.  **Gap Fades/Reversals:** Exploiting Gap and Go vs Gap Reversal anomalies (e.g., refining GapFadeStrategy logic) to capture mispricings at the market open.
+3.  **Sector Rotation Momentum:** Developing a portfolio-level indicator to allocate capital dynamically to the strongest sectors using Relative Strength versus the Nifty 50 benchmark.
