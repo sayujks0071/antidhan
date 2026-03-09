@@ -166,7 +166,7 @@ def request(
 
             return response
 
-        except httpx.RequestError as e:
+        except (httpx.RequestError, httpx.TimeoutException) as e:
             last_exception = e
             if attempt < max_retries:
                 wait_time = backoff_factor * (2**attempt)
