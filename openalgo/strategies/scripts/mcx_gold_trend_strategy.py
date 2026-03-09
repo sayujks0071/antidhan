@@ -4,22 +4,30 @@ MCX Gold Trend Strategy
 MCX Commodity trading strategy with SMA (20/50), RSI, and ADX analysis
 Inherits from BaseStrategy for consistent infrastructure usage.
 """
-import strategy_preamble
+import os
+import sys
+
+# Add repo root to path
+script_dir = os.path.dirname(os.path.abspath(__file__))
+strategies_dir = os.path.dirname(script_dir)
+utils_dir = os.path.join(strategies_dir, "utils")
+sys.path.insert(0, utils_dir)
+
 from base_strategy import BaseStrategy
 
 class MCXGoldTrendStrategy(BaseStrategy):
     def setup(self):
         # Default Parameters
-        self.period_rsi = getattr(self, "period_rsi", 14)
-        self.period_atr = getattr(self, "period_atr", 14)
-        self.period_sma_fast = getattr(self, "period_sma_fast", 20)
-        self.period_sma_slow = getattr(self, "period_sma_slow", 50)
-        self.period_adx = getattr(self, "period_adx", 14)
+        self.period_rsi = int(getattr(self, "period_rsi", 14))
+        self.period_atr = int(getattr(self, "period_atr", 14))
+        self.period_sma_fast = int(getattr(self, "period_sma_fast", 20))
+        self.period_sma_slow = int(getattr(self, "period_sma_slow", 50))
+        self.period_adx = int(getattr(self, "period_adx", 14))
 
         # Multi-Factor Parameters
-        self.seasonality_score = getattr(self, "seasonality_score", 50)
-        self.usd_inr_volatility = getattr(self, "usd_inr_volatility", 0.0)
-        self.global_alignment_score = getattr(self, "global_alignment_score", 50)
+        self.seasonality_score = int(getattr(self, "seasonality_score", 50))
+        self.usd_inr_volatility = float(getattr(self, "usd_inr_volatility", 0.0))
+        self.global_alignment_score = int(getattr(self, "global_alignment_score", 50))
 
         # Default interval for MCX Gold
         if self.interval == "5m":
@@ -75,7 +83,7 @@ class MCXGoldTrendStrategy(BaseStrategy):
                 # Apply modifier for USD Volatility
                 if usd_vol_high:
                     self.logger.warning("⚠️ High USD/INR Volatility: Reducing position size by 30%.")
-                    qty = max(1, int(qty * 0.7))
+                    qty = max(1, int(round(qty * 0.7)))
 
                 action = "BUY" if buy_signal else "SELL"
                 self.logger.info(f"{action} SIGNAL: Price={current['close']}, RSI={rsi:.2f}, ADX={adx:.2f}")
@@ -120,6 +128,16 @@ class MCXGoldTrendStrategy(BaseStrategy):
 
         return "HOLD"
 
+    def get_signal(self, df):
+        # Backtest wrapper for evaluate_signal equivalent
+        res = self.generate_signal(df)
+        if isinstance(res, tuple) and len(res) == 2:
+            action, qty = res
+            return action, qty, {}
+        elif isinstance(res, str):
+            return res, 1.0, {}
+        return "HOLD", 0.0, {}
+
     @classmethod
     def add_arguments(cls, parser):
         parser.add_argument("--usd_inr_volatility", type=float, default=0.0, help="USD/INR Volatility %%")
@@ -127,6 +145,11 @@ class MCXGoldTrendStrategy(BaseStrategy):
         parser.add_argument("--global_alignment_score", type=int, default=50, help="Global Alignment Score")
         parser.add_argument("--period_rsi", type=int, default=14, help="RSI Period")
         parser.add_argument("--period_atr", type=int, default=14, help="ATR Period")
+        parser.add_argument("--period_sma_fast", type=int, default=20, help="SMA Fast Period")
+        parser.add_argument("--period_sma_slow", type=int, default=50, help="SMA Slow Period")
+        parser.add_argument("--period_adx", type=int, default=14, help="ADX Period")
+
+generate_signal = MCXGoldTrendStrategy.backtest_signal
 
 if __name__ == "__main__":
     MCXGoldTrendStrategy.cli()

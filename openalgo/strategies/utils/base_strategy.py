@@ -374,6 +374,7 @@ class BaseStrategy:
             if 'bollinger' in self.indicators:
                 window, std = self.indicators['bollinger']
                 sma, upper, lower = self.calculate_bollinger_bands(df['close'], window, std)
+                df['sma_20'] = sma
                 df['upper_band'] = upper
                 df['lower_band'] = lower
 
