@@ -9,26 +9,35 @@ import logging
 import pandas as pd
 
 # Simplified Import using strategy_preamble
-from strategy_preamble import BaseStrategy
+try:
+    from strategy_preamble import BaseStrategy
+except ImportError:
+    try:
+        from openalgo.strategies.scripts.strategy_preamble import BaseStrategy
+    except ImportError:
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        from base_strategy import BaseStrategy
 
 class SuperTrendVWAPStrategy(BaseStrategy):
+    # Declarative parameters (automatically parsed by BaseStrategy)
+    params = {
+        "threshold": 150,
+        "stop_pct": 1.8,
+        "adx_threshold": 20,
+        "adx_period": 14,
+        "BREAKEVEN_TRIGGER_R": 1.5,
+        "ATR_SL_MULTIPLIER": 3.0,
+        "ATR_TP_MULTIPLIER": 5.0
+    }
+
     def setup(self):
         if self.symbol:
             self.name = f"VWAP_{self.symbol}"
 
         # Logic for sector benchmark (BaseStrategy handles --sector -> self.sector)
         self.sector_benchmark = self.sector if self.sector else 'NIFTY BANK'
-
-        # Optimization Parameters
-        self.threshold = getattr(self, "threshold", 150)
-        self.stop_pct = getattr(self, "stop_pct", 1.8)
-        self.adx_threshold = getattr(self, "adx_threshold", 20)
-        self.adx_period = getattr(self, "adx_period", 14)
-
-        # Risk Parameters
-        self.BREAKEVEN_TRIGGER_R = getattr(self, "BREAKEVEN_TRIGGER_R", 1.5)
-        self.ATR_SL_MULTIPLIER = getattr(self, "ATR_SL_MULTIPLIER", 3.0)
-        self.ATR_TP_MULTIPLIER = getattr(self, "ATR_TP_MULTIPLIER", 5.0)
 
         # State
         self.trailing_stop = 0.0
@@ -174,4 +183,4 @@ class SuperTrendVWAPStrategy(BaseStrategy):
 generate_signal = SuperTrendVWAPStrategy.backtest_signal
 
 if __name__ == "__main__":
-    SuperTrendVWAPStrategy.cli()
+    SuperTrendVWAPStrategy.start()
