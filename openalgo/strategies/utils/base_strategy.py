@@ -43,6 +43,7 @@ try:
         is_market_open,
         normalize_symbol,
         calculate_vix_volatility_multiplier,
+        resolve_api_key,
     )
 except ImportError:
     # Fallback to absolute import or direct import (for script mode)
@@ -67,6 +68,7 @@ except ImportError:
             is_market_open,
             normalize_symbol,
             calculate_vix_volatility_multiplier,
+            resolve_api_key,
         )
     except ImportError:
         # If running from a script that didn't set path correctly
@@ -91,6 +93,7 @@ except ImportError:
             is_market_open,
             normalize_symbol,
             calculate_vix_volatility_multiplier,
+            resolve_api_key,
         )
 
 class BaseStrategy:
@@ -116,6 +119,14 @@ class BaseStrategy:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+        # Initialize declarative parameters
+        if hasattr(self, 'parameters') and isinstance(self.parameters, dict):
+            for name, config in self.parameters.items():
+                default = config.get('default') if isinstance(config, dict) else config
+                # If not already set by kwargs (setattr loop above), set default
+                if not hasattr(self, name):
+                    setattr(self, name, default)
+
         self.last_candle_time = None
 
         # Allow subclasses to perform custom initialization (configuration)
@@ -128,7 +139,7 @@ class BaseStrategy:
         load_dotenv()
 
         # Resolve API Key
-        self.api_key = self._resolve_api_key(api_key)
+        self.api_key = resolve_api_key(api_key)
 
         # Default to 5000 to match trading_utils default, allow override via env
         self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')
@@ -196,38 +207,6 @@ class BaseStrategy:
         except Exception as e:
             # Don't fail if we can't figure out paths, just log it later if logger exists
             pass
-
-    def _resolve_api_key(self, api_key):
-        """Resolve API Key from multiple sources."""
-        if api_key:
-            return api_key
-
-        # 1. Try environment variables
-        key = os.getenv('OPENALGO_APIKEY') or os.getenv('OPENALGO_API_KEY')
-        if key:
-            return key
-
-        # 2. Try database
-        try:
-            # Ensure project root is in path
-            self._add_project_root_to_path()
-            # This requires 'database' to be importable
-            from database.auth_db import get_first_available_api_key
-            key = get_first_available_api_key()
-            if key:
-                if hasattr(self, 'logger'):
-                    self.logger.info("Resolved API key from database.")
-                return key
-        except ImportError:
-            # Database module not available or path issue
-            pass
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.warning(f"Failed to fetch API key from DB: {e}")
-            else:
-                pass
-
-        return None
 
     def setup_logging(self, log_file=None):
         self.logger = logging.getLogger(self.name)
@@ -338,13 +317,19 @@ class BaseStrategy:
         if not hasattr(self, 'indicators'):
             return df
 
+        def resolve(val):
+            if isinstance(val, str) and hasattr(self, val):
+                return getattr(self, val)
+            return val
+
         try:
             if 'rsi' in self.indicators:
-                period = self.indicators['rsi']
+                period = resolve(self.indicators['rsi'])
                 df['rsi'] = self.calculate_rsi(df['close'], period=period)
 
             if 'macd' in self.indicators:
-                fast, slow, signal = self.indicators['macd']
+                params = self.indicators['macd']
+                fast, slow, signal = [resolve(p) for p in params]
                 macd, signal_line, _ = self.calculate_macd(df['close'], fast, slow, signal)
                 df['macd'] = macd
                 df['signal'] = signal_line
@@ -353,32 +338,36 @@ class BaseStrategy:
                 periods = self.indicators['sma']
                 if isinstance(periods, int): periods = [periods]
                 for p in periods:
-                    df[f'sma_{p}'] = self.calculate_sma(df['close'], period=p)
+                    period = resolve(p)
+                    df[f'sma_{period}'] = self.calculate_sma(df['close'], period=period)
 
             if 'ema' in self.indicators:
                 periods = self.indicators['ema']
                 if isinstance(periods, int): periods = [periods]
                 for p in periods:
-                    df[f'ema_{p}'] = self.calculate_ema(df['close'], period=p)
+                    period = resolve(p)
+                    df[f'ema_{period}'] = self.calculate_ema(df['close'], period=period)
 
             if 'adx' in self.indicators:
-                period = self.indicators['adx']
+                period = resolve(self.indicators['adx'])
                 df['adx'] = self.calculate_adx_series(df, period=period)
 
             if 'supertrend' in self.indicators:
-                period, multiplier = self.indicators['supertrend']
+                params = self.indicators['supertrend']
+                period, multiplier = [resolve(p) for p in params]
                 st, direction = self.calculate_supertrend(df, period, multiplier)
                 df['supertrend'] = st
                 df['st_dir'] = direction
 
             if 'bollinger' in self.indicators:
-                window, std = self.indicators['bollinger']
+                params = self.indicators['bollinger']
+                window, std = [resolve(p) for p in params]
                 sma, upper, lower = self.calculate_bollinger_bands(df['close'], window, std)
                 df['upper_band'] = upper
                 df['lower_band'] = lower
 
             if 'atr' in self.indicators:
-                period = self.indicators['atr']
+                period = resolve(self.indicators['atr'])
                 df['atr'] = self.calculate_atr_series(df, period=period)
 
         except Exception as e:
@@ -728,8 +717,20 @@ class BaseStrategy:
 
     @classmethod
     def add_arguments(cls, parser):
-        """Hook for subclasses to add arguments."""
-        pass
+        """Hook for subclasses to add arguments. Auto-generates from parameters dict."""
+        if hasattr(cls, 'parameters') and isinstance(cls.parameters, dict):
+            for name, config in cls.parameters.items():
+                default = config.get('default') if isinstance(config, dict) else config
+                help_text = config.get('help', name) if isinstance(config, dict) else name
+
+                # Determine type
+                if isinstance(config, dict) and 'type' in config:
+                    type_fn = config['type']
+                else:
+                     type_fn = type(default) if default is not None else str
+
+                # Add argument
+                parser.add_argument(f"--{name}", type=type_fn, default=default, help=help_text)
 
     @classmethod
     def parse_arguments(cls, args):

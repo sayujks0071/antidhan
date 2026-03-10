@@ -10,34 +10,26 @@ import strategy_preamble
 from base_strategy import BaseStrategy
 
 class NSERsiMacdStrategy(BaseStrategy):
-    def setup(self):
-        """Initialize strategy parameters"""
-        if self.symbol:
-            self.name = f"NSE_RSI_MACD_{self.symbol}"
+    parameters = {
+        'rsi_period': 14,
+        'macd_fast': 12,
+        'macd_slow': 26,
+        'macd_signal': 9,
+        'adx_period': 14,
+        'adx_threshold': 25
+    }
 
-        # Strategy Parameters
-        self.rsi_period = int(getattr(self, 'rsi_period', 14))
-        self.macd_fast = int(getattr(self, 'macd_fast', 12))
-        self.macd_slow = int(getattr(self, 'macd_slow', 26))
-        self.macd_signal = int(getattr(self, 'macd_signal', 9))
-        self.adx_period = int(getattr(self, 'adx_period', 14))
-        self.adx_threshold = int(getattr(self, 'adx_threshold', 25))
-
-        # Declarative Indicators Configuration for BaseStrategy automation
-        self.indicators = {
-            'rsi': self.rsi_period,
-            'macd': (self.macd_fast, self.macd_slow, self.macd_signal),
-            'adx': self.adx_period
-        }
+    indicators = {
+        'rsi': 'rsi_period',
+        'macd': ('macd_fast', 'macd_slow', 'macd_signal'),
+        'adx': 'adx_period'
+    }
 
     def generate_signal(self, df):
         """
         Generate signal using pre-calculated indicators.
         Returns: ('BUY'/'SELL'/'EXIT'/'HOLD', quantity [optional], details [optional])
         """
-        # Determine exchange
-        exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
-
         # VIX Filter (Equity Curve Protection)
         vix = self.get_vix()
         size_multiplier, _ = self.calculate_vix_volatility_multiplier(vix)
@@ -46,22 +38,11 @@ class NSERsiMacdStrategy(BaseStrategy):
             self.logger.warning(f"Extreme VIX ({vix:.2f}) detected! Skipping entry.")
             return
 
-        # Fetch historical data (enough for indicators)
-        df = self.fetch_history(days=5, exchange=exchange)
         if df.empty or len(df) < max(self.macd_slow, self.rsi_period, self.adx_period) + 5:
             self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows.")
             return
 
-        # Calculate Indicators
-        try:
-            df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
-            macd, signal_line, _ = self.calculate_macd(df['close'], fast=self.macd_fast, slow=self.macd_slow, signal=self.macd_signal)
-            df['macd'] = macd
-            df['signal'] = signal_line
-            df['adx'] = self.calculate_adx_series(df, period=self.adx_period)
-        except Exception as e:
-            self.logger.error(f"Indicator calculation failed: {e}")
-            return
+        # Indicators are already calculated by BaseStrategy if configured in self.indicators
 
         last = df.iloc[-1]
         prev = df.iloc[-2]
@@ -107,13 +88,9 @@ class NSERsiMacdStrategy(BaseStrategy):
         if df.empty or len(df) < max(self.macd_slow, self.rsi_period, self.adx_period) + 5:
             return 'HOLD', 0.0, {}
 
-        # Calculate Indicators
+        # Calculate Indicators using BaseStrategy helper
         try:
-            df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
-            macd, signal_line, _ = self.calculate_macd(df['close'], fast=self.macd_fast, slow=self.macd_slow, signal=self.macd_signal)
-            df['macd'] = macd
-            df['signal'] = signal_line
-            df['adx'] = self.calculate_adx_series(df, period=self.adx_period)
+            df = self.calculate_indicators(df)
 
             last = df.iloc[-1]
             prev = df.iloc[-2]
