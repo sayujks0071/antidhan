@@ -8,6 +8,7 @@ sys.path.insert(0, os.getcwd())
 # Ensure openalgo/strategies/utils is in path for base_strategy import
 sys.path.insert(0, os.path.join(os.getcwd(), 'openalgo'))
 sys.path.insert(0, os.path.join(os.getcwd(), 'openalgo', 'strategies', 'utils'))
+sys.path.insert(0, os.path.join(os.getcwd(), 'openalgo', 'strategies', 'scripts'))
 
 def test_mcx():
     print("Testing MCX Strategy...")
