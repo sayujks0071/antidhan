@@ -27,7 +27,7 @@ sys.path.insert(0, root_dir)
 sys.path.insert(0, utils_dir)
 
 try:
-    from trading_utils import is_market_open, APIClient
+    from trading_utils import is_market_open, APIClient, calculate_ema
     from optionchain_utils import (
         OptionChainClient,
         OptionPositionTracker,
@@ -102,10 +102,6 @@ MAX_ORDERS_PER_HOUR = safe_int(os.getenv("MAX_ORDERS_PER_HOUR", "5"))
 
 # Manual Expiry Override
 EXPIRY_DATE = os.getenv("EXPIRY_DATE", "").strip()
-
-def calculate_ema(series, period):
-    """Calculate Exponential Moving Average using pandas."""
-    return series.ewm(span=period, adjust=False).mean()
 
 class NetCreditTracker(OptionPositionTracker):
     """
