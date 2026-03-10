@@ -62,6 +62,33 @@ def parse_text_log(filepath):
                             trades.append(current_trade)
                             current_trade = {}
 
+                # New Mock Logic: "Signal Buy NIFTY Price: 24151.00"
+                elif "Signal Buy" in line:
+                    price_match = re.search(r'Price: ([\d\.]+)', line)
+                    if price_match:
+                         # Close previous if open
+                         if current_trade.get('status') == 'OPEN':
+                             pass # assume overwrite
+
+                         current_trade = {
+                            'entry_time': dt,
+                            'entry_price': float(price_match.group(1)),
+                            'direction': 'LONG',
+                            'status': 'OPEN'
+                        }
+
+                # New Mock Logic: "Exiting at 24216.00"
+                elif "Exiting at" in line:
+                    price_match = re.search(r'at ([\d\.]+)', line)
+                    if price_match and current_trade.get('status') == 'OPEN':
+                        exit_price = float(price_match.group(1))
+                        current_trade['exit_time'] = dt
+                        current_trade['exit_price'] = exit_price
+                        current_trade['status'] = 'CLOSED'
+                        current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+                        trades.append(current_trade)
+                        current_trade = {}
+
                 # Legacy Logic (keep for backward compatibility if other logs use it)
                 elif "Entry signal detected" in line:
                     price_match = re.search(r'Price: ([\d\.]+)', line)
