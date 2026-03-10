@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timedelta
 
 # Configuration
-LOG_DIRS = ["logs"]
+LOG_DIRS = ["logs", "openalgo/log", "openalgo/log/strategies"]
 
 def parse_text_log(filepath):
     trades = []
