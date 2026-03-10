@@ -130,8 +130,12 @@ class BaseStrategy:
         # Resolve API Key
         self.api_key = self._resolve_api_key(api_key)
 
-        # Default to 5000 to match trading_utils default, allow override via env
-        self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')
+        # Default to port 5000 or the port passed via --port/env
+        legacy_port = kwargs.get('port')
+        if legacy_port:
+            self.host = f"http://127.0.0.1:{legacy_port}"
+        else:
+            self.host = host or os.getenv('OPENALGO_HOST', f"http://127.0.0.1:{os.getenv('FLASK_PORT', 5000)}")
 
         if not self.api_key and not client:
              # Warn but don't fail immediately, allowing for test/mock scenarios
@@ -711,6 +715,7 @@ class BaseStrategy:
         # Connection
         parser.add_argument("--api_key", type=str, help="API Key")
         parser.add_argument("--host", type=str, help="Host URL")
+        parser.add_argument("--port", type=int, help="API Port (Legacy support)")
         parser.add_argument("--logfile", type=str, help="Log file path")
 
         # Logic / Filters
@@ -766,6 +771,11 @@ class BaseStrategy:
         if 'type' not in kwargs: kwargs['type'] = 'EQUITY'
         if 'sector' not in kwargs: kwargs['sector'] = None
         if 'log_file' not in kwargs: kwargs['log_file'] = kwargs.get('logfile')
+
+        # Merge explicitly parsed kwargs to support strategy-specific arguments without custom parse_arguments methods
+        for key, value in vars(args).items():
+            if key not in kwargs and value is not None:
+                kwargs[key] = value
 
         return kwargs
 

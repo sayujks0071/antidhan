@@ -6,19 +6,7 @@ Entry: Buy when SMA 20 crosses above SMA 50.
 Exit: Sell when SMA 20 crosses below SMA 50.
 Inherits from BaseStrategy for significant code reduction.
 """
-import os
-import sys
-
-# Add repo root to path to find BaseStrategy
-try:
-    from base_strategy import BaseStrategy
-except ImportError:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    strategies_dir = os.path.dirname(current_dir)
-    utils_dir = os.path.join(strategies_dir, "utils")
-    if utils_dir not in sys.path:
-        sys.path.insert(0, utils_dir)
-    from base_strategy import BaseStrategy
+from strategy_preamble import BaseStrategy
 
 class NSEMaCrossoverStrategy(BaseStrategy):
     def setup(self):
@@ -34,15 +22,6 @@ class NSEMaCrossoverStrategy(BaseStrategy):
     def add_arguments(cls, parser):
         parser.add_argument('--short_window', type=int, default=20, help='Short Moving Average Window')
         parser.add_argument('--long_window', type=int, default=50, help='Long Moving Average Window')
-        parser.add_argument('--port', type=int, help='API Port (Legacy)')
-
-    @classmethod
-    def parse_arguments(cls, args):
-        kwargs = super().parse_arguments(args)
-        # Support legacy --port arg
-        if hasattr(args, 'port') and args.port:
-            kwargs['host'] = f"http://127.0.0.1:{args.port}"
-        return kwargs
 
     def calculate_indicators(self, df):
         df = df.copy()
