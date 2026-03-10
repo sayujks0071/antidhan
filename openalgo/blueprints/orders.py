@@ -525,11 +525,13 @@ def placesmartorder():
         is_analyze_mode = get_analyze_mode()
 
         # Better Error Handling: Check for Invalid Token early (if not in analyze mode)
+        # We validate the token *before* sending any request to the broker.
         if not is_analyze_mode and not auth_token:
             logger.error("Invalid Token: Authentication token is missing or empty")
             return jsonify({"status": "error", "message": "Invalid Token"}), 401
 
         # Better Error Handling: Check for SecurityId Required (Token not found) early
+        # We look up the token locally *before* making the broker API call to save latency and avoid unnecessary errors.
         symbol = data.get("symbol")
         exchange = data.get("exchange")
         if symbol and exchange:
@@ -549,6 +551,13 @@ def placesmartorder():
             auth_token=auth_token,
             broker=broker_name,
         )
+
+        # Handle specific error codes thrown by service validation before broker call
+        if not success:
+            if response_data.get("message") == "Invalid Token":
+                return jsonify(response_data), 401
+            elif response_data.get("message") == "SecurityId Required":
+                return jsonify(response_data), 400
 
         return jsonify(response_data), status_code
 
@@ -618,6 +627,13 @@ def close_position():
             auth_token=auth_token,
             broker=broker_name,
         )
+
+        # Catch specific pre-flight validation errors directly to avoid sending them to broker if not handled
+        if not success:
+            if response_data.get("message") == "Invalid Token":
+                return jsonify(response_data), 401
+            elif response_data.get("message") == "SecurityId Required":
+                return jsonify(response_data), 400
 
         return jsonify(response_data), status_code
 
