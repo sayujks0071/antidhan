@@ -63,6 +63,37 @@ def parse_text_log(filepath):
                             current_trade = {}
 
                 # Legacy Logic (keep for backward compatibility if other logs use it)
+                elif "Signal Buy" in line:
+                    price_match = re.search(r'Price: ([\d\.]+)', line)
+                    if price_match:
+                         current_trade = {
+                            'entry_time': dt,
+                            'entry_price': float(price_match.group(1)),
+                            'direction': 'LONG',
+                            'status': 'OPEN'
+                        }
+                elif "Signal Sell" in line:
+                    price_match = re.search(r'Price: ([\d\.]+)', line)
+                    if price_match:
+                         current_trade = {
+                            'entry_time': dt,
+                            'entry_price': float(price_match.group(1)),
+                            'direction': 'SHORT',
+                            'status': 'OPEN'
+                        }
+                elif "Exiting at" in line:
+                     price_match = re.search(r'at ([\d\.]+)', line)
+                     if price_match and current_trade.get('status') == 'OPEN':
+                            exit_price = float(price_match.group(1))
+                            current_trade['exit_time'] = dt
+                            current_trade['exit_price'] = exit_price
+                            current_trade['status'] = 'CLOSED'
+                            if current_trade['direction'] == 'LONG':
+                                current_trade['pnl'] = (exit_price - current_trade['entry_price'])
+                            else:
+                                current_trade['pnl'] = (current_trade['entry_price'] - exit_price)
+                            trades.append(current_trade)
+                            current_trade = {}
                 elif "Entry signal detected" in line:
                     price_match = re.search(r'Price: ([\d\.]+)', line)
                     if price_match:
@@ -251,6 +282,9 @@ def main():
             if strategy == "GapFadeStrategy":
                 markdown_content += "- **Analysis**: Fading gaps without trend confirmation often leads to losses in strong momentum markets ('Gap and Go').\n"
                 markdown_content += "- **Improvement**: Add a 'Reversal Candle' check (e.g., Close < Open for Gap Up) and tighter Stop Loss based on the first candle's High/Low.\n"
+            elif strategy == "SuperTrendVWAP":
+                markdown_content += "- **Analysis**: SuperTrend can generate false signals in sideways markets, and VWAP might not act as strong support/resistance without volume confirmation.\n"
+                markdown_content += "- **Improvement**: Add a Volume or ADX filter to confirm trend strength before entry.\n"
             elif "NSE_RSI_MACD_Strategy" in strategy:
                 markdown_content += "- **Analysis**: Basic MACD crossover in choppy markets generates false signals. RSI alone is insufficient filter.\n"
                 markdown_content += "- **Improvement**: Add ADX Filter (ADX > 25) to ensure trend strength and inherit from BaseStrategy for robust execution.\n"
