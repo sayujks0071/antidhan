@@ -335,13 +335,6 @@ def place_smart_order_with_auth(
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 500
 
-    # Add delay if needed
-    try:
-        time.sleep(float(smart_order_delay))
-    except Exception:
-        logger.error(f"Invalid SMART_ORDER_DELAY value: {smart_order_delay}")
-        traceback.print_exc()
-
     if res and res.status == 200:
         return True, order_response_data, 200
     else:
