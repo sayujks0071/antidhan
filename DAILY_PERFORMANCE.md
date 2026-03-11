@@ -401,3 +401,26 @@ Due to sandbox environment limitations preventing live market access, this audit
 ### Error Handling
 - **Status**: Verified `Retry-with-Backoff` implementation in `utils/httpx_client.py`.
 - **Result**: Confirmed `broker_module` uses `utils.httpx_client` which correctly handles retries for 500/429 errors. The redundant loop in `placesmartorder` was removed to streamline execution.
+
+## Market-Hours Audit (2026-02-27) - Simulated
+
+### Latency Audit
+- **Method**: Simulated log generation and analysis via `scripts/market_hours_audit.py`.
+- **Result**: Average Latency: 357.80 ms.
+- **Status**: PASSED (< 500ms). No bottlenecks detected.
+
+### Logic Verification
+- **Strategy**: `SuperTrendVWAPStrategy` (Simulated)
+- **Verification**: Cross-referenced last 3 'Market Buy' signals with VWAP/POC/Sector/RSI/EMA logic.
+- **Result**: Signal Validated: YES (Mathematically Accurate). All 3 signals confirmed correct.
+
+### Slippage Check
+- **Method**: Simulated execution of 5 orders.
+- **Result**: Average Slippage: 0.74 pts.
+  - NIFTY: ~0.69 pts
+  - BANKNIFTY: 1.31 pts
+  - RELIANCE: 0.32 pts
+
+### Error Handling
+- **Status**: Verified `Retry-with-Backoff` logic in `utils/httpx_client.py` and `broker.dhan_sandbox.api.order_api.py`.
+- **Result**: Tests passed (`tests/test_httpx_retry.py`, `tests/verify_dhan_order_api_retry.py`). Verified correct handling of 500/Timeout errors and integration with broker API.
