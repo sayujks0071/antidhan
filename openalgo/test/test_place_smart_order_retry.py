@@ -111,8 +111,6 @@ class TestPlaceSmartOrderService(unittest.TestCase):
 
         # Side effect for place_smartorder_api
         mock_broker.place_smartorder_api.side_effect = [
-            (response_500, {"message": "Internal Server Error"}, None),
-            (response_503, {"message": "Service Unavailable"}, None),
             (response_200, {"message": "Order Placed", "orderId": "1001"}, "1001")
         ]
 
@@ -124,8 +122,8 @@ class TestPlaceSmartOrderService(unittest.TestCase):
         self.assertEqual(status_code, 200)
         self.assertEqual(response.get("orderid"), "1001")
 
-        # Verify it was called 3 times (2 retries + 1 success)
-        self.assertEqual(mock_broker.place_smartorder_api.call_count, 3)
+        # Verify it was called 1 times (retries removed from place_smart_order_service to httpx_client)
+        self.assertEqual(mock_broker.place_smartorder_api.call_count, 1)
 
     @patch('services.place_smart_order_service.get_token')
     @patch('services.place_smart_order_service.import_broker_module')
@@ -140,7 +138,7 @@ class TestPlaceSmartOrderService(unittest.TestCase):
         response_500.status = 500
         response_500.status_code = 500
 
-        # Fail 4 times (Initial + 3 retries)
+        # Fail 1 time (retries removed from place_smart_order_service to httpx_client)
         mock_broker.place_smartorder_api.return_value = (response_500, {"message": "Error"}, None)
 
         success, response, status_code = place_smart_order_with_auth(
@@ -151,8 +149,8 @@ class TestPlaceSmartOrderService(unittest.TestCase):
         # Should return the last error status
         self.assertEqual(status_code, 500)
 
-        # Verify call count: 1 initial + 3 retries = 4 calls
-        self.assertEqual(mock_broker.place_smartorder_api.call_count, 4)
+        # Verify call count: 1 call
+        self.assertEqual(mock_broker.place_smartorder_api.call_count, 1)
 
 if __name__ == '__main__':
     unittest.main()

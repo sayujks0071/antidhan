@@ -166,7 +166,7 @@ def request(
 
             return response
 
-        except httpx.RequestError as e:
+        except (httpx.RequestError, httpx.TimeoutException) as e:
             last_exception = e
             if attempt < max_retries:
                 wait_time = backoff_factor * (2**attempt)
@@ -181,6 +181,9 @@ def request(
                 raise last_exception
 
     # Should only reach here if max_retries > 0 and we exhausted retries on status codes
+    # For compatibility with upstream error handling
+    if response is not None and (response.status_code >= 500 or response.status_code == 429):
+        response.raise_for_status()
     return response
 
 

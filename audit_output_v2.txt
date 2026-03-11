@@ -3,20 +3,21 @@ Generating mock logs at logs/mock_openalgo.log...
 Analyzing logs from logs/mock_openalgo.log...
 
 --- Latency Audit ---
-[10:00:00] Symbol: NIFTY, Latency: 276.00 ms
-[10:10:00] Symbol: BANKNIFTY, Latency: 418.00 ms
-[10:30:00] Symbol: NIFTY, Latency: 88.00 ms
-[10:45:00] Symbol: RELIANCE, Latency: 492.00 ms
-[11:00:00] Symbol: NIFTY, Latency: 276.00 ms
-Average Latency: 310.00 ms
+[10:00:00] Symbol: NIFTY, Latency: 96.00 ms
+[10:10:00] Symbol: BANKNIFTY, Latency: 59.00 ms
+[10:30:00] Symbol: NIFTY, Latency: 389.00 ms
+[10:45:00] Symbol: RELIANCE, Latency: 586.00 ms
+  [WARNING] Latency > 500ms! Bottleneck investigation required.
+[11:00:00] Symbol: NIFTY, Latency: 277.00 ms
+Average Latency: 281.40 ms
 
 --- Slippage Check ---
-Symbol: NIFTY, Slippage: -0.09 pts
-Symbol: BANKNIFTY, Slippage: 0.13 pts
-Symbol: NIFTY, Slippage: 2.12 pts
-Symbol: RELIANCE, Slippage: 1.89 pts
-Symbol: NIFTY, Slippage: 0.00 pts
-Average Slippage: 0.81 pts
+Symbol: NIFTY, Slippage: -0.52 pts
+Symbol: BANKNIFTY, Slippage: -0.79 pts
+Symbol: NIFTY, Slippage: -0.11 pts
+Symbol: RELIANCE, Slippage: 2.18 pts
+Symbol: NIFTY, Slippage: 1.50 pts
+Average Slippage: 0.45 pts
 
 --- Logic Verification ---
 Strategy: SuperTrendVWAPStrategy (NIFTY) - Verifying 3 signals
@@ -26,6 +27,8 @@ Signal #1 at 10:00:00
   POC: 24480.00 (Above: True)
   Sector: Bullish (Bullish: True)
   Dev: 0.0020 (Within 0.03: True)
+  RSI: 55.00 (Bullish > 50: True)
+  EMA Trend: True (Fast 24490.00 > Slow 24460.00)
   Result: Signal Validated: YES (Mathematically Accurate)
 
 Signal #2 at 10:30:00
@@ -33,6 +36,8 @@ Signal #2 at 10:30:00
   POC: 24580.00 (Above: True)
   Sector: Bullish (Bullish: True)
   Dev: 0.0040 (Within 0.03: True)
+  RSI: 57.00 (Bullish > 50: True)
+  EMA Trend: True (Fast 24590.00 > Slow 24560.00)
   Result: Signal Validated: YES (Mathematically Accurate)
 
 Signal #3 at 11:00:00
@@ -40,4 +45,6 @@ Signal #3 at 11:00:00
   POC: 24680.00 (Above: True)
   Sector: Bullish (Bullish: True)
   Dev: 0.0060 (Within 0.03: True)
+  RSI: 59.00 (Bullish > 50: True)
+  EMA Trend: True (Fast 24690.00 > Slow 24660.00)
   Result: Signal Validated: YES (Mathematically Accurate)
