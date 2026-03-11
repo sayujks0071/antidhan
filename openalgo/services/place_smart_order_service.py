@@ -230,19 +230,37 @@ def place_smart_order_with_auth(
     response_data = {}
     order_id = None
 
-    try:
-        res, response_data, order_id = broker_module.place_smartorder_api(
-            order_data, auth_token
-        )
-    except Exception as e:
-        logger.error(f"Error in broker_module.place_smartorder_api: {e}")
-        traceback.print_exc()
-        error_response = {
-            "status": "error",
-            "message": "Failed to place smart order due to internal error",
-        }
-        executor.submit(async_log_order, "placesmartorder", original_data, error_response)
-        return False, error_response, 500
+    max_retries = 3
+    backoff_factor = 0.5
+    for attempt in range(max_retries + 1):
+        try:
+            res, response_data, order_id = broker_module.place_smartorder_api(
+                order_data, auth_token
+            )
+
+            # If successful or not a server error, break out of retry loop
+            if res is None or res.status < 500:
+                break
+
+            # If server error, retry if attempts remain
+            if attempt < max_retries:
+                wait_time = backoff_factor * (2 ** attempt)
+                logger.warning(f"Broker API returned HTTP {res.status}. Retrying in {wait_time}s... (Attempt {attempt+1}/{max_retries})")
+                time.sleep(wait_time)
+
+        except Exception as e:
+            logger.error(f"Error in broker_module.place_smartorder_api (Attempt {attempt+1}/{max_retries+1}): {e}")
+            if attempt < max_retries:
+                wait_time = backoff_factor * (2 ** attempt)
+                time.sleep(wait_time)
+            else:
+                traceback.print_exc()
+                error_response = {
+                    "status": "error",
+                    "message": "Failed to place smart order due to internal error",
+                }
+                executor.submit(async_log_order, "placesmartorder", original_data, error_response)
+                return False, error_response, 500
 
     try:
         # Handle case where position size matches current position
@@ -334,13 +352,6 @@ def place_smart_order_with_auth(
         }
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
         return False, error_response, 500
-
-    # Add delay if needed
-    try:
-        time.sleep(float(smart_order_delay))
-    except Exception:
-        logger.error(f"Invalid SMART_ORDER_DELAY value: {smart_order_delay}")
-        traceback.print_exc()
 
     if res and res.status == 200:
         return True, order_response_data, 200

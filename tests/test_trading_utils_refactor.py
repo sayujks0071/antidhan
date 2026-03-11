@@ -49,6 +49,7 @@ class TestTradingUtilsRefactor(unittest.TestCase):
         error_response = MagicMock(spec=httpx.Response)
         error_response.status_code = 500
         error_response.http_version = "HTTP/1.1"
+        error_response.headers = {}
         error_response.request.extensions = {}
 
         success_response = MagicMock(spec=httpx.Response)
