@@ -25,3 +25,6 @@ __pycache__/
 !mcx_copper_trend_strategy.py
 !nifty_smart_trend_oi.py
 !vbt_ranking_strategy.py
+!nifty_premium_iron_condor.py
+!nifty_pcr_momentum_strategy.py
+!nifty_oi_wall_volume_surge.py
