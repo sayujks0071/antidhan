@@ -62,3 +62,4 @@ Untitled.rtf
 
 # ── Nested git repo — managed separately ─────────────────────────────────────
 openalgo/
+!openalgo/strategies/scripts/vbt_single_strategy_ranking.py
