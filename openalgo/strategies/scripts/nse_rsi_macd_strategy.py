@@ -6,25 +6,27 @@ Entry: Buy when MACD Line crosses above Signal Line AND RSI > 50 AND ADX > 25.
 Exit: Sell when MACD Line crosses below Signal Line OR RSI > 70.
 Inherits from BaseStrategy for code reduction.
 """
-import strategy_preamble
+import sys, os
+# Ensure utils is in path for BaseStrategy import
+try: sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../utils')))
+except: pass
+
 from base_strategy import BaseStrategy
 
 class NSERsiMacdStrategy(BaseStrategy):
-    def setup(self):
-        """Initialize strategy parameters"""
-        if self.symbol:
-            self.name = f"NSE_RSI_MACD_{self.symbol}"
+    # Declarative Parameters
+    parameters = {
+        'rsi_period': 14,
+        'macd_fast': 12,
+        'macd_slow': 26,
+        'macd_signal': 9,
+        'adx_period': 14,
+        'adx_threshold': 25
+    }
 
-        # Strategy Parameters
-        self.rsi_period = int(getattr(self, 'rsi_period', 14))
-        self.macd_fast = int(getattr(self, 'macd_fast', 12))
-        self.macd_slow = int(getattr(self, 'macd_slow', 26))
-        self.macd_signal = int(getattr(self, 'macd_signal', 9))
-        self.adx_period = int(getattr(self, 'adx_period', 14))
-        self.adx_threshold = int(getattr(self, 'adx_threshold', 25))
-
-        # Declarative Indicators Configuration for BaseStrategy automation
-        self.indicators = {
+    @property
+    def indicators(self):
+        return {
             'rsi': self.rsi_period,
             'macd': (self.macd_fast, self.macd_slow, self.macd_signal),
             'adx': self.adx_period
@@ -35,34 +37,12 @@ class NSERsiMacdStrategy(BaseStrategy):
         Generate signal using pre-calculated indicators.
         Returns: ('BUY'/'SELL'/'EXIT'/'HOLD', quantity [optional], details [optional])
         """
-        # Determine exchange
-        exchange = "NSE_INDEX" if "NIFTY" in self.symbol.upper() else "NSE"
-
-        # VIX Filter (Equity Curve Protection)
-        vix = self.get_vix()
-        size_multiplier, _ = self.calculate_vix_volatility_multiplier(vix)
-
-        if vix > 35:
-            self.logger.warning(f"Extreme VIX ({vix:.2f}) detected! Skipping entry.")
+        # VIX Filter (Equity Curve Protection) - VIX already calculated in BaseStrategy
+        if self.vix > 35:
+            self.logger.warning(f"Extreme VIX ({self.vix:.2f}) detected! Skipping entry.")
             return
 
-        # Fetch historical data (enough for indicators)
-        df = self.fetch_history(days=5, exchange=exchange)
-        if df.empty or len(df) < max(self.macd_slow, self.rsi_period, self.adx_period) + 5:
-            self.logger.warning(f"Insufficient data for {self.symbol}: {len(df)} rows.")
-            return
-
-        # Calculate Indicators
-        try:
-            df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
-            macd, signal_line, _ = self.calculate_macd(df['close'], fast=self.macd_fast, slow=self.macd_slow, signal=self.macd_signal)
-            df['macd'] = macd
-            df['signal'] = signal_line
-            df['adx'] = self.calculate_adx_series(df, period=self.adx_period)
-        except Exception as e:
-            self.logger.error(f"Indicator calculation failed: {e}")
-            return
-
+        # Data and Indicators are already prepared by BaseStrategy.default_cycle
         last = df.iloc[-1]
         prev = df.iloc[-2]
 
@@ -92,11 +72,11 @@ class NSERsiMacdStrategy(BaseStrategy):
                 # Adaptive Sizing with VIX Multiplier
                 try:
                     adaptive_qty = self.get_adaptive_quantity(current_price)
-                    qty = max(1, int(adaptive_qty * size_multiplier))
+                    qty = max(1, int(adaptive_qty * self.size_multiplier))
                 except:
                     pass
 
-                self.logger.info(f"Entry signal detected (Bullish Trend + Strong ADX). Buying {qty} (VIX Mult: {size_multiplier}) at {current_price}")
+                self.logger.info(f"Entry signal detected (Bullish Trend + Strong ADX). Buying {qty} (VIX Mult: {self.size_multiplier}) at {current_price}")
                 self.execute_trade('BUY', qty, current_price)
 
     def get_signal(self, df):
@@ -104,17 +84,13 @@ class NSERsiMacdStrategy(BaseStrategy):
         Backtesting signal generation (Optional, can rely on generate_signal if compatible)
         But keeping for legacy compatibility if needed.
         """
-        if df.empty or len(df) < max(self.macd_slow, self.rsi_period, self.adx_period) + 5:
+        # Ensure indicators are present (BaseStrategy handles this, but for standalone backtests):
+        df = self.calculate_indicators(df)
+
+        if df.empty or len(df) < 50:
             return 'HOLD', 0.0, {}
 
-        # Calculate Indicators
         try:
-            df['rsi'] = self.calculate_rsi(df['close'], period=self.rsi_period)
-            macd, signal_line, _ = self.calculate_macd(df['close'], fast=self.macd_fast, slow=self.macd_slow, signal=self.macd_signal)
-            df['macd'] = macd
-            df['signal'] = signal_line
-            df['adx'] = self.calculate_adx_series(df, period=self.adx_period)
-
             last = df.iloc[-1]
             prev = df.iloc[-2]
 

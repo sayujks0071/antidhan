@@ -116,6 +116,12 @@ class BaseStrategy:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+        # Initialize parameters from class definition if not already set (declarative parameters)
+        if hasattr(self, 'parameters'):
+            for key, default in self.parameters.items():
+                if not hasattr(self, key):
+                     setattr(self, key, default)
+
         self.last_candle_time = None
 
         # Allow subclasses to perform custom initialization (configuration)
@@ -155,6 +161,19 @@ class BaseStrategy:
         Override this method to set up strategy-specific attributes without overriding __init__.
         """
         pass
+
+    def get_exchange(self, symbol=None):
+        """
+        Helper to determine exchange based on symbol pattern.
+        """
+        s = symbol or self.symbol
+        if not s:
+            return "NSE"
+        if "NIFTY" in s.upper() or "VIX" in s.upper():
+            return "NSE_INDEX"
+        if s.endswith("FUT"):
+            return "MCX"
+        return "NSE"
 
     def check_new_candle(self, df):
         """
@@ -396,9 +415,9 @@ class BaseStrategy:
         """
         # Fetch Data
         exchange = self.exchange
-        # Auto-detect NSE_INDEX for indices if default exchange is NSE
-        if exchange == "NSE" and ("NIFTY" in self.symbol.upper() or "VIX" in self.symbol.upper()):
-             exchange = "NSE_INDEX"
+        # Auto-detect NSE_INDEX if needed (using helper if exchange is default)
+        if exchange == "NSE":
+            exchange = self.get_exchange(self.symbol)
 
         df = self.fetch_history(days=5, interval=self.interval, exchange=exchange)
 
@@ -407,6 +426,16 @@ class BaseStrategy:
 
         # Calculate Indicators
         df = self.calculate_indicators(df)
+
+        # Auto-calculate VIX and Volatility Multipliers for use in signal generation
+        # These are made available as instance attributes for use inside generate_signal
+        try:
+            self.vix = self.get_vix()
+            self.size_multiplier, self.dev_threshold = self.calculate_vix_volatility_multiplier(self.vix)
+        except Exception:
+            self.vix = 15.0
+            self.size_multiplier = 1.0
+            self.dev_threshold = 0.03
 
         # Generate Signal
         # Try generate_signal first, then fallback to get_signal (backtest interface)
@@ -728,8 +757,24 @@ class BaseStrategy:
 
     @classmethod
     def add_arguments(cls, parser):
-        """Hook for subclasses to add arguments."""
-        pass
+        """
+        Hook for subclasses to add arguments.
+        Automatically adds arguments defined in cls.parameters dictionary.
+        """
+        if hasattr(cls, 'parameters'):
+            for name, default in cls.parameters.items():
+                arg_name = f"--{name}"
+                # Determine type from default value. Handle bool flags specially if needed.
+                if isinstance(default, bool):
+                     if default is False:
+                         parser.add_argument(arg_name, action='store_true', help=f"Enable {name}")
+                     else:
+                         parser.add_argument(f"--no-{name}", dest=name, action='store_false', help=f"Disable {name}")
+                     parser.set_defaults(**{name: default})
+                else:
+                    arg_type = type(default) if default is not None else str
+                    help_text = f"Parameter {name} (default: {default})"
+                    parser.add_argument(arg_name, type=arg_type, default=default, help=help_text)
 
     @classmethod
     def parse_arguments(cls, args):
