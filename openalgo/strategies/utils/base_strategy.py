@@ -43,6 +43,7 @@ try:
         is_market_open,
         normalize_symbol,
         calculate_vix_volatility_multiplier,
+        check_market_volatility,
     )
 except ImportError:
     # Fallback to absolute import or direct import (for script mode)
@@ -67,6 +68,7 @@ except ImportError:
             is_market_open,
             normalize_symbol,
             calculate_vix_volatility_multiplier,
+            check_market_volatility,
         )
     except ImportError:
         # If running from a script that didn't set path correctly
@@ -91,6 +93,7 @@ except ImportError:
             is_market_open,
             normalize_symbol,
             calculate_vix_volatility_multiplier,
+            check_market_volatility,
         )
 
 class BaseStrategy:
@@ -557,6 +560,10 @@ class BaseStrategy:
     def calculate_vix_volatility_multiplier(self, vix):
         """Calculate VIX-based volatility multiplier."""
         return calculate_vix_volatility_multiplier(vix)
+
+    def check_market_volatility(self, vix, threshold=35.0):
+        """Check if market volatility is safe."""
+        return check_market_volatility(vix, threshold)
 
     def calculate_rsi(self, series, period=14):
         """Calculate Relative Strength Index."""

@@ -66,6 +66,9 @@ class SuperTrendVWAPStrategy(BaseStrategy):
         vix = self.get_vix()
         size_multiplier, dev_threshold = self.calculate_vix_volatility_multiplier(vix)
 
+        if not self.check_market_volatility(vix, threshold=35):
+            return
+
         # Indicators
         is_above_vwap = last['close'] > last['vwap']
 
