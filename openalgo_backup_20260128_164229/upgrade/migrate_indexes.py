@@ -13,7 +13,6 @@ Usage:
 import os
 import sys
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.exc import OperationalError
 
 # Set UTF-8 encoding for output to handle Unicode characters on Windows
 if sys.platform == 'win32':
@@ -182,7 +181,7 @@ def migrate_logs_db_indexes(engine):
 
 def verify_indexes(engine, db_name, expected_indexes):
     """Verify that indexes were created"""
-    logger.info(f"")
+    logger.info("")
     logger.info(f"Verifying {db_name} indexes...")
 
     all_found = True

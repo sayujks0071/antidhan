@@ -3,7 +3,6 @@
 Fix strategy ownership - update all strategies to belong to the current logged-in user
 """
 
-import os
 import sys
 import json
 

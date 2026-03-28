@@ -1,8 +1,6 @@
 # csp.py
 
-from flask import request, current_app
 import os
-from functools import wraps
 
 def get_csp_config():
     """

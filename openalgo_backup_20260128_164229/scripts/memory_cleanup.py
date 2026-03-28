@@ -3,10 +3,8 @@
 Memory Cleanup Script for OpenAlgo Strategies
 Cleans up old log files and monitors memory usage
 """
-import os
-import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 
 IST = pytz.timezone('Asia/Kolkata')

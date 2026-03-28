@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """IC Trading Config — single source of truth. Import, don't copy."""
-import os, sys
-from datetime import date, timedelta
+import os
+import sys
+from datetime import timedelta
 
 _FALLBACK_KEY = "d524fa12cd71a21a2d8fa3a6be0ddd06b31f996e6d12bc0d60a110ad66939477"
 OPENALGO_KEY  = os.environ.get("OPENALGO_API_KEY", _FALLBACK_KEY)

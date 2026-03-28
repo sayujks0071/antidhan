@@ -1,13 +1,9 @@
 import websocket
 import threading
-import time
 import struct
 import zlib
-import traceback
-import errno
 import json
 import re
-import os
 import sys
 from datetime import datetime
 from utils.logging import get_logger

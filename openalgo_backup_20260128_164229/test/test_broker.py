@@ -7,9 +7,11 @@ OpenAlgo – New Broker Integration Test
 • Final green / red roll‑up
 """
 
-import os, sys, time, traceback
+import os
+import sys
+import time
 from dataclasses import dataclass, field
-from typing import List, Dict, Tuple
+from typing import List, Dict
 import pandas as pd
 from colorama import Fore, Style, init as colorama_init
 

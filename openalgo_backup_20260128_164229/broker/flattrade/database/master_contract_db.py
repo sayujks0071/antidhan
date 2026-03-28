@@ -76,7 +76,7 @@ def copy_from_dataframe(df):
             db_session.commit()
             logger.info(f"Bulk insert completed successfully with {len(filtered_data_dict)} new records.")
         else:
-            logger.info(f"No new records to insert.")
+            logger.info("No new records to insert.")
     except Exception as e:
         logger.error(f"Error during bulk insert: {e}")
         db_session.rollback()

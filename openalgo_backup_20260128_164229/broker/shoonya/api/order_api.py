@@ -1,7 +1,5 @@
-import httpx
 import json
 import os
-from database.auth_db import get_auth_token
 from database.token_db import get_token , get_br_symbol, get_symbol
 from broker.shoonya.mapping.transform_data import transform_data , map_product_type, reverse_map_product_type, transform_modify_order_data
 from utils.httpx_client import get_httpx_client
@@ -294,7 +292,7 @@ def modify_order(data,auth):
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     payload_str = "jData=" + json.dumps(transformed_data) + "&jKey=" + AUTH_TOKEN
 
-    logger.debug(f"=== SHOONYA MODIFY ORDER ===")
+    logger.debug("=== SHOONYA MODIFY ORDER ===")
     # Redact sensitive fields for logging
     safe_log_data = {k: v for k, v in transformed_data.items() if k != 'uid'}
     logger.debug(f"jData={json.dumps(safe_log_data)}")

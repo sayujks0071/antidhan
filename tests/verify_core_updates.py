@@ -2,8 +2,6 @@ import sys
 import os
 import unittest
 from unittest.mock import MagicMock, patch
-import pandas as pd
-from datetime import datetime
 
 # Add path
 sys.path.append(os.path.join(os.getcwd(), 'openalgo/strategies/utils'))

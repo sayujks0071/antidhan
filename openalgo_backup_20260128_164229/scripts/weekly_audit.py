@@ -18,12 +18,11 @@ import urllib.error
 import os
 import sys
 import re
-import math
 import argparse
 from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple
 
 # Try importing pandas/numpy
 try:
@@ -606,12 +605,12 @@ def main():
     print(f"- Risk Status: {risk['status']}")
 
     if risk.get('concentration_issues'):
-         print(f"- Concentration Risk: ⚠️ Found")
+         print("- Concentration Risk: ⚠️ Found")
          for issue in risk['concentration_issues']:
              print(f"  • {issue}")
 
     if risk.get('sector_overlap'):
-         print(f"- Sector Overlap: ⚠️ High")
+         print("- Sector Overlap: ⚠️ High")
          for sec, val in risk['sector_overlap'].items():
              print(f"  • {sec}: {val}")
 

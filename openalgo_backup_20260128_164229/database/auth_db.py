@@ -2,7 +2,7 @@
 
 import os
 import base64
-from sqlalchemy import create_engine, UniqueConstraint, Index
+from sqlalchemy import create_engine, Index
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -399,7 +399,7 @@ def verify_api_key(provided_api_key):
     - Valid keys cached for 1hr (balances security vs performance)
     - Cache invalidated on key regeneration
     """
-    from flask import request, has_request_context
+    from flask import has_request_context
     from utils.ip_helper import get_real_ip
     from database.traffic_db import InvalidAPIKeyTracker
     import hashlib
@@ -410,7 +410,7 @@ def verify_api_key(provided_api_key):
 
     # Step 1: Check invalid cache first (fast rejection of known bad keys)
     if cache_key in invalid_api_key_cache:
-        logger.debug(f"API key rejected from invalid cache")
+        logger.debug("API key rejected from invalid cache")
         return None
 
     # Step 2: Check valid cache (fast path for legitimate requests)
@@ -439,7 +439,7 @@ def verify_api_key(provided_api_key):
         # If we reach here, the API key is invalid
         # Cache the invalid result to prevent repeated expensive verifications
         invalid_api_key_cache[cache_key] = True
-        logger.debug(f"Invalid API key cached")
+        logger.debug("Invalid API key cached")
 
         # Track the invalid attempt
         try:

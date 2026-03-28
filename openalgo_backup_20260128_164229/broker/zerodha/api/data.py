@@ -1,11 +1,10 @@
 import json
-import os
 import time
 import urllib.parse
-from database.token_db import get_br_symbol, get_oa_symbol
+from database.token_db import get_br_symbol
 from broker.zerodha.database.master_contract_db import SymToken, db_session
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import timedelta
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
 
@@ -283,7 +282,7 @@ class BrokerData:
             logger.debug(f"Permission error fetching multiquotes: {e}")
             raise
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise ZerodhaAPIError(f"Error fetching multiquotes: {e}")
 
     def _process_quotes_batch(self, symbols: list) -> list:

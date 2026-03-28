@@ -1,5 +1,5 @@
 """Base strategy adapter for OpenAlgo strategies to work with AITRAPP backtest engine"""
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 import sys
@@ -13,7 +13,7 @@ except ImportError:
     # Absolute import fallback
     _utils_dir = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, _utils_dir)
-    from aitrapp_integration import Strategy, StrategyContext, Signal, SignalSide, Instrument, InstrumentType
+    from aitrapp_integration import Strategy, StrategyContext, Signal, SignalSide, Instrument
     from openalgo_mock import set_current_timestamp, get_mock
 
 

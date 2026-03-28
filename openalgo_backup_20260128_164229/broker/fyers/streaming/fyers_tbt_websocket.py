@@ -223,7 +223,7 @@ class FyersTbtWebSocket:
         if self.running:
             self.logger.warning(f"TBT WebSocket closed: {close_status_code} - {close_msg}")
         else:
-            self.logger.debug(f"TBT WebSocket closed during shutdown")
+            self.logger.debug("TBT WebSocket closed during shutdown")
 
         if self.on_close and not self.running:
             try:

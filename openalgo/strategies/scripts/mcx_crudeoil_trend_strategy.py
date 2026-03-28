@@ -5,39 +5,34 @@ MCX Commodity trading strategy with EMA, RSI, and ATR analysis
 """
 import os
 import sys
-import time
 import logging
 import argparse
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
 
 # Add repo root to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-strategies_dir = os.path.dirname(script_dir)
-utils_dir = os.path.join(strategies_dir, "utils")
-sys.path.insert(0, utils_dir)
-# Also add the parent of strategies (openalgo root) to path to allow 'from utils import ...' inside trading_utils
-sys.path.insert(0, os.path.dirname(strategies_dir))
+try:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    strategies_dir = os.path.dirname(current_dir)
+    utils_dir = os.path.join(strategies_dir, "utils")
+    if utils_dir not in sys.path:
+        sys.path.insert(0, utils_dir)
+    openalgo_root = os.path.dirname(strategies_dir)
+    if openalgo_root not in sys.path:
+        sys.path.insert(0, openalgo_root)
+except Exception:
+    pass
 
 try:
-    from trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_ema
+    from base_strategy import BaseStrategy
+    from trading_utils import is_market_open
 except ImportError:
     try:
-        sys.path.insert(0, strategies_dir)
-        from utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_ema
+        from utils.base_strategy import BaseStrategy
+        from utils.trading_utils import is_market_open
     except ImportError:
-        try:
-            from openalgo.strategies.utils.trading_utils import APIClient, PositionManager, is_market_open, calculate_rsi, calculate_atr, calculate_ema
-        except ImportError:
-            print("Warning: openalgo package not found or imports failed.")
-            APIClient = None
-            PositionManager = None
-            is_market_open = lambda: True
-            # Define dummy indicators if missing
-            def calculate_rsi(series, period=14): return pd.Series()
-            def calculate_atr(df, period=14): return pd.Series()
-            def calculate_ema(series, period=20): return pd.Series()
+        from openalgo.strategies.utils.base_strategy import BaseStrategy
+        from openalgo.strategies.utils.trading_utils import is_market_open
 
 # Setup Logging
 logging.basicConfig(
@@ -45,76 +40,51 @@ logging.basicConfig(
 )
 logger = logging.getLogger("MCX_CrudeOil_Trend")
 
-class MCXStrategy:
-    def __init__(self, symbol, api_key, host, params):
-        self.symbol = symbol
-        self.api_key = api_key
-        self.host = host
-        self.params = params
+class MCXStrategy(BaseStrategy):
+    def setup(self):
+        """Initialize parameters"""
+        # Default Parameters if not provided
+        self.period_rsi = int(getattr(self, "period_rsi", 14))
+        self.period_atr = int(getattr(self, "period_atr", 14))
+        self.period_ema = int(getattr(self, "period_ema", 20))
 
-        self.client = APIClient(api_key=self.api_key, host=self.host) if APIClient else None
-        self.pm = PositionManager(symbol) if PositionManager else None
+        # Multi-Factor Parameters
+        self.usd_inr_trend = getattr(self, "usd_inr_trend", "Neutral")
+        self.usd_inr_volatility = float(getattr(self, "usd_inr_volatility", 0.0))
+        self.seasonality_score = int(getattr(self, "seasonality_score", 50))
+        self.global_alignment_score = int(getattr(self, "global_alignment_score", 50))
+
         self.data = pd.DataFrame()
 
-        logger.info(f"Initialized Strategy for {symbol}")
-        logger.info(f"Filters: Seasonality={params.get('seasonality_score', 'N/A')}, USD_Vol={params.get('usd_inr_volatility', 'N/A')}")
+        logger.info(f"Initialized Strategy for {self.symbol}")
+        logger.info(f"Filters: Seasonality={self.seasonality_score}, USD_Vol={self.usd_inr_volatility}")
 
-    def fetch_data(self):
-        """Fetch live or historical data from OpenAlgo"""
-        if not self.client:
-            logger.error("API Client not initialized.")
-            return
+    def calculate_indicators(self, df):
+        """Calculate technical indicators using BaseStrategy methods"""
+        if df.empty:
+            return df
 
-        try:
-            logger.info(f"Fetching data for {self.symbol}...")
-            end_date = datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+        # Calculate indicators using BaseStrategy/trading_utils methods
+        df["rsi"] = self.calculate_rsi(df["close"], period=self.period_rsi)
+        df["atr"] = self.calculate_atr_series(df, period=self.period_atr)
+        df["ema_fast"] = self.calculate_ema(df["close"], period=self.period_ema)
 
-            df = self.client.history(
-                symbol=self.symbol,
-                interval="15m",  # MCX typically uses 5m, 15m, or 1h
-                exchange="MCX",
-                start_date=start_date,
-                end_date=end_date,
-            )
+        return df
 
-            if not df.empty and len(df) > 50:
-                self.data = df
-                logger.info(f"Fetched {len(df)} candles.")
-            else:
-                logger.warning(f"Insufficient data for {self.symbol}.")
-
-        except Exception as e:
-            logger.error(f"Error fetching data: {e}", exc_info=True)
-
-    def calculate_indicators(self):
-        """Calculate technical indicators"""
-        if self.data.empty:
-            return
-
-        df = self.data.copy()
-
-        # Calculate indicators
-        df["rsi"] = calculate_rsi(df["close"], self.params.get("period_rsi", 14))
-        df["atr"] = calculate_atr(df, self.params.get("period_atr", 14))
-        df["ema_fast"] = calculate_ema(df["close"], self.params.get("period_ema", 20))
-
-        self.data = df
-
-    def check_signals(self):
+    def check_signals(self, df):
         """Check entry and exit conditions"""
-        if self.data.empty or len(self.data) < 50:
+        if df.empty or len(df) < 50:
             return
 
-        current = self.data.iloc[-1]
+        current = df.iloc[-1]
 
         has_position = False
         if self.pm:
             has_position = self.pm.has_position()
 
         # Multi-Factor Checks
-        seasonality_ok = self.params.get("seasonality_score", 50) > 40
-        usd_vol_high = self.params.get("usd_inr_volatility", 0) > 1.0
+        seasonality_ok = self.seasonality_score > 40
+        usd_vol_high = self.usd_inr_volatility > 1.0
 
         # Position sizing adjustment for volatility
         base_qty = 1
@@ -151,12 +121,10 @@ class MCXStrategy:
         if not has_position:
             if buy_signal:
                 logger.info(f"BUY SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}")
-                if self.pm:
-                    self.pm.update_position(base_qty, current["close"], "BUY")
+                self.buy(base_qty, current["close"])
             elif sell_signal:
                 logger.info(f"SELL SIGNAL: Price={current['close']}, RSI={current['rsi']:.2f}")
-                if self.pm:
-                    self.pm.update_position(base_qty, current["close"], "SELL")
+                self.sell(base_qty, current["close"])
 
         # Exit Logic
         elif has_position:
@@ -181,6 +149,11 @@ class MCXStrategy:
                 elif (current["close"] < current["ema_fast"]): # Trend Reversal
                     exit_signal = True
                     reason = "Trend Reversal"
+
+                if exit_signal:
+                    logger.info(f"EXIT LONG: {reason}")
+                    self.sell(abs(pos_qty), current["close"])
+
             elif pos_qty < 0: # Short
                 if (current["close"] <= entry_price - target):
                     exit_signal = True
@@ -192,19 +165,31 @@ class MCXStrategy:
                     exit_signal = True
                     reason = "Trend Reversal"
 
-            if exit_signal:
-                logger.info(f"EXIT: {reason}")
-                self.pm.update_position(abs(pos_qty), current["close"], "SELL" if pos_qty > 0 else "BUY")
+                if exit_signal:
+                    logger.info(f"EXIT SHORT: {reason}")
+                    self.buy(abs(pos_qty), current["close"])
+
+    def cycle(self):
+        """Main execution logic"""
+        # Fetch Data
+        df = self.fetch_history(days=5, interval="15m")
+        if df.empty or len(df) < 50:
+            logger.warning(f"Insufficient data for {self.symbol}.")
+            return
+
+        df = self.calculate_indicators(df)
+        self.check_signals(df)
 
     def generate_signal(self, df):
         """Generate signal for backtesting"""
         if df.empty:
             return "HOLD", 0.0, {}
 
-        self.data = df
-        self.calculate_indicators()
+        df = self.calculate_indicators(df)
+        if df.empty or len(df) < 50:
+             return "HOLD", 0.0, {}
 
-        current = self.data.iloc[-1]
+        current = df.iloc[-1]
 
         buy_signal = (current["close"] > current["ema_fast"]) and (current["rsi"] > 50)
         sell_signal = (current["close"] < current["ema_fast"]) and (current["rsi"] < 50)
@@ -216,92 +201,38 @@ class MCXStrategy:
 
         return "HOLD", 0.0, {}
 
-    def run(self):
-        logger.info(f"Starting MCX Strategy for {self.symbol}")
-        while True:
-            if not is_market_open(exchange="MCX"):
-                logger.info("Market is closed. Sleeping...")
-                time.sleep(300)
-                continue
 
-            self.fetch_data()
-            self.calculate_indicators()
-            self.check_signals()
-            time.sleep(900)  # 15 minutes
+# Backtesting support
+# Replaced with standard BaseStrategy wrapper
+generate_signal = MCXStrategy.backtest_signal
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="MCX Crude Oil Trend Strategy")
-    parser.add_argument("--symbol", type=str, help="MCX Symbol (e.g., CRUDEOIL19FEB26FUT)")
-    parser.add_argument("--underlying", type=str, help="Commodity Name (e.g., CRUDEOIL)")
-    parser.add_argument("--port", type=int, default=5001, help="API Port")
-    parser.add_argument("--api_key", type=str, help="API Key")
-
+    parser = MCXStrategy.get_standard_parser("MCX Crude Oil Trend Strategy")
     # Multi-Factor Arguments
     parser.add_argument("--usd_inr_trend", type=str, default="Neutral", help="USD/INR Trend")
     parser.add_argument("--usd_inr_volatility", type=float, default=0.0, help="USD/INR Volatility %%")
     parser.add_argument("--seasonality_score", type=int, default=50, help="Seasonality Score (0-100)")
     parser.add_argument("--global_alignment_score", type=int, default=50, help="Global Alignment Score")
+    parser.add_argument("--period_rsi", type=int, default=14, help="RSI Period")
+    parser.add_argument("--period_atr", type=int, default=14, help="ATR Period")
+    parser.add_argument("--period_ema", type=int, default=20, help="EMA Period")
+
+    MCXStrategy.add_arguments = lambda parser: None # Arguments already added above manually for this script style
+
+    # We can use the BaseStrategy CLI but we need to inject the specific parser
+    # Or just replicate the main block
 
     args = parser.parse_args()
+    kwargs = MCXStrategy.parse_arguments(args)
 
-    # Strategy Parameters
-    PARAMS = {
-        "period_rsi": 14,
-        "period_atr": 14,
-        "period_ema": 20,
-        "usd_inr_trend": args.usd_inr_trend,
-        "usd_inr_volatility": args.usd_inr_volatility,
-        "seasonality_score": args.seasonality_score,
-        "global_alignment_score": args.global_alignment_score,
-    }
+    if not kwargs.get('symbol'):
+         print("Error: Must provide --symbol (or --underlying if supported)")
+         sys.exit(1)
 
-    # Symbol Resolution
-    symbol = args.symbol or os.getenv("SYMBOL")
-
-    # Try to resolve from underlying
-    if not symbol and args.underlying:
-        try:
-            from symbol_resolver import SymbolResolver
-        except ImportError:
-            try:
-                from utils.symbol_resolver import SymbolResolver
-            except ImportError:
-                try:
-                    from strategies.utils.symbol_resolver import SymbolResolver
-                except ImportError:
-                     SymbolResolver = None
-
-        if SymbolResolver:
-            resolver = SymbolResolver()
-            res = resolver.resolve({"underlying": args.underlying, "type": "FUT", "exchange": "MCX"})
-            if res:
-                symbol = res
-                logger.info(f"Resolved {args.underlying} -> {symbol}")
-
-    if not symbol:
-        logger.error("Symbol not provided. Use --symbol or --underlying")
-        sys.exit(1)
-
-    api_key = args.api_key or os.getenv("OPENALGO_APIKEY")
-    port = args.port or int(os.getenv("OPENALGO_PORT", 5001))
-    host = f"http://127.0.0.1:{port}"
-
-    strategy = MCXStrategy(symbol, api_key, host, PARAMS)
-    strategy.run()
-
-# Backtesting support
-DEFAULT_PARAMS = {
-    "period_rsi": 14,
-    "period_atr": 14,
-    "period_ema": 20,
-}
-def generate_signal(df, client=None, symbol=None, params=None):
-    strat_params = DEFAULT_PARAMS.copy()
-    if params:
-        strat_params.update(params)
-
-    api_key = client.api_key if client and hasattr(client, "api_key") else "BACKTEST"
-    host = client.host if client and hasattr(client, "host") else "http://127.0.0.1:5001"
-
-    strat = MCXStrategy(symbol or "TEST", api_key, host, strat_params)
-    return strat.generate_signal(df)
+    try:
+         strategy = MCXStrategy(**kwargs)
+         strategy.run()
+    except Exception as e:
+         print(f"Error: {e}")
+         import traceback
+         traceback.print_exc()

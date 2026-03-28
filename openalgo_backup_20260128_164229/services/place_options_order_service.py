@@ -12,11 +12,10 @@ Supports both live trading and sandbox (analyze) mode, just like place_order_ser
 import copy
 import time
 import os
-from typing import Tuple, Dict, Any, Optional, List
+from typing import Tuple, Dict, Any, Optional
 from utils.logging import get_logger
 from services.option_symbol_service import get_option_symbol
 from services.place_order_service import place_order
-from database.auth_db import get_auth_token_broker
 from database.settings_db import get_analyze_mode
 from database.apilog_db import async_log_order, executor as log_executor
 from database.analyzer_db import async_log_analyzer

@@ -1,7 +1,6 @@
 # api/funds.py
 
 import json
-import logging
 from utils.httpx_client import get_httpx_client
 from broker.indmoney.api.baseurl import get_url
 from utils.logging import get_logger

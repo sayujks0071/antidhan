@@ -41,7 +41,6 @@ get_analyze_mode.return_value = False # Live mode
 from services.place_smart_order_service import place_smart_order
 
 # Mock utils.httpx_client which is used by broker.dhan_sandbox.api.order_api
-import utils.httpx_client
 
 class TestOrderFlow(unittest.TestCase):
     def setUp(self):

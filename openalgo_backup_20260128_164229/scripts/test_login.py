@@ -24,7 +24,7 @@ def test_login():
     print(f"   Status: {login_page.status_code}")
     
     if login_page.status_code != 200:
-        print(f"   ❌ Failed to load login page")
+        print("   ❌ Failed to load login page")
         return False
     
     # Extract CSRF token

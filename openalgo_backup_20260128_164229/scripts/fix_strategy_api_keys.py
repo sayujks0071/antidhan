@@ -83,7 +83,7 @@ for strategy_id, config in running_strategies:
     try:
         stop_data = stop_resp.json()
         if stop_data.get('success'):
-            print(f"  ✅ Stopped")
+            print("  ✅ Stopped")
             time.sleep(2)
         else:
             print(f"  ⚠️  Stop response: {stop_data}")
@@ -110,7 +110,7 @@ for strategy_id, config in running_strategies:
     try:
         env_data = env_resp.json()
         if env_data.get('success'):
-            print(f"  ✅ API key set")
+            print("  ✅ API key set")
         else:
             print(f"  ⚠️  Env update: {env_data}")
     except Exception:
@@ -122,7 +122,7 @@ for strategy_id, config in running_strategies:
     try:
         start_data = start_resp.json()
         if start_data.get('success'):
-            print(f"  ✅ Restarted")
+            print("  ✅ Restarted")
         else:
             print(f"  ⚠️  Start: {start_data}")
     except Exception:

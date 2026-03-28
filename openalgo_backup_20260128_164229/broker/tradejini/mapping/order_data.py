@@ -1,5 +1,4 @@
-import json
-from database.token_db import get_symbol, get_oa_symbol 
+from database.token_db import get_oa_symbol
 from broker.tradejini.mapping.transform_data import reverse_map_product_type
 from utils.logging import get_logger
 
@@ -169,7 +168,7 @@ def map_trade_data(trade_data):
     # Check if it's a TradeJini API response
     if not isinstance(trade_data, dict) or 's' not in trade_data or trade_data.get('s') != 'ok':
         # Not a TradeJini API response - log at debug level instead of warning to avoid unnecessary warnings
-        logger.debug(f"map_trade_data - Not a TradeJini API response format")
+        logger.debug("map_trade_data - Not a TradeJini API response format")
         return []
     
     # Get trades from response - they are in the 'd' array

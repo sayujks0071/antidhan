@@ -13,8 +13,8 @@ import json
 import logging
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
+from datetime import datetime
+from typing import Dict, List
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Backtest")
@@ -400,7 +400,7 @@ def main():
     print("=" * 80)
     print("🎯 RISK MANAGEMENT SUMMARY")
     print("=" * 80)
-    print(f"Max Daily Loss Limit:    ₹10,000")
+    print("Max Daily Loss Limit:    ₹10,000")
     print(f"Max Drawdown Seen:       ₹{results['max_drawdown']:,.0f}")
     print(f"Risk:Reward Ratio:       1:{results['profit_factor']}")
 

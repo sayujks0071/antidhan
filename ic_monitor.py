@@ -20,7 +20,12 @@ New in v3:
   - ROLL_ZONE = 80: new exit condition (wider than GAMMA_ZONE_PARTIAL=60)
   - 5 new state keys: ce_rolled, pe_rolled, mae, adjustments, regime_at_entry
 """
-import time, json, requests, sys, os, signal, re, socket
+import time
+import requests
+import sys
+import os
+import signal
+import re
 from datetime import datetime
 import pytz
 

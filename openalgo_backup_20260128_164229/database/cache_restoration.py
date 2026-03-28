@@ -127,8 +127,7 @@ def restore_auth_cache() -> dict:
         from database.auth_db import (
             Auth,
             auth_cache,
-            feed_token_cache,
-            broker_cache
+            feed_token_cache
         )
 
         # Get all non-revoked auth records
@@ -233,8 +232,8 @@ def restore_all_caches() -> dict:
         )
     else:
         logger.debug(
-            f"Cache restoration skipped: No active sessions found. "
-            f"Caches will be populated on user login."
+            "Cache restoration skipped: No active sessions found. "
+            "Caches will be populated on user login."
         )
 
     return result

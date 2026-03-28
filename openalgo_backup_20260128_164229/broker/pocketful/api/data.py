@@ -1,12 +1,9 @@
 import json
 import logging
-import os
-import urllib.parse
-from database.token_db import get_br_symbol, get_oa_symbol
+from database.token_db import get_br_symbol
 from broker.pocketful.database.master_contract_db import SymToken, db_session
 import pandas as pd
-from datetime import datetime, timedelta
-from broker.pocketful.api.pocketfulwebsocket import PocketfulSocket, get_ws_connection_status, get_snapquotedata
+from broker.pocketful.api.pocketfulwebsocket import PocketfulSocket
 import time
 import httpx
 from utils.httpx_client import get_httpx_client
@@ -659,7 +656,7 @@ class BrokerData:
                 return self._process_multiquotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise PocketfulAPIError(f"Error fetching multiquotes: {e}") from e
 
     def _process_multiquotes_batch(self, symbols: list) -> list:

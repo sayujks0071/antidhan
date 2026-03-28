@@ -1,8 +1,5 @@
-import http.client
-import json
 import os
 import urllib.parse
-from database.auth_db import get_auth_token
 from database.token_db import get_br_symbol, get_oa_symbol
 from broker.zerodha.mapping.transform_data import transform_data, map_product_type, reverse_map_product_type, transform_modify_order_data
 from utils.httpx_client import get_httpx_client

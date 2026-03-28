@@ -1,12 +1,11 @@
 import os
-import json
 import time
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import timedelta
 from utils.httpx_client import get_httpx_client
 from broker.mstock.mapping.order_data import transform_positions_data, transform_holdings_data
 from broker.mstock.api.mstockwebsocket import MstockWebSocket
-from database.token_db import get_br_symbol, get_token, get_oa_symbol
+from database.token_db import get_br_symbol, get_token
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -281,7 +280,7 @@ class BrokerData:
                 return self._process_multiquotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_multiquotes_batch(self, symbols: list) -> list:

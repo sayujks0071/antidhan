@@ -1,6 +1,5 @@
 import datetime
 import json
-import ssl
 
 import websocket
 from utils.logging import get_logger

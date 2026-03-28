@@ -3,7 +3,6 @@ from flask import request, jsonify, make_response
 from marshmallow import ValidationError
 from limiter import limiter
 import os
-import traceback
 
 from .data_schemas import HistorySchema
 from services.history_service import get_history

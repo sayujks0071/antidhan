@@ -1,7 +1,7 @@
 #Mapping OpenAlgo API Request https://openalgo.in/docs
 #Mapping JainamXTS Broking Parameters https://symphonyfintech.com/xts-trading-front-end-api/
 
-from database.token_db import get_br_symbol,get_token
+from database.token_db import get_br_symbol
 from utils.logging import get_logger
 
 logger = get_logger(__name__)

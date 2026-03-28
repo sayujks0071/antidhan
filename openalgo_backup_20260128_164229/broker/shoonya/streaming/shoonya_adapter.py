@@ -7,10 +7,8 @@ import json
 import logging
 import time
 from typing import Dict, Any, Optional, List
-from enum import IntEnum
 
 from database.auth_db import get_auth_token
-from database.token_db import get_token
 
 import sys
 import os
@@ -20,7 +18,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
 
 from websocket_proxy.base_adapter import BaseBrokerWebSocketAdapter
 from websocket_proxy.mapping import SymbolMapper
-from .shoonya_mapping import ShoonyaExchangeMapper, ShoonyaCapabilityRegistry
+from .shoonya_mapping import ShoonyaExchangeMapper
 from .shoonya_websocket import ShoonyaWebSocket
 
 

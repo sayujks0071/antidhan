@@ -55,7 +55,7 @@ def test_broker_apis():
             print(f"  Connection reused:                        Second request: {second_time:.0f}ms")
             
         except httpx.ConnectError:
-            print(f"  Could not connect (may require authentication)")
+            print("  Could not connect (may require authentication)")
         except httpx.HTTPStatusError as e:
             print(f"  HTTP error: {e.response.status_code}")
         except Exception as e:

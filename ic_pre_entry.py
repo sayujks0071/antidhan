@@ -15,7 +15,6 @@ Usage:
 """
 
 import sys
-import time
 import requests
 import pytz
 from datetime import datetime
@@ -110,7 +109,7 @@ def main():
     if "error" in oc:
         print(f"  ❌ Option chain error: {oc['error']}")
         print("  → Cannot proceed without market data.")
-        print(f"\n  ⛔  VERDICT: SKIP  (API unavailable — no market data)")
+        print("\n  ⛔  VERDICT: SKIP  (API unavailable — no market data)")
         sys.exit(2)
 
     nifty = float(oc.get("underlying_ltp", 0) or 0)
@@ -118,7 +117,7 @@ def main():
 
     if nifty <= 0 or atm <= 0:
         print("  ❌ NIFTY or ATM is 0 — market may not be open yet.")
-        print(f"\n  ⛔  VERDICT: SKIP  (market not open or pre-open)")
+        print("\n  ⛔  VERDICT: SKIP  (market not open or pre-open)")
         sys.exit(2)
 
     print(f"  NIFTY: {nifty:.1f}  |  ATM: {atm:.0f}")
@@ -131,13 +130,13 @@ def main():
     # VIX-based lot sizing factor
     if vix > 20:
         vix_factor = 0.5
-        print(f"  ⚠️  VIX > 20: reduce lots 50%, consider widening to ±150/±300")
+        print("  ⚠️  VIX > 20: reduce lots 50%, consider widening to ±150/±300")
     elif vix > 16:
         vix_factor = 0.75
-        print(f"  ⚠️  VIX 16–20: reduce lots 25%")
+        print("  ⚠️  VIX 16–20: reduce lots 25%")
     elif vix < 12:
         vix_factor = 0.0
-        print(f"  ⚠️  VIX < 12: premium too thin — IC not viable")
+        print("  ⚠️  VIX < 12: premium too thin — IC not viable")
         reasons_skip.append(f"VIX {vix:.1f} < 12 (premium too thin for IC)")
     else:
         vix_factor = 1.0
@@ -157,7 +156,7 @@ def main():
         else:
             reasons_caution.append(f"VOLATILE_CHOP + VIX {vix:.1f} ≤ 14 — mild chop, watch closely")
     elif regime == "MEAN_REVERSION":
-        print(f"  ✅ MEAN_REVERSION — ideal IC regime")
+        print("  ✅ MEAN_REVERSION — ideal IC regime")
     else:
         reasons_caution.append(f"Regime '{regime}' unknown — proceed with caution")
 
@@ -263,9 +262,9 @@ def main():
     elif verdict == "CAUTION":
         reduced = max(4, int(wave1 * 0.6))
         print(f"     → Consider {reduced} lots instead of {wave1} (60% position)")
-        print(f"     → Widen strikes to ±150/±300 if VIX > 16")
+        print("     → Widen strikes to ±150/±300 if VIX > 16")
     else:
-        print(f"     → Do NOT enter IC today")
+        print("     → Do NOT enter IC today")
 
     print(f"\n  Expiry: {EXPIRY} | Strikes: {int(atm-100)}PE/{int(atm+100)}CE (short) | {int(atm-200)}PE/{int(atm+200)}CE (long)")
     print(f"{'='*60}\n")

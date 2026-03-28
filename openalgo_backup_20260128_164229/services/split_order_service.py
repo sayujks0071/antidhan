@@ -1,23 +1,14 @@
 import importlib
-import traceback
 import copy
 import time
 import os
-from typing import Tuple, Dict, Any, Optional, List
+from typing import Tuple, Dict, Any, Optional
 
 from database.auth_db import get_auth_token_broker
 from database.apilog_db import async_log_order, executor as log_executor
 from database.settings_db import get_analyze_mode
 from database.analyzer_db import async_log_analyzer
 from extensions import socketio
-from utils.api_analyzer import analyze_request, generate_order_id
-from utils.constants import (
-    VALID_EXCHANGES,
-    VALID_ACTIONS,
-    VALID_PRICE_TYPES,
-    VALID_PRODUCT_TYPES,
-    REQUIRED_ORDER_FIELDS
-)
 from utils.logging import get_logger
 from services.telegram_alert_service import telegram_alert_service
 

@@ -7,7 +7,6 @@ Use this to troubleshoot email connection issues.
 
 import smtplib
 import ssl
-import logging
 from database.settings_db import get_smtp_settings
 from utils.logging import get_logger
 

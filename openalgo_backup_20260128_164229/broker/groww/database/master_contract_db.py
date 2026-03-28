@@ -2,8 +2,6 @@
 
 import os
 import pandas as pd
-import numpy as np
-import httpx
 from io import StringIO
 from utils.httpx_client import get_httpx_client
 
@@ -766,7 +764,6 @@ def process_groww_data(path):
                 
             # Format expiry date to standard format (e.g., 25MAY23)
             try:
-                from datetime import datetime
                 expiry_date = pd.to_datetime(row['expiry'])
                 expiry_str = expiry_date.strftime('%d%b%y').upper()
             except:

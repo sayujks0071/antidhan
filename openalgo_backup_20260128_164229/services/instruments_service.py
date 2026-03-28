@@ -1,7 +1,7 @@
-from database.symbol import SymToken, db_session
+from database.symbol import SymToken
 from database.auth_db import verify_api_key
 from utils.logging import get_logger
-from typing import Tuple, Dict, Any, List
+from typing import Tuple, Dict, Any
 import csv
 from io import StringIO
 
@@ -24,7 +24,7 @@ def get_instruments(exchange: str = None, api_key: str = None, format: str = 'js
         if api_key:
             user_id = verify_api_key(api_key)
             if not user_id:
-                logger.warning(f"Invalid API key provided for instruments download")
+                logger.warning("Invalid API key provided for instruments download")
                 return False, {
                     'status': 'error',
                     'message': 'Invalid openalgo apikey'
@@ -50,7 +50,7 @@ def get_instruments(exchange: str = None, api_key: str = None, format: str = 'js
         results = query.all()
 
         if not results:
-            logger.info(f"No instruments found" + (f" for exchange: {exchange}" if exchange else ""))
+            logger.info("No instruments found" + (f" for exchange: {exchange}" if exchange else ""))
             return True, {
                 'status': 'success',
                 'message': 'No instruments found',

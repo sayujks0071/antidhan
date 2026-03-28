@@ -7,7 +7,7 @@ import os
 import sys
 import logging
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from pathlib import Path
 
 # Add services to path

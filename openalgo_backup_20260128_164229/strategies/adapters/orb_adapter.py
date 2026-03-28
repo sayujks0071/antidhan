@@ -2,9 +2,8 @@
 import os
 import sys
 from datetime import datetime, time, timedelta
-from typing import List, Optional
+from typing import List
 import pandas as pd
-import numpy as np
 
 # Add paths
 _script_dir = os.path.dirname(os.path.abspath(__file__))

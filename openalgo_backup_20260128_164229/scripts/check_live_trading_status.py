@@ -26,9 +26,9 @@ if config_path.exists():
                 result = subprocess.run(['ps', '-p', str(pid)], 
                                       capture_output=True, text=True)
                 if result.returncode == 0:
-                    print(f"    ✅ Process active")
+                    print("    ✅ Process active")
                 else:
-                    print(f"    ⚠️  Process not found")
+                    print("    ⚠️  Process not found")
             except:
                 pass
 
@@ -36,7 +36,7 @@ if config_path.exists():
 env_path = Path("/Users/mac/dyad-apps/openalgo/strategies/strategy_env.json")
 if env_path.exists():
     env_data = json.loads(env_path.read_text())
-    print(f"\n✅ Environment Variables Configured:")
+    print("\n✅ Environment Variables Configured:")
     for sid, vars in env_data.items():
         if 'OPENALGO_APIKEY' in vars:
             print(f"  - {sid}: OPENALGO_APIKEY set")
@@ -44,7 +44,7 @@ else:
     print("\n⚠️  No environment variables file found")
 
 # Check recent logs for errors
-print(f"\n📋 Recent Log Activity:")
+print("\n📋 Recent Log Activity:")
 log_dir = Path("/Users/mac/dyad-apps/openalgo/log/strategies")
 if log_dir.exists():
     log_files = sorted(log_dir.glob("*.log"), key=lambda x: x.stat().st_mtime, reverse=True)[:3]

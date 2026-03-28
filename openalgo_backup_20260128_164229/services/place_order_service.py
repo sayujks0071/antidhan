@@ -7,7 +7,6 @@ from database.apilog_db import async_log_order, executor
 from database.settings_db import get_analyze_mode
 from database.analyzer_db import async_log_analyzer
 from extensions import socketio
-from utils.api_analyzer import analyze_request, generate_order_id
 from utils.constants import (
     VALID_EXCHANGES,
     VALID_ACTIONS,

@@ -5,7 +5,6 @@ import sys
 from datetime import datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from typing import Optional
 
 # Load environment variables if .env file exists
 try:
@@ -140,7 +139,7 @@ class ColoredFormatter(logging.Formatter):
         # Wrap in try-except to handle format string mismatches from external libraries
         try:
             original_format = super().format(record)
-        except (TypeError, ValueError) as e:
+        except (TypeError, ValueError):
             # Handle cases where external libraries (like hpack) pass wrong types
             # Example: hpack passes strings like '2' to %d format specifier
             # Fallback to basic formatting without the problematic args

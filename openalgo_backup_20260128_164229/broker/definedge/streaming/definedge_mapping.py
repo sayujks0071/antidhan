@@ -1,4 +1,3 @@
-import logging
 
 class DefinedgeExchangeMapper:
     """Maps OpenAlgo exchange codes to DefinEdge-specific exchange types"""

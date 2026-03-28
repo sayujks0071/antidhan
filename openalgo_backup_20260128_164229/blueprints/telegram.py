@@ -1,5 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for, Response
-from database.auth_db import get_auth_token
+from flask import Blueprint, jsonify, request, render_template, session
 from utils.session import check_session_validity
 from limiter import limiter
 from database.telegram_db import (
@@ -13,8 +12,6 @@ from database.telegram_db import (
 from services.telegram_bot_service import telegram_bot_service
 from utils.logging import get_logger
 import asyncio
-import concurrent.futures
-import json
 import os
 
 logger = get_logger(__name__)

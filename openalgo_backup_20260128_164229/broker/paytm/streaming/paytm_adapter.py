@@ -1,12 +1,10 @@
 import threading
-import json
 import logging
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 from broker.paytm.streaming.paytm_websocket import PaytmWebSocket
-from database.auth_db import get_auth_token, get_feed_token
-from database.token_db import get_token, get_symbol, get_br_symbol
+from database.auth_db import get_feed_token
 
 import sys
 import os
@@ -16,7 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
 
 from websocket_proxy.base_adapter import BaseBrokerWebSocketAdapter
 from websocket_proxy.mapping import SymbolMapper
-from .paytm_mapping import PaytmExchangeMapper, PaytmCapabilityRegistry
+from .paytm_mapping import PaytmExchangeMapper
 
 
 class PaytmWebSocketAdapter(BaseBrokerWebSocketAdapter):

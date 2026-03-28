@@ -1,6 +1,6 @@
 # blueprints/log.py
 
-from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, Response
+from flask import Blueprint, render_template, request, jsonify, Response
 from database.apilog_db import OrderLog
 from utils.session import check_session_validity
 from sqlalchemy import func

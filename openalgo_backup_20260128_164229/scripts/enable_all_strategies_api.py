@@ -5,7 +5,6 @@ Uses HTTP requests instead of browser automation
 """
 
 import sys
-import os
 import re
 import requests
 from typing import List, Dict, Tuple
@@ -184,9 +183,9 @@ def get_strategies(session: requests.Session, port: int) -> List[Dict]:
                 
                 # Try to find strategy name - look for card-title or h2/h3/h4 near the button
                 name_patterns = [
-                    rf'<[^>]*class=["\'][^"\']*card-title[^"\']*["\'][^>]*>([^<]+)</',
-                    rf'<h[234][^>]*>([^<]+)</h[234]>',
-                    rf'<[^>]*class=["\'][^"\']*title[^"\']*["\'][^>]*>([^<]+)</',
+                    r'<[^>]*class=["\'][^"\']*card-title[^"\']*["\'][^>]*>([^<]+)</',
+                    r'<h[234][^>]*>([^<]+)</h[234]>',
+                    r'<[^>]*class=["\'][^"\']*title[^"\']*["\'][^>]*>([^<]+)</',
                 ]
                 
                 strategy_name = f"Strategy {strategy_id[:8]}"
@@ -206,9 +205,9 @@ def get_strategies(session: requests.Session, port: int) -> List[Dict]:
                 # Check status - look for badge classes
                 status_text = ""
                 badge_patterns = [
-                    rf'<[^>]*class=["\'][^"\']*badge-success[^"\']*["\'][^>]*>([^<]+)</',
-                    rf'<[^>]*class=["\'][^"\']*badge-ghost[^"\']*["\'][^>]*>([^<]+)</',
-                    rf'<[^>]*class=["\'][^"\']*badge-error[^"\']*["\'][^>]*>([^<]+)</',
+                    r'<[^>]*class=["\'][^"\']*badge-success[^"\']*["\'][^>]*>([^<]+)</',
+                    r'<[^>]*class=["\'][^"\']*badge-ghost[^"\']*["\'][^>]*>([^<]+)</',
+                    r'<[^>]*class=["\'][^"\']*badge-error[^"\']*["\'][^>]*>([^<]+)</',
                 ]
                 
                 id_pos = html.find(strategy_id)
@@ -234,7 +233,7 @@ def get_strategies(session: requests.Session, port: int) -> List[Dict]:
                     'is_running': is_running
                 })
                 
-            except Exception as e:
+            except Exception:
                 # If extraction fails, still add the strategy with minimal info
                 strategies.append({
                     'id': strategy_id,
@@ -304,7 +303,7 @@ def start_strategy(session: requests.Session, port: int, strategy_id: str) -> Tu
         
         # Rate limit handling
         if response.status_code == 429:
-            return False, f"Rate limit exceeded"
+            return False, "Rate limit exceeded"
         
         return False, f"Failed: {response.status_code} - {response.text[:200]}"
         
@@ -314,7 +313,7 @@ def start_strategy(session: requests.Session, port: int, strategy_id: str) -> Tu
 def main():
     """Main function to enable all strategies"""
     # Get all strategies from config file first (no login needed)
-    print(f"\n📋 Loading strategies from config file...")
+    print("\n📋 Loading strategies from config file...")
     strategies = get_strategies(None, None)  # Pass None since we're reading from file
     
     if not strategies:
@@ -327,7 +326,7 @@ def main():
     stopped_strategies = [s for s in strategies if not s['is_running'] and s['has_start']]
     running_strategies = [s for s in strategies if s['is_running']]
     
-    print(f"📊 Status Summary:")
+    print("📊 Status Summary:")
     print(f"   ✅ Running: {len(running_strategies)}")
     print(f"   ⏸️  Stopped: {len(stopped_strategies)}")
     print(f"   📋 Total: {len(strategies)}\n")
@@ -337,7 +336,7 @@ def main():
         return True
     
     # Now login to start strategies
-    print(f"\n🔐 Logging in to start strategies...")
+    print("\n🔐 Logging in to start strategies...")
     session = requests.Session()
     logged_in = False
     working_port = None
@@ -374,7 +373,7 @@ def main():
             enabled_count += 1
         else:
             if "rate limit" in message.lower() or "429" in message:
-                print(f"   ⚠️  Rate limited - waiting 10 seconds...")
+                print("   ⚠️  Rate limited - waiting 10 seconds...")
                 import time
                 time.sleep(10)
                 # Retry once
@@ -395,7 +394,7 @@ def main():
     
     # Final summary
     print(f"\n{'='*60}")
-    print(f"📊 Final Summary:")
+    print("📊 Final Summary:")
     print(f"   ✅ Enabled: {enabled_count}")
     print(f"   ✅ Already Running: {len(running_strategies)}")
     print(f"   ❌ Failed: {failed_count}")

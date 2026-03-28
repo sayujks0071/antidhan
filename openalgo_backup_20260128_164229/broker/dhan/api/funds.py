@@ -2,9 +2,7 @@
 
 import os
 import json
-import httpx
 from broker.dhan.api.order_api import get_positions
-from broker.dhan.mapping.order_data import map_position_data
 from utils.httpx_client import get_httpx_client
 from broker.dhan.api.baseurl import get_url
 from utils.logging import get_logger

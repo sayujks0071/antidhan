@@ -1,7 +1,5 @@
 import json
-import os
-import httpx
-from database.token_db import get_token, get_br_symbol, get_symbol, get_oa_symbol
+from database.token_db import get_token, get_br_symbol, get_oa_symbol
 from broker.samco.mapping.transform_data import transform_data, map_product_type, reverse_map_product_type, transform_modify_order_data
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger

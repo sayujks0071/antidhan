@@ -4,10 +4,9 @@ import os
 from sqlalchemy import create_engine, UniqueConstraint, Index, CheckConstraint
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, DECIMAL, Date
+from sqlalchemy import Column, Integer, String, DateTime, Text, DECIMAL, Date
 from sqlalchemy.sql import func
 from sqlalchemy.pool import NullPool
-from datetime import datetime
 from utils.logging import get_logger
 from dotenv import load_dotenv
 

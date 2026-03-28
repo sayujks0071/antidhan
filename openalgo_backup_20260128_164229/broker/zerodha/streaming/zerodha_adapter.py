@@ -7,11 +7,10 @@ Fixed Zerodha WebSocket adapter that properly handles NIFTY index data.
 The key fixes are in the _handle_ticks method for proper topic generation.
 """
 import asyncio
-import json
 import os
 import threading
 import time
-from typing import Dict, List, Optional, Set, Any, Callable
+from typing import Dict, List, Optional, Any
 
 from websocket_proxy.base_adapter import BaseBrokerWebSocketAdapter
 from database.token_db import get_token

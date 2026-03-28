@@ -1,19 +1,15 @@
 import os
 import asyncio
-import logging
 import threading
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple
 from datetime import datetime, timedelta
 import httpx
-from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from telegram.constants import ParseMode
-import json
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
-import io
-import base64
 from openalgo import api as openalgo_api
 
 # Database imports
@@ -23,8 +19,6 @@ from database.telegram_db import (
     get_bot_config,
     update_bot_config,
     log_command,
-    get_command_stats,
-    get_all_telegram_users,
     delete_telegram_user,
     get_user_credentials
 )

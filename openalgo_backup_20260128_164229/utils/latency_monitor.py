@@ -4,7 +4,6 @@ from flask import g, request
 from database.latency_db import OrderLatency, latency_session, init_latency_db, purge_old_data_logs
 from database.auth_db import get_broker_name
 from utils.logging import get_logger
-from flask_restx import Resource
 
 logger = get_logger(__name__)
 

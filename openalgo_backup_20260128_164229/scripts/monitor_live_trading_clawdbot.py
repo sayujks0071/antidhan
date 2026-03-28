@@ -8,11 +8,9 @@ import sys
 import time
 import json
 import re
-import subprocess
 import logging
 from pathlib import Path
 from datetime import datetime
-from collections import defaultdict
 import pytz
 
 # Setup logging

@@ -9,7 +9,7 @@ import re
 import time
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Tuple, Optional
 import requests
 
 # Configuration
@@ -292,7 +292,7 @@ def main():
             if was_running:
                 success, msg = stop_strategy(session, strategy_id)
                 if success:
-                    print(f"     ✅ Stopped")
+                    print("     ✅ Stopped")
                 else:
                     print(f"     ⚠️  Stop failed: {msg}")
                     continue
@@ -300,7 +300,7 @@ def main():
             # Set API key
             success, msg = set_api_key(session, strategy_id, API_KEY)
             if success:
-                print(f"     ✅ API key set")
+                print("     ✅ API key set")
             else:
                 print(f"     ⚠️  Failed: {msg}")
                 continue
@@ -310,7 +310,7 @@ def main():
                 time.sleep(1)
                 success, msg = start_strategy(session, strategy_id)
                 if success:
-                    print(f"     ✅ Restarted")
+                    print("     ✅ Restarted")
                 else:
                     print(f"     ⚠️  Restart failed: {msg}")
     

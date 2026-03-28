@@ -1,8 +1,8 @@
 """Adapter for SuperTrend VWAP Strategy"""
 import os
 import sys
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import timedelta
+from typing import List
 import pandas as pd
 import numpy as np
 

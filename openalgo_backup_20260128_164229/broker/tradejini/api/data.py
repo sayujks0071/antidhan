@@ -4,9 +4,8 @@ import time
 import threading
 import pandas as pd
 import httpx
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Tuple, Union
-from database.token_db import get_token, get_br_symbol, get_oa_symbol, get_symbol
+from typing import Dict, Any, List, Tuple, Union
+from database.token_db import get_token, get_br_symbol, get_symbol
 from utils.httpx_client import get_httpx_client
 from broker.tradejini.api.nxtradstream import NxtradStream
 from utils.logging import get_logger
@@ -49,7 +48,7 @@ class TradejiniWebSocket:
                 logger.error(error_msg)
                 raise ValueError(error_msg)
             
-            logger.debug(f"Connecting to Tradejini WebSocket using official SDK")
+            logger.debug("Connecting to Tradejini WebSocket using official SDK")
             
             # Create NxtradStream instance with callbacks using official SDK
             self.nx_stream = NxtradStream(
@@ -390,7 +389,7 @@ class BrokerData:
                     if self.ws.last_quote:
                         logger.debug(f"Last quote symbol: '{self.ws.last_quote.get('symbol', 'None')}'")
                     else:
-                        logger.debug(f"Last quote: None")
+                        logger.debug("Last quote: None")
 
             # If no data received, return default quote in OpenAlgo format
             logger.warning(f"No quote data received for {symbol} after {max_retries} attempts")
@@ -455,7 +454,7 @@ class BrokerData:
                 return self._process_multiquotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_multiquotes_batch(self, symbols: list) -> list:

@@ -1,5 +1,4 @@
-import json
-from database.token_db import get_symbol, get_oa_symbol
+from database.token_db import get_oa_symbol
 from utils.logging import get_logger
 
 logger = get_logger(__name__)

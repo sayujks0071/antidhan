@@ -9,8 +9,6 @@ Fixes:
 3. Database logging errors - Fixes latency_db.py
 """
 import json
-import os
-import sys
 from pathlib import Path
 
 # Paths

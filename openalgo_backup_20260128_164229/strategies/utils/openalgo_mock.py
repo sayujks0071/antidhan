@@ -1,10 +1,9 @@
 """OpenAlgo API mock for backtesting using AITRAPP historical data"""
 import sys
 import os
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from datetime import datetime
+from typing import Dict, Optional, Any
 import pandas as pd
-import numpy as np
 
 # Import AITRAPP modules
 # Handle both relative and absolute imports
@@ -413,7 +412,6 @@ class OpenAlgoAPIMock:
     
     def _calculate_delta(self, S: float, K: float, T: float, iv: float, r: float, is_call: bool) -> float:
         """Calculate delta (simplified approximation)"""
-        import math
         
         if T <= 0 or iv <= 0 or K <= 0:
             return 0.5 if is_call else -0.5

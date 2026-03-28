@@ -1,6 +1,6 @@
 """Backtest configuration"""
 from datetime import datetime
-from typing import List, Dict
+from typing import List
 
 # Default backtest parameters
 DEFAULT_START_DATE = datetime(2025, 8, 15)

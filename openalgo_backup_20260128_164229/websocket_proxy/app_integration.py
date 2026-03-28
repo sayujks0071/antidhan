@@ -1,13 +1,11 @@
 import asyncio
 import threading
-import sys
 import platform
 import os
 import signal
 import atexit
 
-from .server import main as websocket_main
-from utils.logging import get_logger, highlight_url
+from utils.logging import get_logger
 
 # Set the correct event loop policy for Windows to avoid ZeroMQ warnings
 if platform.system() == 'Windows':

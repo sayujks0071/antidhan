@@ -1,12 +1,9 @@
 import json
-import os
 import time
 import urllib.parse
 import httpx
 from database.token_db import get_br_symbol, get_token
-from broker.paytm.database.master_contract_db import SymToken, db_session
 import pandas as pd
-from datetime import datetime, timedelta
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
 
@@ -227,7 +224,7 @@ class BrokerData:
                 return self._process_multiquotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_multiquotes_batch(self, symbols: list) -> list:

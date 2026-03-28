@@ -1,10 +1,8 @@
-from flask import Blueprint, jsonify, render_template, request, session, Response
+from flask import Blueprint, jsonify, render_template, request, Response
 from database.latency_db import OrderLatency, latency_session
 from utils.session import check_session_validity
 from limiter import limiter
 from utils.logging import get_logger
-from sqlalchemy import func
-from collections import defaultdict
 import numpy as np
 from datetime import datetime
 import pytz

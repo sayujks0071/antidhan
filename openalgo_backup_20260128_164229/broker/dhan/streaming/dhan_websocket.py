@@ -10,7 +10,7 @@ import time
 import logging
 import asyncio
 import platform
-from typing import Dict, Any, Optional, List, Callable
+from typing import Dict, Any, List
 from urllib.parse import urlencode
 
 

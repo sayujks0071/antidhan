@@ -1,7 +1,5 @@
 import json
-import os
 import httpx
-from database.auth_db import get_auth_token
 from database.token_db import get_token, get_br_symbol, get_oa_symbol
 from broker.definedge.mapping.transform_data import transform_data, map_product_type, reverse_map_product_type, transform_modify_order_data
 from utils.httpx_client import get_httpx_client
@@ -72,7 +70,7 @@ def get_open_position(tradingsymbol, exchange, product, auth):
     # Convert Trading Symbol from OpenAlgo Format to Broker Format Before Search in OpenPosition
     tradingsymbol = get_br_symbol(tradingsymbol, exchange)
     
-    logger.info(f"=== GET OPEN POSITION ===")
+    logger.info("=== GET OPEN POSITION ===")
     logger.info(f"Looking for: Symbol={tradingsymbol}, Exchange={exchange}, Product={product}")
     
     positions_data = get_positions(auth)
@@ -242,7 +240,7 @@ def place_smartorder_api(data, auth):
         # Get current open position for the symbol
         current_position = int(get_open_position(symbol, exchange, map_product_type(product), auth))
 
-        logger.info(f"=== SMART ORDER EXECUTION ===")
+        logger.info("=== SMART ORDER EXECUTION ===")
         logger.info(f"Symbol: {symbol}, Exchange: {exchange}, Product: {product}")
         logger.info(f"Target position_size: {position_size}")
         logger.info(f"Current Open Position: {current_position}")
@@ -535,7 +533,7 @@ def cancel_order(orderid, auth):
 
 def modify_order(data,auth):
 
-    logger.info(f"=== MODIFY ORDER DEFINEDGE CALLED ===")
+    logger.info("=== MODIFY ORDER DEFINEDGE CALLED ===")
     logger.info(f"Raw input data: {data}")
     
     # Parse the auth token for DefinedGe
@@ -621,7 +619,7 @@ def cancel_all_orders_api(data, auth):
     
     if not orders_data:
         logger.info("No orders found in order book")
-        logger.info(f"Checked fields: 'data', 'orders', 'orderbook' in response")
+        logger.info("Checked fields: 'data', 'orders', 'orderbook' in response")
         return [], []
     
     logger.info(f"Total orders in order book: {len(orders_data)}")
@@ -665,7 +663,7 @@ def cancel_all_orders_api(data, auth):
             logger.warning(f"Order missing ID field: {order}")
     
     # Log summary
-    logger.info(f"=== CANCEL ALL ORDERS SUMMARY ===")
+    logger.info("=== CANCEL ALL ORDERS SUMMARY ===")
     logger.info(f"Total orders cancelled: {len(canceled_orders)}")
     logger.info(f"Total orders failed: {len(failed_cancellations)}")
     

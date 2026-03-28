@@ -2,22 +2,13 @@
 
 import os
 import pandas as pd
-import numpy as np
 import requests
-import gzip
-import shutil
-import http.client
-import json
-import pandas as pd
-import gzip
-import io
 import time
 
 
 from sqlalchemy import create_engine, Column, Integer, String, Float , Sequence, Index, text
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from database.auth_db import get_auth_token
 from extensions import socketio  # Import SocketIO
 from utils.logging import get_logger
 
@@ -147,7 +138,7 @@ def download_csv_indmoney_data(output_path):
     # Get the access token for Indmoney broker from the database
     # Since Indmoney might have multiple users, we need to get the first valid one
     try:
-        from database.auth_db import Auth, db_session
+        from database.auth_db import Auth
         auth_obj = Auth.query.filter_by(broker='indmoney', is_revoked=False).first()
         if auth_obj:
             from database.auth_db import decrypt_token

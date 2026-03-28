@@ -91,7 +91,7 @@ def test_order_execution():
     try:
         success, response_data, status_code = execute_approved_order(order_id)
 
-        print(f"Execution Result:")
+        print("Execution Result:")
         print(f"  Success: {success}")
         print(f"  Status Code: {status_code}")
         print(f"  Response: {json.dumps(response_data, indent=2)}")
@@ -105,7 +105,7 @@ def test_order_execution():
             print(f"  Error: {response_data.get('message', 'Unknown error')}")
 
     except Exception as e:
-        print(f"✗ EXCEPTION DURING EXECUTION:")
+        print("✗ EXCEPTION DURING EXECUTION:")
         print(f"  {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()

@@ -1,9 +1,7 @@
 import json
 import os
-import httpx
-from database.auth_db import get_auth_token
 from database.token_db import get_token, get_symbol
-from broker.mstock.mapping.transform_data import transform_data, map_product_type, reverse_map_product_type, transform_modify_order_data, get_mstock_symbol
+from broker.mstock.mapping.transform_data import transform_data, map_product_type, reverse_map_product_type, transform_modify_order_data
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
 
@@ -168,7 +166,7 @@ def place_order_api(data, auth):
 
     # mStock Type B API returns a list with single dict element
     if isinstance(response_data, list) and len(response_data) > 0:
-        logger.info(f"API returned list, extracting first element")
+        logger.info("API returned list, extracting first element")
         response_dict = response_data[0]
 
         # Extract orderid from the dict

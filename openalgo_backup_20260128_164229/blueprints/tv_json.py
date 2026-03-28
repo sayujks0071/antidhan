@@ -1,6 +1,6 @@
 # blueprints/tv_json.py
 
-from flask import Blueprint, render_template, request, jsonify, session, url_for, redirect
+from flask import Blueprint, render_template, request, jsonify, session
 from database.symbol import enhanced_search_symbols
 from database.auth_db import get_api_key_for_tradingview
 from utils.session import check_session_validity

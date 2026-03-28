@@ -6,7 +6,6 @@ Continuously monitors Silver Mini BUY position and executes exits when SL/TP hit
 import os
 import sys
 import time
-import json
 import subprocess
 import logging
 from pathlib import Path
@@ -184,7 +183,7 @@ class PositionMonitor:
                     logger.info("=" * 60)
                     
                     # Send alert
-                    alert_msg = f"✅ Silver Mini Position Exited\n"
+                    alert_msg = "✅ Silver Mini Position Exited\n"
                     alert_msg += f"Reason: {reason}\n"
                     alert_msg += f"Entry: ₹{self.entry_price:,.2f}\n"
                     alert_msg += f"Exit: ₹{exit_price:,.2f}\n"

@@ -38,7 +38,7 @@ if rankings_csv.exists():
         if file_path and file_path.exists():
             print(f"  Status: ✅ File exists at {file_path}")
         else:
-            print(f"  Status: ❌ File not found")
+            print("  Status: ❌ File not found")
         print(f"  Score: {entry.get('score', 'N/A')}")
         print()
 else:

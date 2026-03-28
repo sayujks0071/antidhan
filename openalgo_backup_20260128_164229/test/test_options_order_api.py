@@ -53,13 +53,13 @@ def test_nifty_atm_call_buy():
         "disclosed_quantity": 0
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -91,13 +91,13 @@ def test_banknifty_itm2_put_sell():
         "disclosed_quantity": 0
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -128,13 +128,13 @@ def test_embedded_expiry():
         "disclosed_quantity": 0
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -166,13 +166,13 @@ def test_limit_order():
         "disclosed_quantity": 0
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -204,13 +204,13 @@ def test_sl_order():
         "disclosed_quantity": 0
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -293,13 +293,13 @@ def test_validation_error():
         "product": "MIS"
     }
 
-    print(f"\nRequest Payload (Missing strike_int):")
+    print("\nRequest Payload (Missing strike_int):")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")

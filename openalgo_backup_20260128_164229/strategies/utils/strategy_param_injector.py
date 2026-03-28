@@ -3,11 +3,10 @@ Strategy Parameter Injector
 ---------------------------
 Dynamically injects parameters into strategy modules for backtesting optimization.
 """
-import os
 import sys
 import importlib
 import importlib.util
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from pathlib import Path
 import logging
 

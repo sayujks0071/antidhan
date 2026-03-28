@@ -1,12 +1,9 @@
 import threading
-import json
 import logging
 import time
-import zmq
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 from database.auth_db import get_auth_token
-from database.token_db import get_token
 
 import sys
 import os
@@ -16,7 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
 
 from websocket_proxy.base_adapter import BaseBrokerWebSocketAdapter
 from websocket_proxy.mapping import SymbolMapper
-from .groww_mapping import GrowwExchangeMapper, GrowwCapabilityRegistry
+from .groww_mapping import GrowwExchangeMapper
 from .nats_websocket import GrowwNATSWebSocket
 
 class GrowwWebSocketAdapter(BaseBrokerWebSocketAdapter):
@@ -289,7 +286,7 @@ class GrowwWebSocketAdapter(BaseBrokerWebSocketAdapter):
 
         # Log token details for debugging F&O
         if exchange in ['NFO', 'BFO']:
-            self.logger.info(f"F&O Subscription Debug:")
+            self.logger.info("F&O Subscription Debug:")
             self.logger.info(f"  Symbol: {symbol}")
             self.logger.info(f"  Exchange: {exchange} -> Groww: {groww_exchange}")
             self.logger.info(f"  Segment: {segment}")
@@ -330,7 +327,7 @@ class GrowwWebSocketAdapter(BaseBrokerWebSocketAdapter):
                     else:
                         # Enhanced logging for BSE depth subscriptions
                         if 'BSE' in groww_exchange:
-                            self.logger.info(f"🔴 Creating BSE DEPTH subscription:")
+                            self.logger.info("🔴 Creating BSE DEPTH subscription:")
                             self.logger.info(f"   Exchange: {groww_exchange}")
                             self.logger.info(f"   Segment: {segment}")
                             self.logger.info(f"   Token: {token}")
@@ -439,7 +436,7 @@ class GrowwWebSocketAdapter(BaseBrokerWebSocketAdapter):
             is_bse_depth = False
             if 'depth_data' in data and 'exchange' in data and 'BSE' in data.get('exchange', ''):
                 is_bse_depth = True
-                self.logger.info(f"🔴 BSE DEPTH DATA RECEIVED!")
+                self.logger.info("🔴 BSE DEPTH DATA RECEIVED!")
                 self.logger.info(f"   Depth data: {data.get('depth_data', {})}")
 
             # Debug log the raw message data to see what we're actually receiving
@@ -479,7 +476,7 @@ class GrowwWebSocketAdapter(BaseBrokerWebSocketAdapter):
 
                 # Special logging for BSE depth
                 if 'BSE' in exchange and mode == 'depth':
-                    self.logger.info(f"🔴 BSE DEPTH: Looking for subscription")
+                    self.logger.info("🔴 BSE DEPTH: Looking for subscription")
 
                 self.logger.info(f"Looking for subscription: symbol={symbol_from_data}, exchange={exchange}, mode={mode}")
                 self.logger.info(f"Available subscriptions: {list(self.subscriptions.keys())}")
@@ -531,7 +528,7 @@ class GrowwWebSocketAdapter(BaseBrokerWebSocketAdapter):
             if not subscription:
                 # Enhanced logging for BSE depth debugging
                 if 'BSE' in str(data) and 'depth' in str(data).lower():
-                    self.logger.error(f"🔴 BSE DEPTH DATA RECEIVED BUT NO SUBSCRIPTION FOUND!")
+                    self.logger.error("🔴 BSE DEPTH DATA RECEIVED BUT NO SUBSCRIPTION FOUND!")
                     self.logger.error(f"   Data: {data}")
                     self.logger.error(f"   Active subscriptions: {self.subscriptions}")
                 self.logger.warning(f"Received data for unsubscribed token/symbol: {data}")

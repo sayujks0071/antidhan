@@ -1,7 +1,5 @@
 import json
 import os
-import httpx
-from database.auth_db import get_auth_token
 from database.token_db import get_token , get_br_symbol, get_symbol, get_symbol_info
 from broker.motilal.mapping.transform_data import transform_data , map_product_type, reverse_map_product_type, transform_modify_order_data, map_exchange, reverse_map_exchange
 from utils.httpx_client import get_httpx_client

@@ -1,5 +1,3 @@
-import httpx
-import json
 import os
 import hashlib
 from utils.httpx_client import get_httpx_client

@@ -51,7 +51,7 @@ def test_broker_protocols():
             print(f"{broker:<20} {url:<35} {'N/A':<12} {'No Conn':<8}")
         except httpx.TimeoutException:
             print(f"{broker:<20} {url:<35} {'N/A':<12} {'Timeout':<8}")
-        except Exception as e:
+        except Exception:
             print(f"{broker:<20} {url:<35} {'N/A':<12} {'Error':<8}")
     
     client.close()

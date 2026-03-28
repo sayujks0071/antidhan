@@ -14,7 +14,6 @@ load_dotenv(dotenv_path)
 from sqlalchemy import Column, Text, inspect, String, DateTime, Boolean
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 import logging
 from datetime import datetime
 

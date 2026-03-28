@@ -3,7 +3,6 @@ from flask import request, jsonify, make_response
 from marshmallow import ValidationError
 from limiter import limiter
 import os
-import traceback
 
 from restx_api.account_schema import OpenPositionSchema
 from services.openposition_service import get_open_position, emit_analyzer_error
@@ -50,7 +49,7 @@ class OpenPosition(Resource):
             
             return make_response(jsonify(response_data), status_code)
 
-        except Exception as e:
+        except Exception:
             logger.exception("An unexpected error occurred in OpenPosition endpoint.")
             error_message = 'An unexpected error occurred'
             if get_analyze_mode():

@@ -1,9 +1,8 @@
-from flask import Blueprint, jsonify, render_template, request, session, redirect, url_for
-import os
+from flask import Blueprint, jsonify, render_template, request, session
 from utils.logging import get_logger
 import secrets
 from argon2 import PasswordHasher
-from database.auth_db import upsert_api_key, get_api_key, verify_api_key, get_api_key_for_tradingview, get_order_mode, update_order_mode
+from database.auth_db import upsert_api_key, get_api_key_for_tradingview, get_order_mode, update_order_mode
 from utils.session import check_session_validity
 
 logger = get_logger(__name__)

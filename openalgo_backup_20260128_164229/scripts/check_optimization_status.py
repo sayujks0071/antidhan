@@ -4,7 +4,6 @@ Check Background Optimization Status
 Shows running optimization processes and their progress
 """
 import subprocess
-import json
 from pathlib import Path
 from datetime import datetime
 
@@ -110,7 +109,7 @@ def main():
     
     log_info = check_optimization_log()
     if log_info:
-        print(f"  Log file exists: ✅")
+        print("  Log file exists: ✅")
         print(f"  Total lines: {log_info['lines']}")
         print()
         print("  Last 10 lines:")
@@ -126,7 +125,7 @@ def main():
     print("=" * 80)
     
     if processes:
-        print(f"✅ Optimization is RUNNING")
+        print("✅ Optimization is RUNNING")
         print(f"   Active processes: {len(processes)}")
         print(f"   Latest results: {len(results)} file(s)")
     else:

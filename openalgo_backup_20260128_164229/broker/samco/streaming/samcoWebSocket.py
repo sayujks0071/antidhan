@@ -4,11 +4,10 @@ Handles connection to Samco's Broadcast API for streaming market data
 Based on official Samco Python SDK pattern
 """
 import json
-import logging
 import threading
 import time
 import websocket
-from typing import Any, Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 from urllib.parse import unquote
 
 from utils.logging import get_logger

@@ -1,6 +1,6 @@
 import importlib
 import traceback
-from typing import Tuple, Dict, Any, Optional, Union, List
+from typing import Tuple, Dict, Any, Optional, List
 from database.auth_db import get_auth_token_broker
 from database.token_db import get_token
 from utils.constants import VALID_EXCHANGES
@@ -53,7 +53,7 @@ def validate_symbols_bulk(symbols: List[Dict[str, str]]) -> Tuple[bool, List[Dic
         exchange = item.get('exchange', '')
 
         if not symbol or not exchange:
-            error = f"Missing symbol or exchange in request"
+            error = "Missing symbol or exchange in request"
             validated.append({**item, 'valid': False, 'error': error})
             if all_valid:
                 first_error = error

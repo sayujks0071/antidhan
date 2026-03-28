@@ -1,4 +1,3 @@
-import os
 import logging
 import pytz
 import json
@@ -6,7 +5,6 @@ from pathlib import Path
 from datetime import datetime, time
 import httpx
 import pandas as pd
-import numpy as np
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

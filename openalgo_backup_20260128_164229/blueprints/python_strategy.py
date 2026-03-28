@@ -12,7 +12,7 @@ import os
 import subprocess
 import psutil
 import logging
-from datetime import datetime, time
+from datetime import datetime
 from pathlib import Path
 from werkzeug.utils import secure_filename
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -24,8 +24,6 @@ import pytz
 import platform
 import threading
 from cryptography.fernet import Fernet
-import base64
-import hashlib
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -376,7 +374,7 @@ def start_strategy_process(strategy_id):
                 log_handle = open(log_file, 'w', encoding='utf-8', buffering=1)
             except PermissionError as e:
                 logger.error(f"Permission denied creating log file: {e}")
-                return False, f"Permission denied creating log file. Check directory permissions."
+                return False, "Permission denied creating log file. Check directory permissions."
             except Exception as e:
                 logger.error(f"Error creating log file: {e}")
                 return False, f"Error creating log file: {str(e)}"
@@ -415,7 +413,7 @@ def start_strategy_process(strategy_id):
             except PermissionError as e:
                 log_handle.close()
                 logger.error(f"Permission denied executing strategy: {e}")
-                return False, f"Permission denied. Check file permissions and Python executable access."
+                return False, "Permission denied. Check file permissions and Python executable access."
             except OSError as e:
                 log_handle.close()
                 if "preexec_fn" in str(e):
@@ -1434,7 +1432,7 @@ def manage_env_variables(strategy_id):
             logger.info(f"Environment variables updated for strategy {strategy_id}")
             return jsonify({
                 'success': True,
-                'message': f'Environment variables saved successfully',
+                'message': 'Environment variables saved successfully',
                 'regular_count': len(regular_vars),
                 'secure_count': len(secure_vars)
             })
@@ -1480,7 +1478,7 @@ def restore_strategy_states():
             if config.get('is_running'):
                 config['is_running'] = False
                 config['is_error'] = True
-                config['error_message'] = f"Waiting for master contracts to be downloaded"
+                config['error_message'] = "Waiting for master contracts to be downloaded"
                 config['error_time'] = get_ist_time().isoformat()
                 config['pid'] = None
         save_configs()

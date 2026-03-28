@@ -1,5 +1,4 @@
 import httpx
-import json
 import os
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
@@ -267,7 +266,7 @@ def verify_otp(otp_code, refresh_token):
         logger.debug(f"Sending OTP verification request with OTP length: {len(otp_code)}")
         logger.debug(f"RefreshToken length: {len(refresh_token) if refresh_token else 0}")
         logger.debug(f"API Key (X-PrivateKey) length: {len(api_key) if api_key else 0}")
-        logger.debug(f"Request URL: https://api.mstock.trade/openapi/typeb/session/token")
+        logger.debug("Request URL: https://api.mstock.trade/openapi/typeb/session/token")
         logger.debug(f"Request headers: {token_headers}")
         logger.debug(f"Request body: refreshToken=[{refresh_token[:20]}...], otp={otp_code}")
 

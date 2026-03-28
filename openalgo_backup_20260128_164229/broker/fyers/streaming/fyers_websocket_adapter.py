@@ -3,11 +3,9 @@ Fyers WebSocket Adapter for OpenAlgo WebSocket Proxy
 Integrates with the OpenAlgo WebSocket proxy system
 """
 
-import json
 import threading
 import logging
 import time
-import zmq
 from typing import Dict, Any, Optional
 
 # Import base adapter

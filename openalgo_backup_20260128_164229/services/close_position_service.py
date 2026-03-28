@@ -8,7 +8,6 @@ from database.apilog_db import async_log_order, executor
 from database.settings_db import get_analyze_mode
 from database.analyzer_db import async_log_analyzer
 from extensions import socketio
-from utils.api_analyzer import analyze_request
 from utils.logging import get_logger
 from services.telegram_alert_service import telegram_alert_service
 

@@ -40,7 +40,7 @@ def get_process_info(pid):
                         'command': parts[6] if len(parts) > 6 else ''
                     }
         return None
-    except Exception as e:
+    except Exception:
         return None
 
 def get_latest_log_entries(sid, n=5):
@@ -52,7 +52,7 @@ def get_latest_log_entries(sid, n=5):
             with open(logs[0], 'r') as f:
                 lines = f.readlines()
                 return [line.strip() for line in lines[-n:] if line.strip()]
-        except Exception as e:
+        except Exception:
             pass
     return []
 

@@ -153,7 +153,7 @@ def check_dependencies():
 def add_smtp_columns():
     """Add SMTP columns to the settings table using raw SQL"""
     try:
-        from sqlalchemy import create_engine, inspect, text, MetaData
+        from sqlalchemy import create_engine, inspect, text
         
         # Get database URL from environment
         database_url = os.getenv('DATABASE_URL')
@@ -165,7 +165,7 @@ def add_smtp_columns():
                     safe_print(f"  {key}: {os.environ[key]}")
             return False
         
-        safe_print(f"🔧 Creating database connection...")
+        safe_print("🔧 Creating database connection...")
         safe_print(f"📁 Database URL: {database_url}")
         
         # Check if database file exists (for SQLite)

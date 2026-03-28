@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest.mock import patch, MagicMock
 from functools import wraps
-from flask import Flask, session, json
+from flask import Flask
 
 # Add openalgo to sys.path
 sys.path.append(os.path.join(os.getcwd(), 'openalgo'))

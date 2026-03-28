@@ -4,9 +4,7 @@ Test Dhan API with correct headers format.
 """
 
 import os
-import sys
 import requests
-import json
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -22,7 +20,7 @@ if ":::" in broker_api_key:
 else:
     client_id = broker_api_key
 
-print(f"=== Dhan API Test ===")
+print("=== Dhan API Test ===")
 print(f"Client ID: {client_id}")
 print(f"Access Token (first 50): {access_token[:50] if access_token else 'None'}...")
 
@@ -36,7 +34,7 @@ headers = {
 }
 
 # Try different payload formats
-print(f"\n=== Test 1: Exchange type format ===")
+print("\n=== Test 1: Exchange type format ===")
 # Format: {exchange_type: [security_ids]}
 # MCX = 3
 payload1 = {"3": [44993]}  # CRUDEOIL19FEB26FUT security_id
@@ -48,7 +46,7 @@ try:
 except Exception as e:
     print(f"Error: {e}")
 
-print(f"\n=== Test 2: Try with NIFTY ===")
+print("\n=== Test 2: Try with NIFTY ===")
 # NSE = 1, NIFTY security_id = 13
 payload2 = {"1": [13]}
 print(f"Payload: {payload2}")
@@ -59,7 +57,7 @@ try:
 except Exception as e:
     print(f"Error: {e}")
 
-print(f"\n=== Test 3: Check user funds ===")
+print("\n=== Test 3: Check user funds ===")
 url_funds = "https://api.dhan.co/fundlimit"
 try:
     response = requests.get(url_funds, headers=headers, timeout=10)

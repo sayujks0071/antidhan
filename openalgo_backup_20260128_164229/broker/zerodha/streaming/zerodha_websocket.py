@@ -388,7 +388,7 @@ class ZerodhaWebSocket:
                     
                 return True
             else:
-                self.logger.warning(f"⚠️ Failed to set mode for batch")
+                self.logger.warning("⚠️ Failed to set mode for batch")
                 return False
                 
         except Exception as e:
@@ -628,7 +628,7 @@ class ZerodhaWebSocket:
                         self.logger.warning("⚠️ Message receive timeout, connection may be dead")
                         self.connected = False
                     
-                    except websockets.exceptions.ConnectionClosed as e:
+                    except websockets.exceptions.ConnectionClosed:
                         #self.logger.warning(f"🔌 Connection closed: {e}")
                         self.connected = False
                         if self.running:  # Only reconnect if we're still supposed to be running

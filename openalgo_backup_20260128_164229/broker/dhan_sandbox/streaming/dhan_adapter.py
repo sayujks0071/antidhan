@@ -6,11 +6,10 @@ import logging
 import os
 import threading
 import time
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Any
 
 # Add the project root to Python path if not already there
 import sys
-import os
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -18,7 +17,6 @@ if project_root not in sys.path:
 # Now import using relative paths from the project root
 from websocket_proxy.base_adapter import BaseBrokerWebSocketAdapter
 from database.token_db import get_token
-from database.auth_db import get_auth_token
 
 # Import the WebSocket client
 from .dhan_websocket import DhanWebSocket

@@ -5,7 +5,6 @@ Enhanced with partial update handling like AliceBlue's tick feed processing.
 """
 import json
 import threading
-import time
 from .HSWebSocketLib import HSWebSocket
 from utils.logging import get_logger
 

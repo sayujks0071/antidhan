@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.telegram_bot_service import telegram_bot_service
 from database.telegram_db import get_telegram_user, create_or_update_telegram_user
-from datetime import datetime
 
 async def test_chart_generation():
     """Test chart generation directly"""

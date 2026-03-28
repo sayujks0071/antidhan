@@ -73,7 +73,7 @@ print("8) Download Last 10 Years Data")
 try:
     user_choice = int(input("Enter your choice (1-8): "))
     start_date, end_date = get_date_range(user_choice)
-except ValueError as e:
+except ValueError:
     print("Invalid input. Please restart the script and select a valid option.")
     exit()
 

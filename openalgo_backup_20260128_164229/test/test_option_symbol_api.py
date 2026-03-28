@@ -42,13 +42,13 @@ def test_option_symbol_nifty_index():
         "option_type": "CE"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -72,13 +72,13 @@ def test_option_symbol_with_embedded_expiry():
         "option_type": "PE"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -103,13 +103,13 @@ def test_option_symbol_banknifty():
         "option_type": "CE"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -134,13 +134,13 @@ def test_option_symbol_equity():
         "option_type": "PE"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")
@@ -165,13 +165,13 @@ def test_validation_error():
         "option_type": "CE"
     }
 
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
 
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(response.json(), indent=2))
     except Exception as e:
         print(f"Error: {e}")

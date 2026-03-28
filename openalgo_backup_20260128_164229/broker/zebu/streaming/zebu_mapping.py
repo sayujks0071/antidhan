@@ -1,7 +1,7 @@
 """
 Zebu-specific mapping utilities for the WebSocket adapter
 """
-from typing import Dict, Set, Optional
+from typing import Dict, Optional
 
 class ZebuExchangeMapper:
     """Maps between OpenAlgo exchange names and Zebu exchange codes"""

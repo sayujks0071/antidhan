@@ -47,7 +47,7 @@ class MarginCalculator(Resource):
 
             return make_response(jsonify(response_data), status_code)
 
-        except Exception as e:
+        except Exception:
             logger.exception("An unexpected error occurred in Margin Calculator endpoint.")
             error_response = {
                 'status': 'error',

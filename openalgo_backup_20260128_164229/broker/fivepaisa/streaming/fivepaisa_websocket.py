@@ -1,13 +1,9 @@
 import json
 import logging
 import ssl
-import time
 import websocket
 import base64
-from typing import Dict, List, Optional
-from urllib.parse import quote
-import logzero
-from logzero import logger
+from typing import Dict, List
 
 class FivePaisaWebSocket(object):
     """

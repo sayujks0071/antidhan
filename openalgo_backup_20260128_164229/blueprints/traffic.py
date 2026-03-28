@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, render_template, request, session, Response
+from flask import Blueprint, jsonify, render_template, request, Response
 from database.traffic_db import TrafficLog, logs_session
 from utils.session import check_session_validity
 from limiter import limiter

@@ -1,11 +1,9 @@
 import json
 import logging
-import time
-import threading
 import socketio
 import requests
-from typing import Dict, Any, Optional, List, Callable
-from broker.jainamxts.baseurl import MARKET_DATA_URL,INTERACTIVE_URL,BASE_URL
+from typing import Dict, List
+from broker.jainamxts.baseurl import MARKET_DATA_URL,BASE_URL
 
 
 class JainamXTSWebSocketClient:
@@ -157,7 +155,7 @@ class JainamXTSWebSocketClient:
                         self.logger.debug(f"[MARKET DATA LOGIN] Success! Token obtained, UserID: {self.actual_user_id}")
                         return True
                     else:
-                        self.logger.error(f"[MARKET DATA LOGIN] Missing token or userID in response")
+                        self.logger.error("[MARKET DATA LOGIN] Missing token or userID in response")
                         return False
                 else:
                     self.logger.error(f"[MARKET DATA LOGIN] API returned error: {result}")
@@ -652,11 +650,11 @@ class JainamXTSWebSocketClient:
             if header_msg_code == 1512:  # LTP
                 # 1512 LTP packets are simple - try LTP at offset 2 (after MessageCode)
                 # or scan for the first valid price
-                self.logger.debug(f"[XTS-BINARY] 1512 LTP: parsing LTP packet")
+                self.logger.debug("[XTS-BINARY] 1512 LTP: parsing LTP packet")
                 self._parse_ltp_packet(payload, market_data)
             elif header_msg_code == 1501:  # Touchline
                 # For 1501, parse OHLC first to get reference range, then find LTP within that range
-                self.logger.debug(f"[XTS-BINARY] 1501 Touchline: parsing with OHLC validation")
+                self.logger.debug("[XTS-BINARY] 1501 Touchline: parsing with OHLC validation")
                 self._parse_touchline_with_ohlc(payload, market_data)
             elif header_msg_code == 1502:  # Market Depth
                 # Based on scan results, LTP is at payload offset 166 for JainamXTS
@@ -669,7 +667,7 @@ class JainamXTSWebSocketClient:
                 # Parse depth data (bids/asks) from binary
                 self._parse_depth(payload, market_data)
             elif header_msg_code == 1510:  # Open Interest
-                self.logger.info(f"[XTS-BINARY] 1510 OpenInterest: scanning for prices")
+                self.logger.info("[XTS-BINARY] 1510 OpenInterest: scanning for prices")
                 self._scan_and_parse(payload, market_data)
             else:
                 self.logger.info(f"[XTS-BINARY] Message code {header_msg_code}: scanning for prices")
@@ -781,7 +779,7 @@ class JainamXTSWebSocketClient:
 
             # Fallback: scan for first valid price
             if ltp is None:
-                self.logger.debug(f"[XTS-LTP] Known offsets failed, scanning...")
+                self.logger.debug("[XTS-LTP] Known offsets failed, scanning...")
                 for off in range(0, min(len(payload) - 7, 100)):
                     try:
                         val = struct.unpack('<d', payload[off:off+8])[0]
@@ -797,7 +795,7 @@ class JainamXTSWebSocketClient:
                 market_data['LastTradedPrice'] = round(ltp, 2)
                 self.logger.debug(f"[XTS-LTP] Parsed LTP={ltp:.2f} at offset {ltp_offset}")
             else:
-                self.logger.warning(f"[XTS-LTP] Could not find valid LTP in payload")
+                self.logger.warning("[XTS-LTP] Could not find valid LTP in payload")
 
         except Exception as e:
             self.logger.error(f"[XTS-LTP] Error parsing LTP packet: {e}")
@@ -952,7 +950,7 @@ class JainamXTSWebSocketClient:
 
             # If fixed offset didn't work, fall back to scanning
             if len(bids) < 2 or len(asks) < 1:
-                self.logger.debug(f"[XTS-BINARY] Fixed offset failed, scanning for depth prices...")
+                self.logger.debug("[XTS-BINARY] Fixed offset failed, scanning for depth prices...")
                 bids, asks = self._scan_depth_prices(payload, ltp)
 
             # Sort bids descending, asks ascending

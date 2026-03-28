@@ -5,7 +5,6 @@ Uses database lookup for brsymbol mapping
 """
 
 import requests
-import json
 import logging
 from typing import Dict, List, Tuple, Optional
 

@@ -2,7 +2,6 @@
 """
 Analyze MCX Trading Logs with Clawdbot AI
 """
-import os
 import sys
 import json
 import re
@@ -228,17 +227,17 @@ def main():
         print(f"  Total Signals: {len(summary.get('signals', []))}")
         
         if summary.get('api_errors'):
-            print(f"  API Error Breakdown:")
+            print("  API Error Breakdown:")
             for code, count in summary['api_errors'].items():
                 print(f"    HTTP {code}: {count}")
         
         if summary.get('last_signals'):
-            print(f"  Latest Signals:")
+            print("  Latest Signals:")
             for signal_type, value in summary['last_signals'].items():
                 print(f"    {signal_type}: {value}")
         
         if summary.get('errors'):
-            print(f"  Recent Errors (last 3):")
+            print("  Recent Errors (last 3):")
             for error in summary['errors'][-3:]:
                 print(f"    - {error[:100]}")
 

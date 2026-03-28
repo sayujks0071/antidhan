@@ -3,15 +3,12 @@ Telegram Alert Service for Order Notifications
 Handles asynchronous sending of order-related alerts to users via Telegram
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
-import time
 from datetime import datetime
-import json
 from database.telegram_db import (
     get_telegram_user_by_username,
     get_all_telegram_users,
-    get_bot_config,
     add_notification
 )
 from utils.logging import get_logger

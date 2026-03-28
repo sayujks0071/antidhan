@@ -49,7 +49,6 @@ def catch_up_mis_squareoff():
     """
     try:
         from database.sandbox_db import SandboxPositions, SandboxFunds, db_session
-        from sandbox.fund_manager import FundManager
 
         # Get today's date at midnight IST
         today = datetime.now(IST).date()
@@ -212,8 +211,7 @@ def catch_up_daily_pnl_snapshot():
     """
     try:
         from database.sandbox_db import (
-            SandboxFunds, SandboxPositions, SandboxHoldings,
-            SandboxDailyPnL, db_session
+            SandboxFunds, SandboxDailyPnL, db_session
         )
         from datetime import date, timedelta
 

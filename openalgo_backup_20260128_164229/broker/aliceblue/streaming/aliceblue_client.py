@@ -3,12 +3,8 @@ import json
 import hashlib
 import enum
 import logging
-from datetime import time, datetime
-from time import sleep
 from collections import namedtuple
-import os
 import websocket
-import ssl
 import threading
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,5 @@
 # api/funds.py
 
-import os
 import json
 import httpx
 from utils.httpx_client import get_httpx_client
@@ -29,7 +28,7 @@ def get_margin_data(auth_token):
         }
         
         # Make the API request using the shared client
-        logger.debug(f"Making getRmsLimits request to AliceBlue API")
+        logger.debug("Making getRmsLimits request to AliceBlue API")
         response = client.get(url, headers=headers)
         response.raise_for_status()
         

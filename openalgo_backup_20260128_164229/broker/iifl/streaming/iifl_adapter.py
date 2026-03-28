@@ -7,7 +7,6 @@ from typing import Dict, Any, Optional, List
 
 from broker.iifl.streaming.iifl_websocket import IiflWebSocketClient
 from database.auth_db import get_auth_token, get_feed_token
-from database.token_db import get_token
 
 import sys
 import os
@@ -322,7 +321,7 @@ class IiflWebSocketAdapter(BaseBrokerWebSocketAdapter):
         exchange_type = IiflExchangeMapper.get_exchange_type(brexchange)
         
         # Log the full mapping for debugging
-        self.logger.info(f"Exchange mapping details:")
+        self.logger.info("Exchange mapping details:")
         self.logger.info(f"  - Input exchange: {exchange}")
         self.logger.info(f"  - Brexchange from DB: {brexchange}")
         self.logger.info(f"  - Mapped exchange type: {exchange_type}")
@@ -455,7 +454,7 @@ class IiflWebSocketAdapter(BaseBrokerWebSocketAdapter):
                 self.logger.info(f"Successfully sent unsubscribe request for {symbol}.{exchange}")
                 
                 # Always disconnect and perform cleanup after unsubscription
-                self.logger.info(f"Initiating disconnect and cleanup after unsubscription")
+                self.logger.info("Initiating disconnect and cleanup after unsubscription")
                 self.disconnect()
                 
                 return self._create_success_response(
@@ -468,7 +467,7 @@ class IiflWebSocketAdapter(BaseBrokerWebSocketAdapter):
                 self.logger.error(f"Error unsubscribing from {symbol}.{exchange}: {e}")
                 return self._create_error_response("UNSUBSCRIPTION_ERROR", str(e))
         else:
-            self.logger.warning(f"Not connected to XTS server, skipping unsubscribe request")
+            self.logger.warning("Not connected to XTS server, skipping unsubscribe request")
             
         return self._create_success_response(
             f"Unsubscribed from {symbol}.{exchange}",

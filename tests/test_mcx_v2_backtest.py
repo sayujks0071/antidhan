@@ -2,8 +2,7 @@ import sys
 import os
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-import importlib.util
+from datetime import datetime
 
 # Add openalgo root to path
 sys.path.append(os.path.join(os.getcwd(), 'openalgo'))

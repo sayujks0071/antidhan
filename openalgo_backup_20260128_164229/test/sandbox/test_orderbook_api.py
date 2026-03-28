@@ -2,8 +2,7 @@
 """
 Test that rejected orders appear correctly in the orderbook API response
 """
-from decimal import Decimal
-from database.sandbox_db import init_db, db_session, SandboxOrders
+from database.sandbox_db import init_db
 from sandbox.order_manager import OrderManager
 
 # Initialize database
@@ -22,7 +21,7 @@ print("📋 Orderbook API Response")
 print("="*60)
 print(f"Success: {success}")
 print(f"Status Code: {code}")
-print(f"\nResponse:")
+print("\nResponse:")
 print(f"  Status: {response.get('status')}")
 print(f"  Mode: {response.get('mode')}")
 
@@ -39,7 +38,7 @@ if 'data' in response:
         print(f"\n  Total Orders: {len(order_list)}")
     else:
         order_list = []
-        print(f"\n  Unexpected data structure")
+        print("\n  Unexpected data structure")
 
     # Filter rejected orders
     rejected_orders = [o for o in order_list if isinstance(o, dict) and o.get('order_status') == 'rejected']
@@ -60,7 +59,7 @@ if 'data' in response:
     # Check statistics
     if 'statistics' in response:
         stats = response['statistics']
-        print(f"\n  📊 Statistics:")
+        print("\n  📊 Statistics:")
         print(f"    Total Buy Orders: {stats.get('total_buy_orders', 0)}")
         print(f"    Total Sell Orders: {stats.get('total_sell_orders', 0)}")
         print(f"    Open Orders: {stats.get('total_open_orders', 0)}")

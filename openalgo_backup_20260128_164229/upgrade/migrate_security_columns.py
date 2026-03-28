@@ -87,7 +87,7 @@ def migrate_settings_table():
                     logger.info(f"✓ Column already exists: {column_name}")
                     columns_existing += 1
 
-        logger.info(f"\n📊 Migration Summary:")
+        logger.info("\n📊 Migration Summary:")
         logger.info(f"   - Columns added: {columns_added}")
         logger.info(f"   - Columns already existing: {columns_existing}")
         logger.info(f"   - Total security columns: {len(security_columns)}")

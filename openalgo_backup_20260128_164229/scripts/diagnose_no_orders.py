@@ -3,7 +3,6 @@
 Diagnose why strategies aren't placing orders
 Analyzes logs to identify which entry conditions are failing
 """
-import re
 from pathlib import Path
 from collections import defaultdict
 

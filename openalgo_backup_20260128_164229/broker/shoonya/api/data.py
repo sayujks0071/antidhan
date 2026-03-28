@@ -4,10 +4,9 @@ import json
 import os
 import time
 import pandas as pd
-from datetime import datetime, timedelta
-import urllib.parse
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from database.token_db import get_token, get_br_symbol, get_oa_symbol
+from database.token_db import get_token, get_br_symbol
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
 
@@ -159,7 +158,7 @@ class BrokerData:
                 return self._process_quotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _fetch_single_quote_sync(self, symbol: str, exchange: str, api_exchange: str, token: str, api_key: str) -> dict:
@@ -567,7 +566,7 @@ class BrokerData:
                             'volume': float(candle.get('intv', 0)),
                             'oi': float(candle.get('oi', 0))
                         })
-                except (KeyError, ValueError) as e:
+                except (KeyError, ValueError):
                     logger.error(f"Error parsing candle data: {{e}}, Candle: {candle}")
                     continue
 

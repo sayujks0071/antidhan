@@ -1,7 +1,6 @@
 
 import unittest
 from unittest.mock import MagicMock, patch
-import time
 import httpx
 from datetime import datetime, timezone, timedelta
 from email.utils import format_datetime
@@ -27,7 +26,7 @@ try:
 except ImportError:
     # If openalgo package is not recognized, try adding openalgo to path
     sys.path.append(os.path.join(os.getcwd(), 'openalgo'))
-    from utils.httpx_client import request, get_httpx_client, _create_http_client
+    from utils.httpx_client import request
 
 
 class TestHttpxRetryVerification(unittest.TestCase):

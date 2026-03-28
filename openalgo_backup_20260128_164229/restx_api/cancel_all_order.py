@@ -60,7 +60,7 @@ class CancelAllOrder(Resource):
             executor.submit(async_log_order, 'cancelallorder', data, error_response)
             return make_response(jsonify(error_response), 400)
             
-        except Exception as e:
+        except Exception:
             logger.error("An unexpected error occurred in CancelAllOrder endpoint.")
             traceback.print_exc()
             error_message = 'An unexpected error occurred'

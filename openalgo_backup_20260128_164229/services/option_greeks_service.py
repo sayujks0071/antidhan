@@ -206,7 +206,7 @@ def calculate_time_to_expiry(expiry: datetime) -> Tuple[float, float]:
     if years_to_expiry < 0.0001:  # Less than ~1 hour
         years_to_expiry = 0.0001
         days_to_expiry = years_to_expiry * 365.0
-        logger.info(f"Very close to expiry - using minimum 0.0001 years")
+        logger.info("Very close to expiry - using minimum 0.0001 years")
 
     logger.info(f"Time to expiry: {days_to_expiry:.4f} days ({years_to_expiry:.6f} years)")
 
@@ -294,7 +294,7 @@ def calculate_greeks(
         if time_value <= 0 or (intrinsic_value > 0 and time_value < 0.01):
             # Deep ITM option with no/negligible time value
             # Return theoretical Greeks: IV=0, Delta=+/-1, Gamma=0, Theta=0, Vega=0
-            logger.info(f"Deep ITM option with no time value - returning theoretical Greeks")
+            logger.info("Deep ITM option with no time value - returning theoretical Greeks")
 
             response = {
                 'status': 'success',
@@ -342,7 +342,7 @@ def calculate_greeks(
             error_msg = str(e)
             # If IV calculation fails due to numerical issues, return theoretical deep ITM Greeks
             if "intrinsic" in error_msg.lower() or "below" in error_msg.lower() or "convergence" in error_msg.lower():
-                logger.info(f"IV calculation failed - returning theoretical Greeks for deep ITM option")
+                logger.info("IV calculation failed - returning theoretical Greeks for deep ITM option")
                 response = {
                     'status': 'success',
                     'symbol': option_symbol,

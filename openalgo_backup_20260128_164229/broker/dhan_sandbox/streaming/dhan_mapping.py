@@ -2,7 +2,6 @@
 Mapping utilities for Dhan broker integration.
 Provides exchange code mappings between OpenAlgo and Dhan formats.
 """
-from typing import Dict
 
 # Exchange code mappings
 # OpenAlgo exchange code -> Dhan exchange code

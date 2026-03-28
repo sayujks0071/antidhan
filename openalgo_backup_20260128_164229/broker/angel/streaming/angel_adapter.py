@@ -1,12 +1,10 @@
 import threading
-import json
 import logging
 import time
 from typing import Dict, Any, Optional, List
 
 from broker.angel.streaming.smartWebSocketV2 import SmartWebSocketV2
 from database.auth_db import get_auth_token, get_feed_token
-from database.token_db import get_token
 
 import sys
 import os

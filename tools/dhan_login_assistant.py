@@ -11,9 +11,7 @@ Interactive tool to update Dhan Authentication Tokens.
 
 import os
 import sys
-import time
 import requests
-from dotenv import load_dotenv
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

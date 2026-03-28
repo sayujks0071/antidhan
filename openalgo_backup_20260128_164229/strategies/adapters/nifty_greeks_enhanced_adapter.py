@@ -19,12 +19,11 @@ sys.path.insert(0, _scripts_dir)
 from strategy_adapter import StrategyAdapter
 from aitrapp_integration import StrategyContext, Signal, SignalSide, Instrument, InstrumentType
 from openalgo_mock import get_mock
-from aitrapp_utils import OptimizedIndicators, PositionSizer, PortfolioHeatTracker
+from aitrapp_utils import OptimizedIndicators, PortfolioHeatTracker
 
 # Import strategy constants and functions
 from nifty_greeks_enhanced_20260122 import (
-    UNDERLYING, UNDERLYING_EXCHANGE, OPTIONS_EXCHANGE, STRIKE_INT,
-    ACCOUNT_SIZE, RISK_PCT, MAX_POSITIONS, DAILY_LOSS_LIMIT_PCT,
+    UNDERLYING, UNDERLYING_EXCHANGE, OPTIONS_EXCHANGE, ACCOUNT_SIZE, DAILY_LOSS_LIMIT_PCT,
     EMA_FAST, EMA_SLOW, ADX_PERIOD, ATR_PERIOD, RSI_PERIOD,
     MIN_ADX, MIN_ATR_PCT, MAX_ATR_PCT,
     RSI_LONG_MIN, RSI_LONG_MAX, RSI_SHORT_MIN, RSI_SHORT_MAX,

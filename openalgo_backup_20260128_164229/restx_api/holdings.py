@@ -3,7 +3,6 @@ from flask import request, jsonify, make_response
 from marshmallow import ValidationError
 from limiter import limiter
 import os
-import traceback
 
 from .account_schema import HoldingsSchema
 from services.holdings_service import get_holdings

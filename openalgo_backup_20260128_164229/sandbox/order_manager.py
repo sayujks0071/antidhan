@@ -16,16 +16,14 @@ import time
 from decimal import Decimal
 from datetime import datetime
 import pytz
-import uuid
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.sandbox_db import (
-    SandboxOrders, SandboxTrades, SandboxPositions, db_session
+    SandboxOrders, SandboxPositions, db_session
 )
 from sandbox.fund_manager import FundManager
-from database.symbol import SymToken
 from database.token_db import get_symbol_info
 from utils.logging import get_logger
 
@@ -312,7 +310,7 @@ class OrderManager:
                     if order_qty <= existing_qty:
                         # Order will only reduce/close position - no new margin needed
                         actual_margin_to_block = Decimal('0')
-                        logger.info(f"Order will reduce position - no margin required")
+                        logger.info("Order will reduce position - no margin required")
                     else:
                         # Order will reverse position - only block margin for excess quantity
                         excess_qty = order_qty - existing_qty

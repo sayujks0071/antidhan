@@ -2,24 +2,14 @@
 
 import os
 import pandas as pd
-import numpy as np
 import httpx
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional
 from utils.httpx_client import get_httpx_client
-import requests
-import gzip
-import shutil
-import http.client
-import json
-import pandas as pd
-import gzip
-import io
 
 
 from sqlalchemy import create_engine, Column, Integer, String, Float , Sequence, Index
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from database.auth_db import get_auth_token
 from extensions import socketio  # Import SocketIO
 from utils.logging import get_logger
 
@@ -134,7 +124,6 @@ def download_csv_fyers_data(output_path: str) -> Tuple[bool, List[str], Optional
             - List[str]: List of paths to downloaded files
             - Optional[str]: Error message if any error occurred, None otherwise
     """
-    from utils.httpx_client import get_httpx_client
     logger.info("Downloading Master Contract CSV Files")
     
     # URLs of the CSV files to be downloaded
@@ -506,7 +495,7 @@ def delete_fyers_temp_data(output_path):
 
 
 def master_contract_download():
-    logger.info(f"Downloading Master Contract")
+    logger.info("Downloading Master Contract")
     
 
     output_path = 'tmp'

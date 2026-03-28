@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, session, request
+from flask import Blueprint, jsonify, session
 from database.master_contract_status_db import get_status, check_if_ready
 from utils.session import check_session_validity
 from utils.logging import get_logger

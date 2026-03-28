@@ -11,7 +11,7 @@ import copy
 from typing import Tuple, Dict, Any, Optional
 from database.settings_db import get_analyze_mode
 from database.auth_db import verify_api_key
-from database.apilog_db import async_log_order, executor
+from database.apilog_db import executor
 from database.analyzer_db import async_log_analyzer
 from extensions import socketio
 from utils.logging import get_logger
@@ -21,7 +21,7 @@ from services.telegram_alert_service import telegram_alert_service
 from sandbox.order_manager import OrderManager
 from sandbox.position_manager import PositionManager
 from sandbox.holdings_manager import HoldingsManager
-from sandbox.fund_manager import FundManager, get_user_funds
+from sandbox.fund_manager import get_user_funds
 
 logger = get_logger(__name__)
 

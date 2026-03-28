@@ -5,7 +5,6 @@ Tests the credentials directly to identify the problem
 """
 
 import os
-import sys
 from dotenv import load_dotenv
 import json
 from datetime import datetime
@@ -26,12 +25,12 @@ print()
 # Parse the API key format
 if ":::" in api_key:
     client_id, access_token = api_key.split(":::")
-    print(f"✅ Format: client_id:::access_token (OpenAlgo format)")
+    print("✅ Format: client_id:::access_token (OpenAlgo format)")
     print(f"   Client ID: {client_id}")
     print(f"   Access Token (first 30 chars): {access_token[:30]}...")
     print(f"   Access Token length: {len(access_token)} chars")
 else:
-    print(f"❌ Invalid format - missing ':::'")
+    print("❌ Invalid format - missing ':::'")
     access_token = api_key
     client_id = None
 
@@ -82,9 +81,9 @@ try:
         token_client_id = payload_data.get("dhanbClientId")
         if client_id and token_client_id:
             if client_id == token_client_id:
-                print(f"   ✅ Client IDs match")
+                print("   ✅ Client IDs match")
             else:
-                print(f"   ❌ Client ID mismatch!")
+                print("   ❌ Client ID mismatch!")
                 print(f"      .env client_id: {client_id}")
                 print(f"      Token client_id: {token_client_id}")
 
@@ -103,7 +102,7 @@ try:
     # Initialize client - dhanhq expects (client_id, access_token)
     # But we need to use the format they expect
     if client_id:
-        print(f"Attempting connection with:")
+        print("Attempting connection with:")
         print(f"  client_id (api_secret): {api_secret}")
         print(f"  access_token (api_key): {access_token[:50]}...")
         print()
@@ -117,7 +116,7 @@ try:
         print("Testing get_fund_limits()...")
         try:
             result = dhan.get_fund_limits()
-            print(f"✅ API call successful!")
+            print("✅ API call successful!")
             print(f"   Response type: {type(result)}")
             if isinstance(result, dict):
                 print(f"   Response keys: {list(result.keys())}")
@@ -135,7 +134,7 @@ try:
                 dhan2 = dhanhq(token_client_id, access_token)
                 try:
                     result = dhan2.get_fund_limits()
-                    print(f"✅ API call successful with token client_id!")
+                    print("✅ API call successful with token client_id!")
                     print(f"   Use this client_id: {token_client_id}")
                 except Exception as e2:
                     print(f"❌ Also failed: {e2}")

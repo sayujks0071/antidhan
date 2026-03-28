@@ -34,10 +34,7 @@ Example Usage (OLD METHOD - Legacy):
 """
 
 import re
-import importlib
 from typing import Tuple, Dict, Any, Optional, List
-from datetime import datetime
-from database.auth_db import get_auth_token_broker
 from database.symbol import SymToken, db_session
 from services.quotes_service import get_quotes
 from utils.logging import get_logger

@@ -4,10 +4,8 @@ Implements core NATS protocol without external dependencies
 """
 
 import json
-import random
-import string
 import logging
-from typing import Dict, Any, Optional, Callable, List, Union, Tuple
+from typing import Dict, Any, Optional, Callable, List, Union
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -197,10 +195,10 @@ class NATSProtocol:
                         
             elif self.pending_data.startswith(MSG):
                 # MSG format: MSG <subject> <sid> [reply-to] <#bytes>\r\n<payload>\r\n
-                logger.info(f"🔍 Found MSG in data stream")
+                logger.info("🔍 Found MSG in data stream")
                 end_idx = self.pending_data.find('\r\n')
                 if end_idx == -1:
-                    logger.debug(f"MSG header incomplete, waiting for more data")
+                    logger.debug("MSG header incomplete, waiting for more data")
                     break  # Incomplete header
                     
                 msg_header = self.pending_data[:end_idx]

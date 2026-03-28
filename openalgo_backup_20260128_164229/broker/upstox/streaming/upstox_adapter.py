@@ -1,10 +1,8 @@
 # broker/upstox/streaming/upstox_adapter.py
 import asyncio
 import threading
-import json
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
 
 from websocket_proxy.base_adapter import BaseBrokerWebSocketAdapter
 from websocket_proxy.mapping import SymbolMapper

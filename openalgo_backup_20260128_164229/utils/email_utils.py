@@ -459,7 +459,7 @@ def validate_smtp_settings(smtp_settings):
         if smtp_settings.get('smtp_helo_hostname'):
             try:
                 server.ehlo(smtp_settings['smtp_helo_hostname'])
-            except Exception as e:
+            except Exception:
                 try:
                     server.helo(smtp_settings['smtp_helo_hostname'])
                 except Exception:

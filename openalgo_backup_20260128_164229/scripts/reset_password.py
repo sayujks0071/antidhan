@@ -31,10 +31,10 @@ def reset_password(username, new_password):
         db_session.commit()
         
         print(f"✅ Password reset successfully for user '{username}'!")
-        print(f"\n📋 Login Credentials:")
+        print("\n📋 Login Credentials:")
         print(f"   Username: {username}")
         print(f"   Password: {new_password}")
-        print(f"\n🔑 You can now login at: http://127.0.0.1:5001/auth/login")
+        print("\n🔑 You can now login at: http://127.0.0.1:5001/auth/login")
         return True
         
     except Exception as e:

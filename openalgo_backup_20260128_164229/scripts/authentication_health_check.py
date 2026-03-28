@@ -6,7 +6,6 @@ import datetime
 import socket
 import json
 import warnings
-import time
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -211,10 +210,10 @@ def main():
     print(f"- API Test: {dhan_api_status}")
     print(f"- Last Refresh: {dhan_last_refresh}\n")
 
-    print(f"✅ OPENALGO AUTH:")
+    print("✅ OPENALGO AUTH:")
     print(f"- Login Status: {strat_status}")
     print(f"- API Keys: {strat_valid}/{strat_total} strategies configured")
-    print(f"- CSRF Handling: ✅ Working\n")
+    print("- CSRF Handling: ✅ Working\n")
 
     print("⚠️ ISSUES DETECTED:")
     if issues:

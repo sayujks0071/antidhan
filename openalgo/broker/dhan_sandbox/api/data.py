@@ -94,7 +94,12 @@ def get_api_response(endpoint, auth, method="POST", payload=""):
 
 class BrokerData:
     def __init__(self, auth_token):
-        """Initialize Dhan data handler with authentication token"""
+        """
+        Initialize Dhan data handler with authentication token.
+
+        Args:
+            auth_token (str): The authentication token for the Dhan API.
+        """
         self.auth_token = auth_token
         # Map common timeframe format to Dhan resolutions
         self.timeframe_map = {
@@ -113,7 +118,19 @@ class BrokerData:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_cache_path(self, symbol, exchange, interval, start_date, end_date):
-        """Generate a unique cache file path."""
+        """
+        Generate a unique cache file path.
+
+        Args:
+            symbol (str): Trading symbol.
+            exchange (str): Exchange name.
+            interval (str): Data interval.
+            start_date (str): Start date.
+            end_date (str): End date.
+
+        Returns:
+            Path: The path to the cache file.
+        """
         # Normalize keys
         key_str = f"{symbol}_{exchange}_{interval}_{start_date}_{end_date}"
         # Use hash to avoid filesystem issues with characters
@@ -121,7 +138,16 @@ class BrokerData:
         return self.cache_dir / f"{key_hash}.pkl"
 
     def _convert_to_dhan_request(self, symbol, exchange):
-        """Convert symbol and exchange to Dhan format"""
+        """
+        Convert symbol and exchange to Dhan format.
+
+        Args:
+            symbol (str): Trading symbol.
+            exchange (str): Exchange name.
+
+        Returns:
+            tuple: (security_id, exchange_segment)
+        """
         br_symbol = get_br_symbol(symbol, exchange)
         # Extract security ID and determine exchange segment
         # This needs to be implemented based on your symbol mapping logic
@@ -141,12 +167,29 @@ class BrokerData:
         return security_id, exchange_segment
 
     def _convert_date_to_utc(self, date_str: str) -> str:
-        """Convert IST date to UTC date for API request"""
+        """
+        Convert IST date to UTC date for API request.
+
+        Args:
+            date_str (str): Date string.
+
+        Returns:
+            str: Converted date string.
+        """
         # Simply return the date string as the API expects YYYY-MM-DD format
         return date_str
 
     def _convert_timestamp_to_ist(self, timestamp: int, is_daily: bool = False) -> int:
-        """Convert UTC timestamp to IST timestamp"""
+        """
+        Convert UTC timestamp to IST timestamp.
+
+        Args:
+            timestamp (int): UTC timestamp.
+            is_daily (bool): Flag indicating if it's daily data.
+
+        Returns:
+            int: IST timestamp.
+        """
         if is_daily:
             # For daily data, we want to show just the date
             # The Dhan API returns timestamps at UTC midnight
@@ -167,7 +210,16 @@ class BrokerData:
             return int(ist_dt.timestamp())
 
     def _get_intraday_chunks(self, start_date, end_date) -> list:
-        """Split date range into 5-day chunks for intraday data"""
+        """
+        Split date range into 5-day chunks for intraday data.
+
+        Args:
+            start_date (str or datetime): Start date.
+            end_date (str or datetime): End date.
+
+        Returns:
+            list: List of date chunks.
+        """
         # Handle both string and datetime.date objects
         if isinstance(start_date, str):
             start = datetime.strptime(start_date, "%Y-%m-%d")
@@ -188,7 +240,15 @@ class BrokerData:
         return chunks
 
     def _get_exchange_segment(self, exchange: str) -> str:
-        """Get exchange segment based on exchange"""
+        """
+        Get exchange segment based on exchange.
+
+        Args:
+            exchange (str): Exchange name.
+
+        Returns:
+            str: Exchange segment code.
+        """
         exchange_map = {
             "NSE": "NSE_EQ",  # NSE Cash
             "BSE": "BSE_EQ",  # BSE Cash
@@ -203,7 +263,16 @@ class BrokerData:
         return exchange_map.get(exchange)
 
     def _get_instrument_type(self, exchange: str, symbol: str) -> str:
-        """Get instrument type based on exchange and symbol"""
+        """
+        Get instrument type based on exchange and symbol.
+
+        Args:
+            exchange (str): Exchange name.
+            symbol (str): Trading symbol.
+
+        Returns:
+            str: Instrument type code.
+        """
         # For cash market (NSE, BSE)
         if exchange in ["NSE", "BSE"]:
             return "EQUITY"
@@ -273,7 +342,15 @@ class BrokerData:
         raise Exception(f"Unsupported exchange: {exchange}")
 
     def _is_trading_day(self, date_str) -> bool:
-        """Check if the given date is a trading day (not weekend)"""
+        """
+        Check if the given date is a trading day (not weekend).
+
+        Args:
+            date_str (str): Date string.
+
+        Returns:
+            bool: True if trading day, False otherwise.
+        """
         # Handle both string and datetime.date objects
         if isinstance(date_str, str):
             date = datetime.strptime(date_str, "%Y-%m-%d")
@@ -282,7 +359,16 @@ class BrokerData:
         return date.weekday() < 5  # 0-4 are Monday to Friday
 
     def _adjust_dates(self, start_date, end_date) -> tuple:
-        """Adjust dates to nearest trading days"""
+        """
+        Adjust dates to nearest trading days.
+
+        Args:
+            start_date (str): Start date.
+            end_date (str): End date.
+
+        Returns:
+            tuple: (adjusted_start_date, adjusted_end_date)
+        """
         # Handle both string and datetime.date objects
         if isinstance(start_date, str):
             start = datetime.strptime(start_date, "%Y-%m-%d")
@@ -306,11 +392,13 @@ class BrokerData:
 
     def _get_intraday_time_range(self, date_str: str) -> tuple:
         """
-        Get intraday time range in IST for a given date
+        Get intraday time range in IST for a given date.
+
         Args:
-            date_str: Date string in YYYY-MM-DD format
+            date_str (str): Date string in YYYY-MM-DD format.
+
         Returns:
-            tuple: (start_date, end_date) in YYYY-MM-DD format
+            tuple: (start_date, end_date) in YYYY-MM-DD format.
         """
         # Simply return the same date for both start and end
         # The API will handle the full day's data automatically
@@ -320,18 +408,20 @@ class BrokerData:
         self, symbol: str, exchange: str, interval: str, start_date, end_date
     ) -> pd.DataFrame:
         """
-        Get historical data for given symbol
+        Get historical data for given symbol.
+
         Args:
-            symbol: Trading symbol
-            exchange: Exchange (e.g., NSE, BSE)
-            interval: Candle interval in common format:
+            symbol (str): Trading symbol.
+            exchange (str): Exchange (e.g., NSE, BSE).
+            interval (str): Candle interval in common format:
                      Minutes: 1m, 5m, 15m, 25m
                      Hours: 1h
                      Days: D
-            start_date: Start date (YYYY-MM-DD) in IST
-            end_date: End date (YYYY-MM-DD) in IST
+            start_date (str or datetime): Start date (YYYY-MM-DD) in IST.
+            end_date (str or datetime): End date (YYYY-MM-DD) in IST.
+
         Returns:
-            pd.DataFrame: Historical data with columns [timestamp, open, high, low, close, volume, oi]
+            pd.DataFrame: Historical data with columns [timestamp, open, high, low, close, volume, oi].
         """
         try:
             # Check if interval is supported
@@ -640,12 +730,14 @@ class BrokerData:
 
     def get_batch_quotes(self, symbols: list, exchange: str) -> dict:
         """
-        Get real-time quotes for multiple symbols
+        Get real-time quotes for multiple symbols.
+
         Args:
-            symbols: List of trading symbols
-            exchange: Exchange (e.g., NSE, BSE)
+            symbols (list): List of trading symbols.
+            exchange (str): Exchange (e.g., NSE, BSE).
+
         Returns:
-            dict: Map of symbol -> Quote data
+            dict: Map of symbol -> Quote data.
         """
         try:
             exchange_type = self._get_exchange_segment(exchange)
@@ -707,12 +799,14 @@ class BrokerData:
 
     def get_quotes(self, symbol: str, exchange: str) -> dict:
         """
-        Get real-time quotes for given symbol
+        Get real-time quotes for given symbol.
+
         Args:
-            symbol: Trading symbol or List of symbols
-            exchange: Exchange (e.g., NSE, BSE)
+            symbol (str or list): Trading symbol or List of symbols.
+            exchange (str): Exchange (e.g., NSE, BSE).
+
         Returns:
-            dict: Quote data with fields: ltp, open, high, low, volume, oi, bid, ask, prev_close
+            dict: Quote data with fields: ltp, open, high, low, volume, oi, bid, ask, prev_close.
         """
         if isinstance(symbol, list):
             return self.get_batch_quotes(symbol, exchange)
@@ -799,12 +893,14 @@ class BrokerData:
 
     def get_depth(self, symbol: str, exchange: str) -> dict:
         """
-        Get market depth for given symbol
+        Get market depth for given symbol.
+
         Args:
-            symbol: Trading symbol
-            exchange: Exchange (e.g., NSE, BSE)
+            symbol (str): Trading symbol.
+            exchange (str): Exchange (e.g., NSE, BSE).
+
         Returns:
-            dict: Market depth data with bids, asks, ltp, ltq, volume, open, high, low, prev_close, oi, totalbuyqty, totalsellqty
+            dict: Market depth data with bids, asks, ltp, ltq, volume, open, high, low, prev_close, oi, totalbuyqty, totalsellqty.
         """
         try:
             security_id = get_token(symbol, exchange)

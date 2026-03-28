@@ -76,7 +76,7 @@ def integrate_service(service_file, config):
 
     if check_str in content:
         print(f"✗ Service already has analyzer check but needs sandbox routing: {service_file}")
-        print(f"  Manual integration required - check contains logic that needs preservation")
+        print("  Manual integration required - check contains logic that needs preservation")
         return False
 
     # Find the function definition

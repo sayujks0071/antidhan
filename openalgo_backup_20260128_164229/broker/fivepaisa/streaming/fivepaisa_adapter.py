@@ -1,15 +1,12 @@
 import threading
-import json
 import logging
 import time
 import os
 import re
-from datetime import datetime
 from typing import Dict, Any, Optional, List
 
 from broker.fivepaisa.streaming.fivepaisa_websocket import FivePaisaWebSocket
 from database.auth_db import get_auth_token
-from database.token_db import get_token
 
 import sys
 
@@ -73,7 +70,7 @@ class FivepaisaWebSocketAdapter(BaseBrokerWebSocketAdapter):
                         self.logger.debug(f"Using client_code from BROKER_API_KEY: {client_code}")
                     else:
                         client_code = user_id
-                        self.logger.warning(f"BROKER_API_KEY format incorrect, using user_id as client_code")
+                        self.logger.warning("BROKER_API_KEY format incorrect, using user_id as client_code")
                 except Exception as e:
                     self.logger.error(f"Error parsing BROKER_API_KEY: {e}")
                     client_code = user_id

@@ -3,7 +3,7 @@ Example blueprint showing how to use the WebSocket service layer
 for internal UI components without authentication overhead.
 """
 
-from flask import Blueprint, render_template, request, jsonify, session, current_app
+from flask import Blueprint, render_template, request, jsonify, session
 from extensions import socketio
 from flask_socketio import emit, join_room, leave_room
 from utils.session import check_session_validity
@@ -17,8 +17,7 @@ from services.websocket_service import (
 )
 from services.market_data_service import (
     get_market_data_service,
-    subscribe_to_market_updates,
-    unsubscribe_from_market_updates
+    subscribe_to_market_updates
 )
 from utils.logging import get_logger
 

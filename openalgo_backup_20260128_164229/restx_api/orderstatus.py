@@ -3,7 +3,6 @@ from flask import request, jsonify, make_response
 from marshmallow import ValidationError
 from limiter import limiter
 import os
-import traceback
 
 from restx_api.account_schema import OrderStatusSchema
 from services.orderstatus_service import get_order_status, emit_analyzer_error
@@ -50,7 +49,7 @@ class OrderStatus(Resource):
             
             return make_response(jsonify(response_data), status_code)
 
-        except Exception as e:
+        except Exception:
             logger.exception("An unexpected error occurred in OrderStatus endpoint.")
             error_message = 'An unexpected error occurred'
             if get_analyze_mode():

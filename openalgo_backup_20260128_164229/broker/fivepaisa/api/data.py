@@ -1,12 +1,11 @@
-import json
 from datetime import datetime, timedelta
 import os
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 import httpx
 import pytz
 from utils.httpx_client import get_httpx_client
-from database.token_db import get_br_symbol, get_token, get_oa_symbol
+from database.token_db import get_br_symbol, get_token
 from broker.fivepaisa.mapping.transform_data import map_exchange, map_exchange_type
 import traceback
 import pandas as pd
@@ -468,7 +467,7 @@ class BrokerData:
                 return self._process_quotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_quotes_batch(self, symbols: list) -> list:

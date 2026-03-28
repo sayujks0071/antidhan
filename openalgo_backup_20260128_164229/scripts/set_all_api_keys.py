@@ -8,7 +8,7 @@ import re
 import time
 import subprocess
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Tuple
 import requests
 
 # Configuration

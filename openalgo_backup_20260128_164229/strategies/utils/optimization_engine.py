@@ -6,11 +6,8 @@ Implements grid search and Bayesian optimization for finding optimal strategy pa
 import os
 import sys
 import logging
-import json
 import itertools
-from typing import Dict, List, Tuple, Any, Optional
-from datetime import datetime
-import pandas as pd
+from typing import Dict, List, Any, Optional
 import numpy as np
 from pathlib import Path
 
@@ -20,8 +17,8 @@ if str(utils_path) not in sys.path:
     sys.path.insert(0, str(utils_path))
 
 from simple_backtest_engine import SimpleBacktestEngine
-from strategy_param_injector import create_strategy_with_params, get_strategy_symbol
-from parameter_space import get_grid_search_params, get_continuous_ranges, normalize_weights, normalize_timeframe_weights
+from strategy_param_injector import create_strategy_with_params
+from parameter_space import get_grid_search_params, get_continuous_ranges
 
 logger = logging.getLogger("OptimizationEngine")
 

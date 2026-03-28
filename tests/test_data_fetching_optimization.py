@@ -1,9 +1,7 @@
 import time
 import unittest
 from unittest.mock import MagicMock, patch
-import pandas as pd
 import sys
-import os
 from pathlib import Path
 
 # Add repo root and openalgo to path to emulate the environment

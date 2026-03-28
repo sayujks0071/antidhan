@@ -11,7 +11,7 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 # Paths
 SCRIPT_DIR = Path(__file__).parent
@@ -88,7 +88,7 @@ def create_backup(include_env: bool = False) -> Optional[Path]:
             errors.append(f"Failed to backup strategy_configs.json: {e}")
             print(f"❌ Error backing up strategy_configs.json: {e}")
     else:
-        print(f"⚠️  strategy_configs.json not found (skipping)")
+        print("⚠️  strategy_configs.json not found (skipping)")
     
     # Backup strategy_env.json
     if STRATEGY_ENV_FILE.exists():
@@ -105,7 +105,7 @@ def create_backup(include_env: bool = False) -> Optional[Path]:
             errors.append(f"Failed to backup strategy_env.json: {e}")
             print(f"❌ Error backing up strategy_env.json: {e}")
     else:
-        print(f"⚠️  strategy_env.json not found (skipping)")
+        print("⚠️  strategy_env.json not found (skipping)")
     
     # Backup .env (optional, with warning)
     if include_env:
@@ -114,14 +114,14 @@ def create_backup(include_env: bool = False) -> Optional[Path]:
                 dest = backup_dir / ".env"
                 shutil.copy2(ENV_FILE, dest)
                 backed_up_files.append(".env")
-                print(f"✅ Backed up .env (contains sensitive credentials)")
+                print("✅ Backed up .env (contains sensitive credentials)")
             except Exception as e:
                 errors.append(f"Failed to backup .env: {e}")
                 print(f"❌ Error backing up .env: {e}")
         else:
-            print(f"⚠️  .env not found (skipping)")
+            print("⚠️  .env not found (skipping)")
     else:
-        print(f"ℹ️  Skipping .env backup (use --include-env to backup)")
+        print("ℹ️  Skipping .env backup (use --include-env to backup)")
     
     # Create manifest file
     manifest = {
@@ -148,7 +148,7 @@ def create_backup(include_env: bool = False) -> Optional[Path]:
         with open(manifest_file, 'w') as f:
             json.dump(manifest, f, indent=2)
         backed_up_files.append("backup_manifest.json")
-        print(f"✅ Created backup_manifest.json")
+        print("✅ Created backup_manifest.json")
     except Exception as e:
         errors.append(f"Failed to create manifest: {e}")
         print(f"❌ Error creating manifest: {e}")
@@ -159,13 +159,13 @@ def create_backup(include_env: bool = False) -> Optional[Path]:
         if latest_link.exists() or latest_link.is_symlink():
             latest_link.unlink()
         latest_link.symlink_to(backup_dir.name)
-        print(f"✅ Updated 'latest' symlink")
+        print("✅ Updated 'latest' symlink")
     except Exception as e:
         print(f"⚠️  Could not create 'latest' symlink: {e}")
     
     # Summary
     print(f"\n{'='*60}")
-    print(f"Backup Summary")
+    print("Backup Summary")
     print(f"{'='*60}")
     print(f"Backup location: {backup_dir}")
     print(f"Files backed up: {len(backed_up_files)}")
@@ -213,14 +213,14 @@ def main():
     backup_dir = create_backup(include_env=args.include_env)
     
     if backup_dir:
-        print(f"✅ Backup completed successfully!")
-        print(f"\nTo restore this backup, run:")
-        print(f"  python3 scripts/restore_settings.py")
-        print(f"\nTo list all backups, run:")
-        print(f"  python3 scripts/list_backups.py")
+        print("✅ Backup completed successfully!")
+        print("\nTo restore this backup, run:")
+        print("  python3 scripts/restore_settings.py")
+        print("\nTo list all backups, run:")
+        print("  python3 scripts/list_backups.py")
         return 0
     else:
-        print(f"❌ Backup failed!")
+        print("❌ Backup failed!")
         return 1
 
 if __name__ == "__main__":

@@ -9,7 +9,6 @@ import time
 import logging
 import argparse
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
 
 # Add repo root to path

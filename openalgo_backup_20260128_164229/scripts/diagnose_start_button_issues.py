@@ -5,7 +5,6 @@ Diagnose why start buttons might not be working.
 import json
 import os
 from pathlib import Path
-import subprocess
 
 CONFIG_PATH = Path("/Users/mac/dyad-apps/openalgo/strategies/strategy_configs.json")
 BASE_DIR = Path("/Users/mac/dyad-apps/openalgo")
@@ -96,7 +95,7 @@ def main():
             with open(full_path, 'r') as f:
                 first_line = f.readline()
                 if not first_line.startswith('#!'):
-                    print(f"     ⚠️  No shebang line (not critical)")
+                    print("     ⚠️  No shebang line (not critical)")
         except Exception as e:
             print(f"     ⚠️  Could not read file: {e}")
     

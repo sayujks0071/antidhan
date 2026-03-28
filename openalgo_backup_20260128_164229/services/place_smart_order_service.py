@@ -9,7 +9,6 @@ from database.apilog_db import async_log_order, executor
 from database.settings_db import get_analyze_mode
 from database.analyzer_db import async_log_analyzer
 from extensions import socketio
-from utils.api_analyzer import analyze_request, generate_order_id
 from utils.constants import (
     VALID_EXCHANGES,
     VALID_ACTIONS,
@@ -267,7 +266,7 @@ def place_smart_order_with_auth(
     # Add delay if needed
     try:
         time.sleep(float(smart_order_delay))
-    except Exception as e:
+    except Exception:
         logger.error(f"Invalid SMART_ORDER_DELAY value: {smart_order_delay}")
         traceback.print_exc()
 

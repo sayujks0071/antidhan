@@ -2,11 +2,6 @@
 
 import os
 import pandas as pd
-import numpy as np
-import gzip
-import shutil
-import json
-import gzip
 import io
 import zipfile
 # Use httpx client for connection pooling
@@ -16,7 +11,6 @@ from utils.httpx_client import get_httpx_client
 from sqlalchemy import create_engine, Column, Integer, String, Float , Sequence, Index
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from database.auth_db import get_auth_token
 from extensions import socketio  # Import SocketIO
 from utils.logging import get_logger
 

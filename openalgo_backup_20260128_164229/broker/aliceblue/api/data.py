@@ -1,12 +1,9 @@
 import os
-import json
 import time
-import os
 from datetime import datetime
 import pandas as pd
 import threading
-import httpx
-from typing import Dict, List, Any, Union, Tuple, Optional
+from typing import Dict, List, Any
 from requests.exceptions import Timeout, HTTPError
 from utils.logging import get_logger
 
@@ -38,10 +35,9 @@ def get_token(symbol, exchange):
     except Exception as e:
         logger.error(f"Error getting token: {str(e)}")
         return None
-from datetime import datetime, timedelta
 
 from utils.httpx_client import get_httpx_client
-from database.token_db import get_token, get_br_symbol, get_oa_symbol, get_brexchange
+from database.token_db import get_token, get_br_symbol
 from database.symbol import SymToken
 from database.auth_db import db_session
 from .alicebluewebsocket import AliceBlueWebSocket
@@ -147,7 +143,7 @@ class BrokerData:
                 return None
                 
             # Create new websocket connection
-            logger.info(f"Creating new WebSocket connection for AliceBlue")
+            logger.info("Creating new WebSocket connection for AliceBlue")
             self._websocket = AliceBlueWebSocket(user_id, self.session_id)
             self._websocket.connect()
             
@@ -416,7 +412,7 @@ class BrokerData:
                 return self._process_multiquotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _process_multiquotes_batch(self, symbols: list) -> list:
@@ -1117,7 +1113,7 @@ class BrokerData:
             aliceblue_timeframe = self.timeframe_map[timeframe]
             
             # Get credentials - AliceBlue historical API uses user_id in Bearer token
-            from utils.config import get_broker_api_key, get_broker_api_secret
+            from utils.config import get_broker_api_key
 
             # IMPORTANT: AliceBlue historical API uses user_id (BROKER_API_KEY), not client_id!
             # This is different from other APIs which use BROKER_API_SECRET
@@ -1249,7 +1245,7 @@ class BrokerData:
             }
             
             # Debug logging
-            logger.debug(f"Making historical data request:")
+            logger.debug("Making historical data request:")
             logger.debug(f"URL: {HISTORICAL_API_URL}")
             logger.debug(f"Headers: {headers}")
             logger.debug(f"Payload: {payload}")
@@ -1274,7 +1270,7 @@ class BrokerData:
                         logger.error(f"AliceBlue does not support historical data for {exchange} exchange yet.")
                     else:
                         logger.error(f"No historical data available for {symbol} on {exchange}.")
-                        logger.error(f"This could be due to: 1) Symbol not traded in the date range, 2) Invalid symbol, or 3) Data not available during market hours (available from 5:30 PM to 8 AM on weekdays)")
+                        logger.error("This could be due to: 1) Symbol not traded in the date range, 2) Invalid symbol, or 3) Data not available during market hours (available from 5:30 PM to 8 AM on weekdays)")
                 
                 return pd.DataFrame()
             
@@ -1294,7 +1290,7 @@ class BrokerData:
 
             # Ensure DataFrame has required columns
             if not all(col in df.columns for col in ['timestamp', 'open', 'high', 'low', 'close', 'volume']):
-                logger.error(f"Missing required columns in historical data response")
+                logger.error("Missing required columns in historical data response")
                 return pd.DataFrame()
 
             # Log the first few rows of raw data to debug
@@ -1343,7 +1339,7 @@ class BrokerData:
             # For intraday data, ensure we have data from market open (9:15 AM)
             if timeframe != 'D' and not df.empty:
                 import pytz
-                from datetime import datetime, time, timedelta
+                from datetime import datetime, time
                 ist = pytz.timezone('Asia/Kolkata')
 
                 # Get the date from the first timestamp
@@ -1357,7 +1353,7 @@ class BrokerData:
 
                 # If first data point is after 9:15 AM, pad with data from 9:15 AM
                 if df['timestamp'].iloc[0] > market_open_ts:
-                    logger.info(f"Padding data from market open (9:15 AM) to first available data point")
+                    logger.info("Padding data from market open (9:15 AM) to first available data point")
 
                     # Get the first available price as reference
                     first_price = df['open'].iloc[0]

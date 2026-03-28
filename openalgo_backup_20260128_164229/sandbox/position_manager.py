@@ -836,7 +836,7 @@ class PositionManager:
         This should be called at session expiry time (e.g., 3:00 AM IST)
         """
         try:
-            from datetime import datetime, date
+            from datetime import date
             from database.sandbox_db import SandboxHoldings
             from database import db
             import os

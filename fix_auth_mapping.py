@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 load_dotenv("/Users/mac/openalgo/openalgo/.env")
 
-from database.auth_db import upsert_auth, init_db, get_auth_token_broker
+from database.auth_db import upsert_auth, init_db
 import sqlite3
 
 # Get Dhan credentials from environment
@@ -31,7 +31,7 @@ init_db()
 
 # The API key is associated with user_id 'sks20417'
 # We need to store the auth token under name='sks20417' for the lookup to work
-print(f"\nInserting auth token for user: sks20417")
+print("\nInserting auth token for user: sks20417")
 upsert_auth(
     name="sks20417",  # This must match the user_id in api_keys table
     auth_token=dhan_access_token,
@@ -50,7 +50,7 @@ cursor = conn.cursor()
 cursor.execute('SELECT name, broker, user_id FROM auth WHERE name="sks20417"')
 row = cursor.fetchone()
 if row:
-    print(f"\nVerification - Auth entry for sks20417:")
+    print("\nVerification - Auth entry for sks20417:")
     print(f"  name: {row[0]}")
     print(f"  broker: {row[1]}")
     print(f"  user_id: {row[2]}")

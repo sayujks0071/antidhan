@@ -67,13 +67,13 @@ def cleanup_configs():
     with open(CONFIG_FILE, 'w') as f:
         json.dump(configs, f, indent=2, default=str)
     
-    print(f"\n📊 Summary:")
+    print("\n📊 Summary:")
     print(f"   Original: {original_count} strategies")
     print(f"   Removed: {len(removed)} entries")
     print(f"   Remaining: {len(configs)} strategies")
     
     if duplicates:
-        print(f"\n✅ Kept (removed duplicates):")
+        print("\n✅ Kept (removed duplicates):")
         for name, kept_id in duplicates.items():
             print(f"   - {name}: {kept_id}")
 

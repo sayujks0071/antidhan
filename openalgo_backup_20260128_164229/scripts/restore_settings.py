@@ -186,13 +186,13 @@ def restore_backup(backup_dir: Path, reset_processes: bool = True, include_env: 
         source_env_file = backup_dir / ".env"
         if restore_file(source_env_file, ENV_FILE, ".env (server configuration)", create_backup=True):
             success_count += 1
-            print(f"\n⚠️  IMPORTANT: Server configuration (.env) has been restored.")
-            print(f"   You may need to restart the server for changes to take effect.")
+            print("\n⚠️  IMPORTANT: Server configuration (.env) has been restored.")
+            print("   You may need to restart the server for changes to take effect.")
     else:
-        print(f"ℹ️  Skipping .env restore (use --include-env to restore)")
+        print("ℹ️  Skipping .env restore (use --include-env to restore)")
     
     print(f"\n{'='*60}")
-    print(f"Restore Summary")
+    print("Restore Summary")
     print(f"{'='*60}")
     print(f"Files restored: {success_count}")
     print(f"{'='*60}\n")
@@ -234,7 +234,7 @@ def main():
     
     if not backups:
         print("❌ No backups found!")
-        print(f"   Create a backup first with: python3 scripts/save_settings.py")
+        print("   Create a backup first with: python3 scripts/save_settings.py")
         return 1
     
     # Select backup
@@ -276,7 +276,7 @@ def main():
             else:
                 print(f"  {i}. {backup.name}")
         
-        print(f"\n  0. Cancel")
+        print("\n  0. Cancel")
         
         try:
             choice = input("\nSelect backup to restore (number): ").strip()
@@ -302,18 +302,18 @@ def main():
     if args.dry_run:
         manifest = load_manifest(backup_dir)
         print(f"\n{'='*60}")
-        print(f"DRY RUN - Preview of restore")
+        print("DRY RUN - Preview of restore")
         print(f"{'='*60}")
         print(f"Backup: {backup_dir.name}")
         if manifest:
             print(f"Files in backup: {', '.join(manifest.get('files_backed_up', []))}")
-        print(f"\nWould restore:")
+        print("\nWould restore:")
         if (backup_dir / "strategy_configs.json").exists():
-            print(f"  ✅ strategy_configs.json")
+            print("  ✅ strategy_configs.json")
         if (backup_dir / "strategy_env.json").exists():
-            print(f"  ✅ strategy_env.json")
+            print("  ✅ strategy_env.json")
         if args.include_env and (backup_dir / ".env").exists():
-            print(f"  ✅ .env")
+            print("  ✅ .env")
         print(f"\nProcess state reset: {'No' if args.no_reset_processes else 'Yes'}")
         print(f"{'='*60}\n")
         return 0
@@ -335,20 +335,20 @@ def main():
     )
     
     if success:
-        print(f"✅ Restore completed successfully!")
-        print(f"\nNext steps:")
-        print(f"  1. Review restored files:")
+        print("✅ Restore completed successfully!")
+        print("\nNext steps:")
+        print("  1. Review restored files:")
         print(f"     - {STRATEGY_CONFIGS_FILE}")
         print(f"     - {STRATEGY_ENV_FILE}")
         if args.include_env:
             print(f"     - {ENV_FILE}")
-        print(f"  2. Restart the server if .env was restored:")
-        print(f"     python3 app.py")
-        print(f"  3. Start strategies via web UI:")
-        print(f"     http://127.0.0.1:5001/python/")
+        print("  2. Restart the server if .env was restored:")
+        print("     python3 app.py")
+        print("  3. Start strategies via web UI:")
+        print("     http://127.0.0.1:5001/python/")
         return 0
     else:
-        print(f"❌ Restore failed!")
+        print("❌ Restore failed!")
         return 1
 
 if __name__ == "__main__":

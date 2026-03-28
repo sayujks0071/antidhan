@@ -2,7 +2,6 @@
 
 import os
 import pandas as pd
-import numpy as np
 from utils.httpx_client import get_httpx_client
 
 from sqlalchemy import create_engine, Column, Integer, String, Float , Sequence, Index

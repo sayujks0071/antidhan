@@ -4,7 +4,6 @@ import glob
 import csv
 from datetime import datetime
 from collections import defaultdict
-import json
 
 # Configuration
 LOG_DIRS = ["openalgo/strategies/logs", "openalgo/log/strategies"]

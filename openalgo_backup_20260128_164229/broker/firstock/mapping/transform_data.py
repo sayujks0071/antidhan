@@ -2,7 +2,6 @@
 #Mapping Firstock API Parameters https://connect.thefirstock.com/api/V4/placeOrder
 
 from database.token_db import get_br_symbol
-import html
 
 def transform_data(data,token):
     """

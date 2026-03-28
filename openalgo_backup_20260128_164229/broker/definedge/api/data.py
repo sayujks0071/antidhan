@@ -4,8 +4,8 @@ import pandas as pd
 import time
 import asyncio
 import httpx
-from datetime import datetime, timedelta
-from database.token_db import get_br_symbol, get_token, get_oa_symbol
+from datetime import timedelta
+from database.token_db import get_br_symbol, get_token
 from utils.logging import get_logger
 from concurrent.futures import ThreadPoolExecutor
 
@@ -252,7 +252,7 @@ class BrokerData:
                 return self._process_quotes_batch(symbols)
 
         except Exception as e:
-            logger.exception(f"Error fetching multiquotes")
+            logger.exception("Error fetching multiquotes")
             raise Exception(f"Error fetching multiquotes: {e}")
 
     def _fetch_single_quote_sync(self, symbol: str, exchange: str, api_exchange: str, token: str, api_session_key: str) -> dict:
@@ -678,7 +678,7 @@ class BrokerData:
                     # Check if we have valid data
                     if chunk_df.empty:
                         logger.info(f"Debug - No valid data after parsing CSV for {timeframe} timeframe")
-                        logger.info(f"Debug - This might be due to incorrect date parsing")
+                        logger.info("Debug - This might be due to incorrect date parsing")
                         current_start = current_end + timedelta(days=1)
                         continue
                     
@@ -747,7 +747,7 @@ class BrokerData:
                         logger.debug(f"Debug - Received {len(chunk_df)} candles for chunk {current_start.date()} to {current_end.date()}")
                         dfs.append(chunk_df)
                     else:
-                        logger.debug(f"Debug - Empty DataFrame after processing chunk")
+                        logger.debug("Debug - Empty DataFrame after processing chunk")
                     
                 except Exception as chunk_error:
                     logger.error(f"Debug - Error fetching chunk {current_start} to {current_end}: {str(chunk_error)}")

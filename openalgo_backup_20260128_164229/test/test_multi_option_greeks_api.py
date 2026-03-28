@@ -42,14 +42,14 @@ def test_multiple_nifty_options():
         ]
     }
     
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
     
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
         result = response.json()
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(result, indent=2))
         
         if result.get('status') in ['success', 'partial']:
@@ -89,14 +89,14 @@ def test_with_custom_underlying():
         "interest_rate": 7.0
     }
     
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
     
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
         result = response.json()
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(result, indent=2))
         
         if result.get('status') in ['success', 'partial']:
@@ -126,7 +126,7 @@ def test_mixed_options():
         ]
     }
     
-    print(f"\nRequest Payload: (6 symbols)")
+    print("\nRequest Payload: (6 symbols)")
     print(json.dumps(payload, indent=2))
     
     try:
@@ -162,17 +162,17 @@ def test_invalid_symbol():
         ]
     }
     
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
     
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
         result = response.json()
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(result, indent=2))
         
-        print(f"\n✓ Expected: status='partial', summary showing 1 success, 1 failed")
+        print("\n✓ Expected: status='partial', summary showing 1 success, 1 failed")
     
     except Exception as e:
         print(f"Error: {e}")
@@ -191,17 +191,17 @@ def test_empty_symbols():
         "symbols": []
     }
     
-    print(f"\nRequest Payload:")
+    print("\nRequest Payload:")
     print(json.dumps(payload, indent=2))
     
     try:
         response = requests.post(url, json=payload)
         print(f"\nResponse Status: {response.status_code}")
         result = response.json()
-        print(f"Response Body:")
+        print("Response Body:")
         print(json.dumps(result, indent=2))
         
-        print(f"\n✓ Expected: Validation error (min 1 symbol required)")
+        print("\n✓ Expected: Validation error (min 1 symbol required)")
     
     except Exception as e:
         print(f"Error: {e}")

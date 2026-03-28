@@ -4,14 +4,9 @@ Advanced MCX Commodity Strategy & Analysis Tool
 Daily analysis and strategy deployment for MCX Commodities.
 """
 import os
-import sys
-import time
-import json
 import logging
-import requests
-import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 # Try importing openalgo
@@ -174,7 +169,7 @@ class AdvancedMCXStrategy:
             print(f"   - Trend: {'Strong' if opp['details']['trend']>50 else 'Weak'} (ADX: {opp['details']['adx']:.1f}) | Momentum Score: {opp['details']['momentum']}")
             print(f"   - Global Alignment: {opp['details']['global']:.1f}% | Volatility: {opp['details']['volatility']}")
             print(f"   - Rationale: High composite score driven by {'Trend' if opp['details']['trend']>opp['details']['momentum'] else 'Momentum'}")
-            print(f"   - Filters Passed: ✅ Trend ✅ Global ✅ Liquidity")
+            print("   - Filters Passed: ✅ Trend ✅ Global ✅ Liquidity")
 
         print("\n🔧 STRATEGY ENHANCEMENTS APPLIED:")
         print("- Momentum: Added USD/INR adjustment factor")

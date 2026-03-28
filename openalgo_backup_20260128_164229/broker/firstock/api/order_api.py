@@ -1,6 +1,5 @@
 import json
 import os
-from database.auth_db import get_auth_token
 from database.token_db import get_token, get_br_symbol, get_symbol
 from broker.firstock.mapping.transform_data import transform_data, map_product_type, reverse_map_product_type, transform_modify_order_data
 from utils.logging import get_logger
@@ -176,7 +175,7 @@ def place_order_api(data, auth):
         client = get_httpx_client()
         
         headers = {'Content-Type': 'application/json'}
-        url = f"https://api.firstock.in/V1/placeOrder"
+        url = "https://api.firstock.in/V1/placeOrder"
         
         # Make request using shared httpx client
         response = client.request("POST", url, json=transformed_data, headers=headers, timeout=30)
@@ -430,7 +429,7 @@ def cancel_order(orderid, auth):
         client = get_httpx_client()
         
         headers = {'Content-Type': 'application/json'}
-        url = f"https://api.firstock.in/V1/cancelOrder"
+        url = "https://api.firstock.in/V1/cancelOrder"
         
         # Make request using shared httpx client
         response = client.request("POST", url, json=request_data, headers=headers, timeout=30)
@@ -500,7 +499,7 @@ def modify_order(data, auth):
         client = get_httpx_client()
         
         headers = {'Content-Type': 'application/json'}
-        url = f"https://api.firstock.in/V1/modifyOrder"
+        url = "https://api.firstock.in/V1/modifyOrder"
         
         # Make request using shared httpx client
         response = client.request("POST", url, json=transformed_data, headers=headers, timeout=30)

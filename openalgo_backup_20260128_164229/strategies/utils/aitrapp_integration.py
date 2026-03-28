@@ -41,7 +41,6 @@ def setup_aitrapp_path():
 AITRAPP_PATH = setup_aitrapp_path()
 
 # Change to AITRAPP directory for config loading
-import os
 _original_cwd = os.getcwd()
 try:
     os.chdir(str(AITRAPP_PATH))

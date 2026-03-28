@@ -102,10 +102,10 @@ async def enable_all_strategies():
                 print(f"   Status: {status_text}")
                 
                 if has_stop or "running" in status_text.lower() or "success" in status_text.lower():
-                    print(f"   ✅ Already running")
+                    print("   ✅ Already running")
                     already_running += 1
                 elif has_start:
-                    print(f"   🚀 Starting strategy...")
+                    print("   🚀 Starting strategy...")
                     try:
                         await start_button.click()
                         await page.wait_for_timeout(2000)
@@ -116,19 +116,19 @@ async def enable_all_strategies():
                         # Verify it started
                         new_status = card.locator('.badge-success').first
                         if await new_status.is_visible(timeout=5000):
-                            print(f"   ✅ Successfully started!")
+                            print("   ✅ Successfully started!")
                             enabled_count += 1
                         else:
-                            print(f"   ⚠️  Started but status unclear")
+                            print("   ⚠️  Started but status unclear")
                             enabled_count += 1
                     except Exception as e:
                         print(f"   ❌ Failed to start: {e}")
                         error_count += 1
                 elif "error" in status_text.lower():
-                    print(f"   ⚠️  Has error - may need API configuration")
+                    print("   ⚠️  Has error - may need API configuration")
                     error_count += 1
                 else:
-                    print(f"   ⚠️  Unknown state")
+                    print("   ⚠️  Unknown state")
                     
             except Exception as e:
                 print(f"   ❌ Error processing strategy: {e}")
@@ -136,7 +136,7 @@ async def enable_all_strategies():
         
         # Summary
         print(f"\n{'='*60}")
-        print(f"📊 Summary:")
+        print("📊 Summary:")
         print(f"   ✅ Enabled: {enabled_count}")
         print(f"   ✅ Already Running: {already_running}")
         print(f"   ⚠️  Errors/Issues: {error_count}")

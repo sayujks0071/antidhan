@@ -7,8 +7,7 @@ Uses HSM binary protocol for real-time data
 import logging
 import time
 import threading
-from typing import Dict, List, Any, Optional, Callable
-from collections import defaultdict
+from typing import Dict, List, Any, Callable
 
 from .fyers_hsm_websocket import FyersHSMWebSocket
 from .fyers_token_converter import FyersTokenConverter
@@ -157,7 +156,7 @@ class FyersAdapter:
         
         try:
             with self.lock:
-                self.logger.debug(f"\n" + "="*60)
+                self.logger.debug("\n" + "="*60)
                 self.logger.debug(f"SUBSCRIBING TO {len(symbols)} SYMBOLS")
                 self.logger.debug(f"Data type: {data_type}")
                 self.logger.debug(f"Symbols to subscribe: {symbols}")
@@ -256,7 +255,7 @@ class FyersAdapter:
                                 self.logger.debug(f"✅ Recovery mapped: {full_symbol} <-> {hsm_token}")
                 
                 # Final verification
-                self.logger.debug(f"\n📊 Mapping Summary:")
+                self.logger.debug("\n📊 Mapping Summary:")
                 self.logger.debug(f"   Active subscriptions: {len(self.active_subscriptions)}")
                 self.logger.debug(f"   HSM tokens generated: {len(hsm_tokens)}")
                 self.logger.debug(f"   Mappings created: {len(self.hsm_to_symbol)}")

@@ -4,7 +4,6 @@ from marshmallow import ValidationError
 from limiter import limiter
 import os
 import traceback
-import copy
 
 from restx_api.schemas import BasketOrderSchema
 from services.basket_order_service import place_basket_order
@@ -52,7 +51,7 @@ class BasketOrder(Resource):
             
             return make_response(jsonify(response_data), status_code)
             
-        except Exception as e:
+        except Exception:
             logger.error("An unexpected error occurred in BasketOrder endpoint.")
             traceback.print_exc()
             error_message = 'An unexpected error occurred'

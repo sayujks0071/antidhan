@@ -1,16 +1,14 @@
 from flask import Blueprint, render_template, request, jsonify, session, flash, redirect, url_for, abort
 from database.strategy_db import (
-    Strategy, StrategySymbolMapping, db_session,
     create_strategy, add_symbol_mapping, get_strategy_by_webhook_id,
-    get_symbol_mappings, get_all_strategies, delete_strategy,
-    update_strategy_times, delete_symbol_mapping, bulk_add_symbol_mappings,
+    get_symbol_mappings, delete_strategy,
+    delete_symbol_mapping, bulk_add_symbol_mappings,
     toggle_strategy, get_strategy, get_user_strategies
 )
 from database.symbol import enhanced_search_symbols
 from database.auth_db import get_api_key_for_tradingview
 from utils.session import check_session_validity, is_session_valid
 from limiter import limiter
-import json
 from datetime import datetime, time
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler

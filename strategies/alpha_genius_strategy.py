@@ -19,15 +19,13 @@ Market: NSE F&O (BankNifty, Nifty, FinNifty)
 ================================================================================
 """
 
-import os
 import sys
-import json
 import math
 import logging
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Any
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -521,7 +519,7 @@ def main():
     
     # Get status
     status = strategy.get_status()
-    logger.info(f"\n📈 Strategy Status:")
+    logger.info("\n📈 Strategy Status:")
     logger.info(f"   Daily P&L: ₹{status['daily_pnl']}")
     logger.info(f"   Trades: {status['trades']}")
     logger.info(f"   Can Trade: {status['can_trade']}")

@@ -9,13 +9,10 @@ import logging
 import struct
 from datetime import datetime
 import websockets
-import os
 import time
 import threading
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Callable, Union
+from typing import Dict, List, Optional, Any, Callable
 
-import websockets
 
 # Set up logging
 logger = logging.getLogger("dhan_websocket")
@@ -2125,7 +2122,7 @@ class DhanWebSocket:
                     logger.error(f'Error unsubscribing token {token} from main WebSocket: {e}')
                     success_main = False
             else:
-                logger.warning(f"Cannot unsubscribe from main WebSocket - not connected")
+                logger.warning("Cannot unsubscribe from main WebSocket - not connected")
                 success_main = False
                 
             # Then unsubscribe from 20-level depth if appropriate
@@ -2155,7 +2152,7 @@ class DhanWebSocket:
         """
         try:
             if not self.depth_20_connected or not self.depth_20_ws:
-                logger.warning(f"Cannot unsubscribe from 20-level depth - WebSocket not connected")
+                logger.warning("Cannot unsubscribe from 20-level depth - WebSocket not connected")
                 return False
                 
             # Create unsubscription packet
@@ -2198,7 +2195,7 @@ class DhanWebSocket:
                     
                     # Check if no more tokens are subscribed, if so close the connection
                     if not self.depth_20_instruments:
-                        logger.info(f'No more tokens subscribed to 20-level depth, initiating connection termination')
+                        logger.info('No more tokens subscribed to 20-level depth, initiating connection termination')
                         # Schedule connection close in the event loop
                         try:
                             future = asyncio.run_coroutine_threadsafe(
@@ -2461,7 +2458,7 @@ class DhanWebSocket:
                                 "orders": int(orders)
                             })
                             logger.debug(f"Valid bid level {i+1}: price={price}, qty={quantity}, orders={orders}")
-                    except struct.error as e:
+                    except struct.error:
                         # If big-endian fails, try little-endian as fallback
                         try:
                             price = struct.unpack('<d', price_bytes)[0]
@@ -2606,7 +2603,7 @@ class DhanWebSocket:
                                 "orders": int(orders)
                             })
                             logger.debug(f"Valid ask level {i+1}: price={price}, qty={quantity}, orders={orders}")
-                    except struct.error as e:
+                    except struct.error:
                         # If big-endian fails, try little-endian as fallback
                         try:
                             price = struct.unpack('<d', price_bytes)[0]

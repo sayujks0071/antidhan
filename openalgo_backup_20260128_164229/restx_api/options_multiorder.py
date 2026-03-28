@@ -157,7 +157,7 @@ class OptionsMultiOrder(Resource):
                 'message': 'Validation error',
                 'errors': err.messages
             }), 400)
-        except Exception as e:
+        except Exception:
             logger.exception("An unexpected error occurred in OptionsMultiOrder endpoint.")
             error_response = {
                 'status': 'error',

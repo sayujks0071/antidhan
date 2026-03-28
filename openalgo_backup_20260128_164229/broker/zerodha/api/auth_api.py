@@ -1,6 +1,5 @@
 import os
 import hashlib
-import json
 from utils.httpx_client import get_httpx_client
 
 def authenticate_broker(request_token):

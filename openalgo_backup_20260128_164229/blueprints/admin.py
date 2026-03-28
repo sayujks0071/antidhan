@@ -1,15 +1,15 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
+from flask import Blueprint, render_template, request, flash, redirect, url_for
 from utils.session import check_session_validity
 from utils.logging import get_logger
 from limiter import limiter
 from database.qty_freeze_db import (
     QtyFreeze, db_session as freeze_db_session,
-    load_freeze_qty_from_csv, load_freeze_qty_cache, get_all_freeze_qty
+    load_freeze_qty_from_csv, load_freeze_qty_cache
 )
 from database.market_calendar_db import (
-    Holiday, HolidayExchange, MarketTiming, db_session as calendar_db_session,
-    get_holidays_by_year, get_market_timings_for_date, get_all_market_timings,
-    update_market_timing, DEFAULT_MARKET_TIMINGS, SUPPORTED_EXCHANGES,
+    Holiday, HolidayExchange, db_session as calendar_db_session,
+    get_market_timings_for_date, get_all_market_timings,
+    update_market_timing, SUPPORTED_EXCHANGES,
     clear_market_calendar_cache
 )
 from datetime import datetime, date

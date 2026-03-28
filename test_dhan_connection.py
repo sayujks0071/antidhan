@@ -40,7 +40,7 @@ try:
     print("Test 1: Fetching account funds...")
     try:
         funds = dhan.get_fund_limits()
-        print(f"✅ Funds retrieved successfully")
+        print("✅ Funds retrieved successfully")
         print(f"Response type: {type(funds)}")
         if isinstance(funds, dict):
             print(f"Available balance: ₹{funds.get('availabelBalance', 'N/A')}")
@@ -54,7 +54,7 @@ try:
     print("Test 2: Fetching positions...")
     try:
         positions = dhan.get_positions()
-        print(f"✅ Positions retrieved successfully")
+        print("✅ Positions retrieved successfully")
         print(f"Response type: {type(positions)}")
         if isinstance(positions, dict) and "data" in positions:
             pos_list = positions["data"]
@@ -70,7 +70,7 @@ try:
     print("Test 3: Fetching order book...")
     try:
         orders = dhan.get_order_list()
-        print(f"✅ Order book retrieved successfully")
+        print("✅ Order book retrieved successfully")
         print(f"Response type: {type(orders)}")
         if isinstance(orders, dict) and "data" in orders:
             order_list = orders["data"]

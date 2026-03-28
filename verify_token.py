@@ -14,14 +14,14 @@ from dotenv import load_dotenv
 
 load_dotenv("/Users/mac/openalgo/openalgo/.env")
 
-from database.auth_db import decrypt_token, init_db
+from database.auth_db import decrypt_token
 import sqlite3
 
 # Get Dhan credentials from environment
 dhan_client_id = os.getenv("DHAN_CLIENT_ID")
 dhan_access_token = os.getenv("DHAN_ACCESS_TOKEN")
 
-print(f"=== Environment ===")
+print("=== Environment ===")
 print(f"DHAN_CLIENT_ID: {dhan_client_id}")
 print(
     f"DHAN_ACCESS_TOKEN (first 50 chars): {dhan_access_token[:50] if dhan_access_token else 'None'}..."
@@ -29,7 +29,7 @@ print(
 print(f"DHAN_ACCESS_TOKEN length: {len(dhan_access_token) if dhan_access_token else 0}")
 
 # Check what's in the database
-print(f"\n=== Database ===")
+print("\n=== Database ===")
 conn = sqlite3.connect("/Users/mac/openalgo/openalgo/db/openalgo.db")
 cursor = conn.cursor()
 
@@ -53,20 +53,19 @@ for row in rows:
 
                 # Check if it matches the env token
                 if dhan_access_token and decrypted == dhan_access_token:
-                    print(f"  ✓ Matches DHAN_ACCESS_TOKEN from .env")
+                    print("  ✓ Matches DHAN_ACCESS_TOKEN from .env")
                 else:
-                    print(f"  ✗ Does NOT match DHAN_ACCESS_TOKEN from .env")
+                    print("  ✗ Does NOT match DHAN_ACCESS_TOKEN from .env")
             else:
-                print(f"  Decryption returned None!")
+                print("  Decryption returned None!")
         except Exception as e:
             print(f"  Decryption error: {e}")
 
 conn.close()
 
 # Now let's test the token directly with Dhan API
-print(f"\n=== Testing Token with Dhan API ===")
+print("\n=== Testing Token with Dhan API ===")
 import requests
-import json
 
 # Use the token from .env
 url = "https://api.dhan.co/v2/marketfeed/quote"
