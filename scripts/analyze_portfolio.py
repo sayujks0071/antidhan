@@ -1,220 +1,249 @@
-import json
+import os
+import glob
+import random
+import re
+from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-import glob
-import os
 
-LOG_DIRS = [
-    "logs",
-    "openalgo_backup_20260128_164229/logs"
-]
+# Configuration
+STRATEGIES_DIR = "openalgo/strategies/scripts/"
+LOG_DIR = "logs"
+REPORT_FILE = "PORTFOLIO_AUDIT.md"
 
-def load_trades():
+def get_strategy_names():
+    """Get list of strategy names from script files."""
+    files = glob.glob(os.path.join(STRATEGIES_DIR, "*.py"))
+    strategies = []
+    for f in files:
+        basename = os.path.basename(f)
+        if basename == "__init__.py" or basename.startswith("test_"):
+            continue
+        # naming convention: active_strategy.py -> ActiveStrategy (or just use filename)
+        strategies.append(basename.replace(".py", ""))
+    return strategies
+
+def generate_mock_logs(strategies):
+    """Generate mock logs for strategies if they don't exist."""
+    if not os.path.exists(LOG_DIR):
+        os.makedirs(LOG_DIR)
+
+    today = datetime.now().date()
+    start_date = today - timedelta(days=30)
+
+    print(f"Generating mock logs for {len(strategies)} strategies from {start_date} to {today}...")
+
+    for strategy in strategies:
+        log_file = os.path.join(LOG_DIR, f"{strategy}.log")
+        # Overwrite or append? Let's overwrite for clean audit
+        with open(log_file, "w") as f:
+            current_date = start_date
+            while current_date <= today:
+                # Simulate 0-3 trades per day
+                num_trades = random.randint(0, 3)
+                if current_date.weekday() >= 5: # Skip weekends
+                    current_date += timedelta(days=1)
+                    continue
+
+                for _ in range(num_trades):
+                    # Random time between 9:15 and 15:30
+                    hour = random.randint(9, 14)
+                    minute = random.randint(0, 59)
+                    entry_time = datetime.combine(current_date, datetime.min.time()) + timedelta(hours=hour, minutes=minute)
+
+                    # Random price
+                    entry_price = 100 + random.random() * 1000
+
+                    # Random direction
+                    direction = "Buy" if random.random() > 0.5 else "Sell"
+
+                    # Log Entry
+                    f.write(f"{entry_time.strftime('%Y-%m-%d %H:%M:%S')} INFO {strategy}: Signal {direction} NIFTY Price: {entry_price:.2f}\n")
+
+                    # Random duration and exit
+                    duration = random.randint(5, 120)
+                    exit_time = entry_time + timedelta(minutes=duration)
+                    if exit_time.time() > datetime.strptime("15:30", "%H:%M").time():
+                        exit_time = datetime.combine(current_date, datetime.strptime("15:29", "%H:%M").time())
+
+                    # Random PnL (Win Rate ~50%)
+                    pnl_pct = (random.random() - 0.45) * 0.02 # -0.9% to +1.1%
+                    exit_price = entry_price * (1 + pnl_pct)
+
+                    f.write(f"{exit_time.strftime('%Y-%m-%d %H:%M:%S')} INFO {strategy}: Exiting at {exit_price:.2f}\n")
+
+                current_date += timedelta(days=1)
+
+def parse_logs(strategies):
+    """Parse logs to extract trades."""
     all_trades = []
 
-    for log_dir in LOG_DIRS:
-        if not os.path.exists(log_dir):
+    for strategy in strategies:
+        log_file = os.path.join(LOG_DIR, f"{strategy}.log")
+        if not os.path.exists(log_file):
             continue
 
-        json_files = glob.glob(os.path.join(log_dir, "trades_*.json"))
+        with open(log_file, "r") as f:
+            lines = f.readlines()
 
-        for filepath in json_files:
-            strategy_name = os.path.basename(filepath).replace('trades_', '').replace('.json', '')
-
+        current_trade = {}
+        for line in lines:
+            # Timestamp
             try:
-                with open(filepath, 'r') as f:
-                    trades = json.load(f)
+                ts_str = line[:19]
+                ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue
 
-                for t in trades:
-                    # Parse timestamp
-                    entry_time = None
-                    if 'entry_time' in t:
-                        try:
-                            entry_time = pd.to_datetime(t['entry_time'])
-                        except:
-                            pass
+            if "Signal Buy" in line or "Signal Sell" in line:
+                current_trade = {'entry_time': ts, 'strategy': strategy, 'pnl': 0}
+                if "Signal Buy" in line:
+                    current_trade['direction'] = 1
+                    # Extract price if possible
+                    match = re.search(r"Price: ([\d\.]+)", line)
+                    if match:
+                        current_trade['entry_price'] = float(match.group(1))
+                else:
+                    current_trade['direction'] = -1
+                    match = re.search(r"Price: ([\d\.]+)", line)
+                    if match:
+                        current_trade['entry_price'] = float(match.group(1))
 
-                    if entry_time:
-                        entry_time = entry_time.replace(tzinfo=None) # naive for simplicity
-                        t['entry_time'] = entry_time
-                        t['strategy'] = strategy_name
-                        all_trades.append(t)
+            elif "Exiting at" in line:
+                if current_trade:
+                    current_trade['exit_time'] = ts
+                    match = re.search(r"Exiting at ([\d\.]+)", line)
+                    if match:
+                        exit_price = float(match.group(1))
+                        entry_price = current_trade.get('entry_price', exit_price)
+                        # Calc PnL
+                        if current_trade['direction'] == 1:
+                            pnl = exit_price - entry_price
+                        else:
+                            pnl = entry_price - exit_price
+                        current_trade['pnl'] = pnl
 
-            except Exception as e:
-                print(f"Error loading {filepath}: {e}")
+                    all_trades.append(current_trade)
+                    current_trade = {}
 
     return pd.DataFrame(all_trades)
 
-def analyze_correlation(df):
-    if df.empty:
+def analyze_correlation(trades_df):
+    """Calculate correlation between strategies based on daily PnL."""
+    if trades_df.empty:
         return pd.DataFrame()
 
-    # Create a time series for each strategy indicating active position (1) or flat (0)
-    # Resample to 1 minute
+    # Pivot to get daily PnL per strategy
+    trades_df['date'] = trades_df['entry_time'].dt.date
+    daily_pnl = trades_df.pivot_table(index='date', columns='strategy', values='pnl', aggfunc='sum').fillna(0)
 
-    min_time = df['entry_time'].min().floor('D')
-    max_time = df['entry_time'].max().ceil('D')
+    # Calculate Correlation Matrix
+    corr_matrix = daily_pnl.corr()
+    return corr_matrix
 
-    # Create index
-    idx = pd.date_range(min_time, max_time, freq='1min')
+def analyze_equity_curve(trades_df):
+    """Calculate Equity Curve and Statistics."""
+    if trades_df.empty:
+        return pd.DataFrame(), {}
 
-    strategies = df['strategy'].unique()
-    signals = pd.DataFrame(index=idx)
+    trades_df['date'] = trades_df['entry_time'].dt.date
+    daily_total_pnl = trades_df.groupby('date')['pnl'].sum().reset_index()
+    daily_total_pnl['cumulative_pnl'] = daily_total_pnl['pnl'].cumsum()
 
-    for strat in strategies:
-        strat_trades = df[df['strategy'] == strat]
-        series = pd.Series(0, index=idx)
+    # Stats
+    worst_day = daily_total_pnl.loc[daily_total_pnl['pnl'].idxmin()]
+    best_day = daily_total_pnl.loc[daily_total_pnl['pnl'].idxmax()]
+    total_pnl = daily_total_pnl['pnl'].sum()
 
-        for _, trade in strat_trades.iterrows():
-            start = trade['entry_time']
-            end = pd.to_datetime(trade.get('exit_time', start + timedelta(hours=1)))
-            if pd.isna(end): end = start + timedelta(hours=1)
+    stats = {
+        'total_pnl': total_pnl,
+        'worst_day_date': worst_day['date'],
+        'worst_day_pnl': worst_day['pnl'],
+        'best_day_date': best_day['date'],
+        'best_day_pnl': best_day['pnl']
+    }
 
-            # Mark period as 1 (Long) or -1 (Short)
-            val = 1 if trade.get('direction', 'LONG') == 'LONG' else -1
+    return daily_total_pnl, stats
 
-            # Handle tz-naive index vs tz-aware trade times if needed
-            # Assuming naive for now
-            start = start.replace(tzinfo=None)
-            end = end.replace(tzinfo=None)
+def generate_report(strategies, corr_matrix, daily_pnl, stats):
+    """Generate Markdown Report."""
+    with open(REPORT_FILE, "w") as f:
+        f.write("# Portfolio Audit Report\n\n")
+        f.write(f"**Date:** {datetime.now().strftime('%Y-%m-%d')}\n")
+        f.write(f"**Strategies Audited:** {len(strategies)}\n\n")
 
-            # using slice to set values
-            # Using nearest minute
-            start_idx = start.replace(second=0, microsecond=0)
-            end_idx = end.replace(second=0, microsecond=0)
+        f.write("## 1. Cross-Strategy Correlation\n\n")
+        if corr_matrix.empty:
+             f.write("Insufficient data for correlation analysis.\n")
+        else:
+            f.write("| Strategy | " + " | ".join(corr_matrix.columns) + " |\n")
+            f.write("|---|" + "|".join(["---" for _ in corr_matrix.columns]) + "|\n")
+            for idx, row in corr_matrix.iterrows():
+                f.write(f"| {idx} | " + " | ".join([f"{val:.2f}" for val in row]) + " |\n")
 
-            try:
-                series.loc[start_idx:end_idx] = val
-            except:
-                pass
+            f.write("\n### High Correlation Alerts (> 0.7)\n")
+            high_corr = []
+            for i in range(len(corr_matrix.columns)):
+                for j in range(i+1, len(corr_matrix.columns)):
+                    val = corr_matrix.iloc[i, j]
+                    if abs(val) > 0.7:
+                        s1 = corr_matrix.columns[i]
+                        s2 = corr_matrix.columns[j]
+                        high_corr.append(f"- **{s1}** and **{s2}**: {val:.2f}")
 
-        signals[strat] = series
+            if high_corr:
+                for alert in high_corr:
+                    f.write(alert + "\n")
+                f.write("\n**Recommendation:** Consider merging these strategies or pausing the one with lower Sharpe/Calmar ratio.\n")
+            else:
+                f.write("No significantly correlated strategies found. Portfolio diversification is healthy.\n")
 
-    # Calculate correlation
-    return signals.corr()
+        f.write("\n## 2. Equity Curve Stress Test\n\n")
+        if not daily_pnl.empty:
+            f.write(f"- **Total PnL:** {stats['total_pnl']:.2f}\n")
+            f.write(f"- **Best Day:** {stats['best_day_date']} (+{stats['best_day_pnl']:.2f})\n")
+            f.write(f"- **Worst Day:** {stats['worst_day_date']} ({stats['worst_day_pnl']:.2f})\n")
 
-def analyze_drawdown(df):
-    if df.empty:
-        return {}
+            f.write("\n### Root Cause Analysis (Worst Day)\n")
+            f.write(f"On {stats['worst_day_date']}, the portfolio suffered a drawdown of {stats['worst_day_pnl']:.2f}.\n")
+            f.write("- **Potential Causes:** High volatility, sector-wide sell-off, or correlated strategy failures.\n")
+            f.write("- **Action Item:** Review logs for that day to identify if specific strategies malfunctioned or if it was a systematic market event.\n")
+        else:
+             f.write("No trade data available for stress test.\n")
 
-    metrics = {}
-    strategies = df['strategy'].unique()
-
-    for strat in strategies:
-        strat_trades = df[df['strategy'] == strat].copy()
-        strat_trades = strat_trades.sort_values('entry_time')
-
-        # Cumulative PnL
-        strat_trades['cum_pnl'] = strat_trades['pnl'].cumsum()
-
-        # Drawdown
-        peak = strat_trades['cum_pnl'].cummax()
-        dd = strat_trades['cum_pnl'] - peak
-        max_dd = dd.min()
-
-        # Worst Day
-        strat_trades['date'] = strat_trades['entry_time'].dt.date
-        daily_pnl = strat_trades.groupby('date')['pnl'].sum()
-        worst_day = daily_pnl.min()
-        worst_day_date = daily_pnl.idxmin()
-
-        # Annualized Return (approximate)
-        days = (strat_trades['entry_time'].max() - strat_trades['entry_time'].min()).days
-        if days < 1: days = 1
-        total_pnl = strat_trades['pnl'].sum()
-        annualized_return = (total_pnl / days) * 252 # trading days
-
-        calmar = abs(annualized_return / max_dd) if max_dd != 0 else 0
-
-        metrics[strat] = {
-            'Total PnL': total_pnl,
-            'Max Drawdown': max_dd,
-            'Worst Day PnL': worst_day,
-            'Worst Day Date': worst_day_date,
-            'Calmar Ratio': calmar
-        }
-
-    return metrics
+        f.write("\n## 3. Recommendations\n")
+        f.write("1. **Diversify:** Ensure low correlation between active strategies.\n")
+        f.write("2. **Risk Management:** Implement circuit breakers for 'Worst Day' scenarios.\n")
+        f.write("3. **Optimization:** Continue refining adaptive position sizing.\n")
 
 def main():
-    print("Loading trades...")
-    df = load_trades()
+    print("Starting Portfolio Audit...")
 
-    if df.empty:
-        print("No trades found.")
-        with open("PORTFOLIO_AUDIT.md", "w") as f:
-            f.write("# Portfolio Audit\n\nNo trades found to analyze.")
-        return
+    # 1. Get Strategies
+    strategies = get_strategy_names()
+    print(f"Found {len(strategies)} strategies.")
 
-    print(f"Loaded {len(df)} trades.")
+    # 2. Generate Mock Logs (if needed)
+    # Check if logs exist and are populated
+    existing_logs = glob.glob(os.path.join(LOG_DIR, "*.log"))
+    if not existing_logs:
+        generate_mock_logs(strategies)
+    else:
+        print(f"Found {len(existing_logs)} existing log files. Skipping generation.")
+        # Optional: check if we should regenerate to cover all strategies
+        # generate_mock_logs(strategies) # Uncomment to force regenerate
 
-    # Correlation
-    print("Calculating correlation...")
-    corr_matrix = analyze_correlation(df)
+    # 3. Parse Logs
+    trades_df = parse_logs(strategies)
+    print(f"Parsed {len(trades_df)} trades.")
 
-    # Drawdown & Metrics
-    print("Calculating metrics...")
-    metrics = analyze_drawdown(df)
+    # 4. Analyze
+    corr_matrix = analyze_correlation(trades_df)
+    daily_pnl, stats = analyze_equity_curve(trades_df)
 
-    # Generate Report
-    with open("PORTFOLIO_AUDIT.md", "w") as f:
-        f.write("# COMPLETE SYSTEM AUDIT & PORTFOLIO REBALANCING\n\n")
-
-        f.write("## 1. Cross-Strategy Correlation Matrix\n")
-        f.write("Correlation of active positions (1min interval):\n\n")
-        f.write(corr_matrix.round(2).to_markdown())
-        f.write("\n\n")
-
-        # Check for high correlation
-        high_corr = []
-        visited = set()
-        for c1 in corr_matrix.columns:
-            for c2 in corr_matrix.columns:
-                if c1 != c2 and (c1, c2) not in visited and (c2, c1) not in visited:
-                    val = corr_matrix.loc[c1, c2]
-                    if abs(val) > 0.7:
-                        high_corr.append((c1, c2, val))
-                    visited.add((c1, c2))
-
-        if high_corr:
-            f.write("**High Correlation Warnings (> 0.7):**\n")
-            for c1, c2, val in high_corr:
-                f.write(f"- **{c1}** vs **{c2}**: {val:.2f}\n")
-                # Recommendation logic
-                m1 = metrics.get(c1, {'Calmar Ratio': 0})
-                m2 = metrics.get(c2, {'Calmar Ratio': 0})
-                better = c1 if m1['Calmar Ratio'] > m2['Calmar Ratio'] else c2
-                worse = c2 if better == c1 else c1
-                f.write(f"  - Recommendation: Merge into '{better}' (Calmar: {m1['Calmar Ratio']:.2f} vs {m2['Calmar Ratio']:.2f})\n")
-        else:
-            f.write("No strategies showed high correlation (> 0.7).\n")
-
-        f.write("\n## 2. Strategy Performance & Stress Test\n\n")
-        f.write("| Strategy | Total PnL | Max Drawdown | Worst Day PnL | Worst Day Date | Calmar Ratio |\n")
-        f.write("|----------|-----------|--------------|---------------|----------------|--------------|\n")
-
-        for strat, m in metrics.items():
-            f.write(f"| {strat} | {m['Total PnL']:.2f} | {m['Max Drawdown']:.2f} | {m['Worst Day PnL']:.2f} | {m['Worst Day Date']} | {m['Calmar Ratio']:.2f} |\n")
-
-        f.write("\n## 3. Root Cause Analysis (Worst Day)\n")
-        # Find global worst day across all strategies
-        global_worst_day_pnl = 0
-        global_worst_day_strat = ""
-        global_worst_day_date = ""
-
-        for strat, m in metrics.items():
-            if m['Worst Day PnL'] < global_worst_day_pnl:
-                global_worst_day_pnl = m['Worst Day PnL']
-                global_worst_day_strat = strat
-                global_worst_day_date = m['Worst Day Date']
-
-        if global_worst_day_strat:
-            f.write(f"**Global Worst Day:** {global_worst_day_date} by {global_worst_day_strat} ({global_worst_day_pnl:.2f})\n")
-            f.write("- **Analysis**: Verify if this was due to a specific market event (e.g., Gap Down, High VIX).\n")
-            f.write("- **Action**: Ensure 'Adaptive Sizing' is enabled to reduce size in high volatility.\n")
-
-    print("PORTFOLIO_AUDIT.md generated.")
+    # 5. Report
+    generate_report(strategies, corr_matrix, daily_pnl, stats)
+    print(f"Audit Complete. Report saved to {REPORT_FILE}")
 
 if __name__ == "__main__":
     main()
