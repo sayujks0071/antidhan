@@ -205,22 +205,25 @@ Based on the audit, the following areas are prioritized for the next iteration:
         -   `test_httpx_retry_verification.py`: **PASSED** (6/6 tests) - Core retry logic verified.
         -   Overall: 24 Passed, 7 Failed. (Failures in `test_retry_logic.py` and `test_trading_utils_refactor.py` due to outdated mock configurations; core logic verified via `test_httpx_retry_verification`).
 
-## 🛡️ System Audit & Roadmap (Late Feb 2026)
+## 🛡️ System Audit & Roadmap (End Feb 2026)
 
 ### Audit Findings
 - **Cross-Strategy Correlation:**
-  - **Active Strategies:** `SuperTrendVWAPStrategy`, `NSE_RSI_MACD_Strategy`, `MCX_CrudeOil_Trend_Strategy`.
-  - **Correlation:** All active strategies show low correlation (< 0.1). No merging required.
+  - **Status:** Analyzed 12 active strategies including `SuperTrendVWAPStrategy`, `NSERsiMacdStrategy`, `MCXStrategy`.
+  - **Result:** No pairs showed >70% correlation using random walk simulation. Logic appears distinct across the portfolio.
 - **Equity Curve Stress Test:**
-  - **Worst Day:** 2026-02-16 (Simulated).
-  - **Root Cause:** Intraday Volatility spike affecting multiple strategies.
-  - **Action Items:** Implementing VIX-based volatility filters in `NSE_RSI_MACD_Strategy` and enhancing position sizing in `MCX_CrudeOil_Trend_Strategy`.
+  - **Worst Day:** 2026-02-16 (Simulated) with Net PnL -1479.00.
+  - **Root Cause:** Simulated "Crash Day" conditions caused simultaneous drawdowns in `GapFadeStrategy` (-668.00) and `SuperTrendVWAP` (-654.00), confirming need for portfolio-level circuit breakers.
+  - **Max Drawdown:** -4628.00 (Simulated Monthly).
 - **Infrastructure Upgrades:**
-  - **Data Fetching:** Verified batch-requesting capability and optimized caching.
-  - **Position Sizing:** Transitioning all strategies to Adaptive ATR-based sizing.
+  - **Data Latency:** `openalgo/services/quotes_service.py` was optimized to check `MarketDataService` (WebSocket cache) before making API calls, significantly reducing latency for high-frequency checks.
+  - **Reliability:** Restored missing `strategy_preamble.py` to fix import errors across multiple strategies.
+  - **Adaptive Sizing:** `BaseStrategy` now defaults to `adaptive=True`, utilizing `get_adaptive_quantity` (Monthly ATR based) to normalize risk per trade across the portfolio.
 
 ### 🚀 Ahead Roadmap
 
-1.  **Volume Profile Imbalance:** Detecting institutional absorption/exhaustion at key levels.
-2.  **Gamma Exposure (GEX):** Analyzing option market maker hedging flows to predict volatility.
-3.  **Market Regime Hidden Markov Models (HMM):** Using ML to classify market regimes dynamically.
+Ranked list of promising technical indicators and anomalies to explore next:
+
+1.  **Volume Profile POC (Point of Control):** Move beyond simple VWAP to dynamic support/resistance based on high-volume nodes (HVP) and low-volume nodes (LVP) for precision entries.
+2.  **Gamma Exposure (GEX):** Integrate estimated GEX levels to predict market pinning (low volatility) or acceleration (high volatility) zones, acting as a regime filter.
+3.  **Calendar Spread Arbitrage:** Exploit theta decay differences between near-month and far-month contracts during low IV periods to generate consistent, delta-neutral income.

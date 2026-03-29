@@ -119,6 +119,22 @@ def get_quotes_with_auth(
     if not is_valid:
         return False, {"status": "error", "message": error_msg}, 400
 
+    # Optimization: Check Market Data Service cache first (WebSocket data)
+    try:
+        from services.market_data_service import get_quote as get_cached_quote, is_data_fresh
+
+        # If data is fresh (within 2 seconds), return it directly
+        # This significantly reduces latency and API calls for high-frequency strategies
+        if is_data_fresh(symbol, exchange, max_age_seconds=2.0):
+            cached_data = get_cached_quote(symbol, exchange)
+            if cached_data and cached_data.get("ltp", 0) > 0:
+                logger.debug(f"Serving cached quote for {exchange}:{symbol}")
+                return True, {"status": "success", "data": cached_data}, 200
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug(f"Error checking market data cache: {e}")
+
     broker_module = import_broker_module(broker)
     if broker_module is None:
         return False, {"status": "error", "message": "Broker-specific module not found"}, 404
