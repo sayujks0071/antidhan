@@ -83,8 +83,40 @@ def test_mcx_crudeoil():
         import traceback
         traceback.print_exc()
 
+def test_gap_fade():
+    print("Testing Gap Fade Strategy...")
+    try:
+        from openalgo.strategies.scripts.gap_fade_strategy import GapFadeStrategy
+        df = pd.DataFrame({
+            'timestamp': pd.date_range(start='2026-01-01', periods=100, freq='5min'),
+            'open': [100.0]*100,
+            'high': [105.0]*100,
+            'low': [95.0]*100,
+            'close': [100.0]*100,
+            'volume': [1000]*100
+        })
+        df.set_index('timestamp', inplace=True)
+
+        # Manually set last candles to trigger signal
+        # Period 98: Prev Candle
+        df.iloc[98, df.columns.get_loc('high')] = 105.0
+        df.iloc[98, df.columns.get_loc('low')] = 95.0
+        df.iloc[98, df.columns.get_loc('close')] = 100.0
+
+        # Period 99: Current Candle (Gap Up, Bearish)
+        df.iloc[99, df.columns.get_loc('open')] = 106.0 # Gap Up (> Prev High 105)
+        df.iloc[99, df.columns.get_loc('close')] = 104.0 # Bearish (< Open)
+
+        signal = GapFadeStrategy.backtest_signal(df)
+        print(f"Gap Fade Signal: {signal}")
+    except Exception as e:
+        print(f"Gap Fade Failed: {e}")
+        import traceback
+        traceback.print_exc()
+
 if __name__ == "__main__":
     test_mcx()
     test_ml_v2()
     test_nse_rsi_macd()
     test_mcx_crudeoil()
+    test_gap_fade()
