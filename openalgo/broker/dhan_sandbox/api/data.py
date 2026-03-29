@@ -5,6 +5,7 @@ import pickle
 import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
+import concurrent.futures
 
 import httpx
 import jwt
@@ -54,8 +55,8 @@ def get_api_response(endpoint, auth, method="POST", payload=""):
     url = get_url(endpoint)
 
     logger.info(f"Making request to {url}")
-    logger.info(f"Headers: {headers}")
-    logger.info(f"Payload: {payload}")
+    logger.debug(f"Headers: {headers}")
+    logger.debug(f"Payload: {payload}")
 
     if method == "GET":
         res = client.get(url, headers=headers)
@@ -69,7 +70,7 @@ def get_api_response(endpoint, auth, method="POST", payload=""):
     response = json.loads(res.text)
 
     logger.info(f"Response status: {res.status}")
-    logger.info(f"Response: {json.dumps(response, indent=2)}")
+    logger.debug(f"Response: {json.dumps(response, indent=2)}")
 
     # Handle Dhan API error codes
     if response.get("status") == "failed":
@@ -316,6 +317,65 @@ class BrokerData:
         # The API will handle the full day's data automatically
         return date_str, date_str
 
+    def _fetch_intraday_chunk(self, chunk_start, chunk_end, security_id, exchange_segment, instrument_type, interval):
+        """Fetch intraday data for a specific chunk"""
+        # Skip if both dates are non-trading days
+        if not self._is_trading_day(chunk_start) and not self._is_trading_day(chunk_end):
+            return []
+
+        # Get time range for each day
+        from_time, _ = self._get_intraday_time_range(chunk_start)
+        _, to_time = self._get_intraday_time_range(chunk_end)
+
+        request_data = {
+            "securityId": str(security_id),
+            "exchangeSegment": exchange_segment,
+            "instrument": instrument_type,
+            "interval": self.timeframe_map[interval],
+            "fromDate": from_time,
+            "toDate": to_time,
+            "oi": True,
+        }
+
+        endpoint = "/v2/charts/intraday"
+        logger.info(f"Making intraday history request to {endpoint} for chunk {chunk_start} to {chunk_end}")
+
+        try:
+            response = get_api_response(
+                endpoint, self.auth_token, "POST", json.dumps(request_data)
+            )
+
+            # Process response
+            timestamps = response.get("timestamp", [])
+            opens = response.get("open", [])
+            highs = response.get("high", [])
+            lows = response.get("low", [])
+            closes = response.get("close", [])
+            volumes = response.get("volume", [])
+            openinterest = response.get("open_interest", [])
+
+            chunk_candles = []
+            for i in range(len(timestamps)):
+                # Convert UTC timestamp to IST
+                ist_timestamp = self._convert_timestamp_to_ist(timestamps[i])
+                chunk_candles.append(
+                    {
+                        "timestamp": ist_timestamp,
+                        "open": float(opens[i]) if opens[i] else 0,
+                        "high": float(highs[i]) if highs[i] else 0,
+                        "low": float(lows[i]) if lows[i] else 0,
+                        "close": float(closes[i]) if closes[i] else 0,
+                        "volume": int(float(volumes[i])) if volumes[i] else 0,
+                        "oi": int(float(openinterest[i])) if openinterest[i] else 0,
+                    }
+                )
+            return chunk_candles
+        except Exception as e:
+            logger.error(
+                f"Error fetching chunk {chunk_start} to {chunk_end}: {str(e)}"
+            )
+            return []
+
     def get_history(
         self, symbol: str, exchange: str, interval: str, start_date, end_date
     ) -> pd.DataFrame:
@@ -353,12 +413,6 @@ class BrokerData:
             # Check Cache
             cache_path = self._get_cache_path(symbol, exchange, interval, start_date, end_date)
             if cache_path.exists():
-                # Check if cache is fresh enough?
-                # For historical data with fixed start/end, it shouldn't change unless corrected.
-                # However, if end_date is Today, the data is incomplete until market close.
-                # Simplification: If end_date is strictly in the past (yesterday or before), use cache.
-                # If end_date is today, do not use cache (or check modified time).
-
                 today_str = datetime.now().strftime("%Y-%m-%d")
                 if end_date < today_str:
                     try:
@@ -515,65 +569,33 @@ class BrokerData:
                     except Exception as e:
                         logger.error(f"Error fetching intraday data: {str(e)}")
                 else:
-                    # For multiple days, split into chunks
+                    # For multiple days, split into chunks and fetch in parallel
                     date_chunks = self._get_intraday_chunks(start_date, end_date)
 
-                    for chunk_start, chunk_end in date_chunks:
-                        # Skip if both dates are non-trading days
-                        if not self._is_trading_day(chunk_start) and not self._is_trading_day(
-                            chunk_end
-                        ):
-                            continue
-
-                        # Get time range for each day
-                        from_time, _ = self._get_intraday_time_range(chunk_start)
-                        _, to_time = self._get_intraday_time_range(chunk_end)
-
-                        request_data = {
-                            "securityId": str(security_id),
-                            "exchangeSegment": exchange_segment,
-                            "instrument": instrument_type,
-                            "interval": self.timeframe_map[interval],
-                            "fromDate": from_time,
-                            "toDate": to_time,
-                            "oi": True,
+                    # Use ThreadPoolExecutor for parallel processing
+                    # Max workers limited to 3 to be polite to API limits
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                        future_to_chunk = {
+                            executor.submit(
+                                self._fetch_intraday_chunk,
+                                chunk[0], chunk[1],
+                                security_id, exchange_segment, instrument_type, interval
+                            ): chunk for chunk in date_chunks
                         }
 
-                        logger.info(f"Making intraday history request to {endpoint}")
-                        logger.info(f"Request data: {json.dumps(request_data, indent=2)}")
+                        # Collect results as they complete
+                        # Note: We need to maintain order?
+                        # Actually we sort by timestamp at the end, so order of completion doesn't strictly matter
+                        # but processing them in order might be cleaner for debugging.
+                        # However, for speed, we process as completed.
 
-                        try:
-                            response = get_api_response(
-                                endpoint, self.auth_token, "POST", json.dumps(request_data)
-                            )
-
-                            # Process response
-                            timestamps = response.get("timestamp", [])
-                            opens = response.get("open", [])
-                            highs = response.get("high", [])
-                            lows = response.get("low", [])
-                            closes = response.get("close", [])
-                            volumes = response.get("volume", [])
-                            openinterest = response.get("open_interest", [])
-                            for i in range(len(timestamps)):
-                                # Convert UTC timestamp to IST
-                                ist_timestamp = self._convert_timestamp_to_ist(timestamps[i])
-                                all_candles.append(
-                                    {
-                                        "timestamp": ist_timestamp,
-                                        "open": float(opens[i]) if opens[i] else 0,
-                                        "high": float(highs[i]) if highs[i] else 0,
-                                        "low": float(lows[i]) if lows[i] else 0,
-                                        "close": float(closes[i]) if closes[i] else 0,
-                                        "volume": int(float(volumes[i])) if volumes[i] else 0,
-                                        "oi": int(float(openinterest[i])) if openinterest[i] else 0,
-                                    }
-                                )
-                        except Exception as e:
-                            logger.error(
-                                f"Error fetching chunk {chunk_start} to {chunk_end}: {str(e)}"
-                            )
-                            continue
+                        for future in concurrent.futures.as_completed(future_to_chunk):
+                            chunk = future_to_chunk[future]
+                            try:
+                                chunk_data = future.result()
+                                all_candles.extend(chunk_data)
+                            except Exception as exc:
+                                logger.error(f"Chunk {chunk} generated an exception: {exc}")
 
             # For daily timeframe, check if today's date is within the range
             if interval == "D":
@@ -615,6 +637,7 @@ class BrokerData:
                 )
             else:
                 # Sort by timestamp and remove duplicates
+                # This sort is CRITICAL because parallel fetching (as_completed) returns unordered data
                 df = (
                     df.sort_values("timestamp")
                     .drop_duplicates(subset=["timestamp"])
