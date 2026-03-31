@@ -164,37 +164,8 @@ def calculate_bollinger_bands(series, window=20, num_std=2):
 
 def calculate_adx(df, period=14):
     """Calculate ADX (Returns Series)."""
-    try:
-        # Cleaned up implementation to avoid SettingWithCopyWarning and potential errors
-        plus_dm = df['high'].diff()
-        minus_dm = df['low'].diff()
-
-        # Vectorized modification
-        plus_dm = np.where(plus_dm < 0, 0, plus_dm)
-        # If low goes UP (diff > 0), then downward movement is 0.
-        # If low goes DOWN (diff < 0), then downward movement is negative.
-        # BaseStrategy used: minus_dm[minus_dm > 0] = 0.
-        # This keeps negative values (downward moves).
-        minus_dm = np.where(minus_dm > 0, 0, minus_dm)
-
-        tr1 = df['high'] - df['low']
-        tr2 = (df['high'] - df['close'].shift(1)).abs()
-        tr3 = (df['low'] - df['close'].shift(1)).abs()
-        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-
-        atr = tr.rolling(period).mean()
-
-        plus_dm_series = pd.Series(plus_dm, index=df.index)
-        minus_dm_series = pd.Series(minus_dm, index=df.index)
-
-        plus_di = 100 * (plus_dm_series.ewm(alpha=1/period).mean() / atr)
-        minus_di = 100 * (minus_dm_series.abs().ewm(alpha=1/period).mean() / atr)
-
-        dx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
-        adx = dx.rolling(period).mean()
-        return adx.fillna(0)
-    except Exception:
-        return pd.Series(0, index=df.index)
+    adx, _, _ = calculate_adx_di(df, period)
+    return adx
 
 
 def analyze_volume_profile(df, n_bins=20):
@@ -1203,14 +1174,6 @@ def calculate_vwmacd(df, fast=12, slow=26, signal=9):
     return macd_line, signal_line, histogram
 
 
-def calculate_macd(series, fast=12, slow=26, signal=9):
-    """Calculate MACD, Signal, Hist."""
-    ema_fast = series.ewm(span=fast, adjust=False).mean()
-    ema_slow = series.ewm(span=slow, adjust=False).mean()
-    macd_line = ema_fast - ema_slow
-    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
-    histogram = macd_line - signal_line
-    return macd_line, signal_line, histogram
 
 
 def calculate_adx_di(df, period=14):

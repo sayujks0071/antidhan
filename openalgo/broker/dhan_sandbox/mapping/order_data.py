@@ -108,6 +108,15 @@ def calculate_order_statistics(order_data):
 
 
 def transform_order_data(orders):
+    """
+    Transforms order data from broker format to OpenAlgo format.
+
+    Args:
+        orders (list or dict): List of order dictionaries or a single order dictionary.
+
+    Returns:
+        list: List of transformed order dictionaries.
+    """
     # Directly handling a dictionary assuming it's the structure we expect
     if isinstance(orders, dict):
         # Convert the single dictionary into a list of one dictionary
@@ -152,10 +161,29 @@ def transform_order_data(orders):
 
 
 def map_trade_data(trade_data):
+    """
+    Maps trade data to include standard symbol and product types.
+    Delegates to map_order_data.
+
+    Args:
+        trade_data (list): List of trade dictionaries.
+
+    Returns:
+        list: Modified trade data.
+    """
     return map_order_data(trade_data)
 
 
 def transform_tradebook_data(tradebook_data):
+    """
+    Transforms tradebook data from broker format to OpenAlgo format.
+
+    Args:
+        tradebook_data (list): List of trade dictionaries.
+
+    Returns:
+        list: List of transformed trade dictionaries.
+    """
     transformed_data = []
     for trade in tradebook_data:
         transformed_trade = {
@@ -174,10 +202,29 @@ def transform_tradebook_data(tradebook_data):
 
 
 def map_position_data(position_data):
+    """
+    Maps position data to include standard symbol and product types.
+    Delegates to map_order_data.
+
+    Args:
+        position_data (list): List of position dictionaries.
+
+    Returns:
+        list: Modified position data.
+    """
     return map_order_data(position_data)
 
 
 def transform_positions_data(positions_data):
+    """
+    Transforms position data from broker format to OpenAlgo format.
+
+    Args:
+        positions_data (list): List of position dictionaries.
+
+    Returns:
+        list: List of transformed position dictionaries.
+    """
     transformed_data = []
     for position in positions_data:
         transformed_position = {
@@ -192,6 +239,15 @@ def transform_positions_data(positions_data):
 
 
 def transform_holdings_data(holdings_data):
+    """
+    Transforms holdings data from broker format to OpenAlgo format.
+
+    Args:
+        holdings_data (list): List of holding dictionaries.
+
+    Returns:
+        list: List of transformed holding dictionaries.
+    """
     transformed_data = []
     for holdings in holdings_data:
         transformed_position = {
@@ -234,6 +290,15 @@ def map_portfolio_data(portfolio_data):
 
 
 def calculate_portfolio_statistics(holdings_data):
+    """
+    Calculates portfolio statistics from holdings data.
+
+    Args:
+        holdings_data (list): List of holding dictionaries.
+
+    Returns:
+        dict: Portfolio statistics including total value, investment value, PnL, etc.
+    """
     totalholdingvalue = sum(item["avgCostPrice"] * item["totalQty"] for item in holdings_data)
     totalinvvalue = sum(item["avgCostPrice"] * item["totalQty"] for item in holdings_data)
     totalprofitandloss = 0
