@@ -12,6 +12,9 @@
 *.backup
 *~
 
+# Ignore HTML plots
+*.html
+
 # Ignore Python cache
 __pycache__/
 *.pyc
