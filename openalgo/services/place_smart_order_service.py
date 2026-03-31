@@ -164,7 +164,11 @@ def place_smart_order_with_auth(
             return False, emit_analyzer_error(original_data, error_message), 400
         error_response = {"status": "error", "message": error_message}
         executor.submit(async_log_order, "placesmartorder", original_data, error_response)
-        return False, error_response, 400
+
+        # Better Error Handling: Return 400 for SecurityId Required
+        status_code = 400
+
+        return False, error_response, status_code
 
     # If in analyze mode, route to sandbox for virtual trading
     if get_analyze_mode():

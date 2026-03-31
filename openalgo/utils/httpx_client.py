@@ -77,6 +77,9 @@ def request(
     """
     Make an HTTP request using the shared client with automatic protocol negotiation.
 
+    This function includes built-in retry logic for 500-level server errors and 429 rate limits.
+    It automatically respects Retry-After headers if present.
+
     Args:
         method: HTTP method (GET, POST, etc.)
         url: URL to request
@@ -88,7 +91,7 @@ def request(
         httpx.Response: The HTTP response
 
     Raises:
-        httpx.HTTPError: If the request fails
+        httpx.HTTPError: If the request fails after all retries
     """
     try:
         from flask import g
