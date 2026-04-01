@@ -408,10 +408,13 @@ class BaseStrategy:
         # Calculate Indicators
         df = self.calculate_indicators(df)
 
+        current_price = df['close'].iloc[-1]
+
         # Generate Signal
         # Try generate_signal first, then fallback to get_signal (backtest interface)
         signal = "HOLD"
-        qty = self.quantity
+        # Use adaptive quantity if PositionManager is active, otherwise default
+        qty = self.get_adaptive_quantity(current_price) if self.pm else self.quantity
         details = {}
 
         try:
@@ -435,8 +438,6 @@ class BaseStrategy:
         except Exception as e:
              self.logger.error(f"Error in signal generation: {e}")
              return
-
-        current_price = df['close'].iloc[-1]
 
         # Position Management
         if signal == "BUY":

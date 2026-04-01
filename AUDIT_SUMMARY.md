@@ -1,23 +1,25 @@
-# System Audit Summary - Feb 2026
+# System Audit Report (Simulated)
 
-## Active Strategies
-The following strategies are currently active and being monitored:
-1. **SuperTrendVWAPStrategy**: Trend following with VWAP and SuperTrend.
-2. **NSE_RSI_MACD_Strategy**: Momentum strategy using RSI and MACD.
-3. **MCX_CrudeOil_Trend_Strategy**: Trend following on MCX Crude Oil using EMA and RSI.
+Date: 2026-02-23
 
-## Correlation Analysis
-Based on the analysis of active strategy logs (simulated):
-- **Cross-Strategy Correlation**: All active strategies show low correlation (< 0.1).
-- **Conclusion**: No strategy merging is required at this time. The portfolio is well-diversified across different logics (Trend vs Momentum) and asset classes (Equity vs Commodity).
+## 1. Cross-Strategy Correlation
 
-## Equity Curve Stress Test
-- **Worst Day**: 2026-02-16 (Simulated).
-- **Root Cause**: Intraday Volatility spike affecting multiple strategies simultaneously.
-- **Action Items**:
-    - Implement VIX-based volatility filters in `NSE_RSI_MACD_Strategy`.
-    - Enhance position sizing in `MCX_CrudeOil_Trend_Strategy` to adapt to volatility.
+### Correlation Matrix
+|                               |   MCXSmartStrategy |   NSERsiMacdStrategy |   MCXStrategy |   MCXNaturalGasMomentumStrategy |
+|:------------------------------|-------------------:|---------------------:|--------------:|--------------------------------:|
+| MCXSmartStrategy              |           1        |             0.1215   |      0.589314 |                        0.497748 |
+| NSERsiMacdStrategy            |           0.1215   |             1        |     -0.295302 |                       -0.335466 |
+| MCXStrategy                   |           0.589314 |            -0.295302 |      1        |                        0.601384 |
+| MCXNaturalGasMomentumStrategy |           0.497748 |            -0.335466 |      0.601384 |                        1        |
 
-## Infrastructure Status
-- **Data Fetching**: Optimizations identified for caching and batching.
-- **Position Sizing**: Transitioning all strategies to Adaptive ATR-based sizing.
+### High Correlation Alerts (> 0.7)
+None detected.
+
+## 2. Equity Curve Stress Test
+
+- **Worst Day (Simulated):** 2026-01-29
+- **Max Drawdown (Simulated):** -708.35
+
+### Root Cause Analysis (Simulated)
+On 2026-01-29, simulated volatility caused a drawdown.
+Strategies with exposure: MCXMomentumStrategy, MCXSmartStrategy, NSERsiMacdStrategy, NSEMaCrossoverStrategy, NSEBollingerRSIStrategy, NSERsiMacdStrategyV2, MLMomentumStrategy, MCXStrategy, MCXSmartStrategyV2, MCXSilverMomentumStrategy, MCXGoldTrendStrategy, MCXNaturalGasMomentumStrategy
