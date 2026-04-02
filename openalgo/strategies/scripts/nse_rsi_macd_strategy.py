@@ -6,22 +6,32 @@ Entry: Buy when MACD Line crosses above Signal Line AND RSI > 50 AND ADX > 25.
 Exit: Sell when MACD Line crosses below Signal Line OR RSI > 70.
 Inherits from BaseStrategy for code reduction.
 """
-import strategy_preamble
+import os
+import sys
+
+# Add strategies/utils to path so we can import BaseStrategy
+current_dir = os.path.dirname(os.path.abspath(__file__))
+strategies_dir = os.path.dirname(current_dir)
+utils_dir = os.path.join(strategies_dir, "utils")
+if utils_dir not in sys.path:
+    sys.path.insert(0, utils_dir)
+
 from base_strategy import BaseStrategy
 
 class NSERsiMacdStrategy(BaseStrategy):
+    parameters = {
+        'rsi_period': 14,
+        'macd_fast': 12,
+        'macd_slow': 26,
+        'macd_signal': 9,
+        'adx_period': 14,
+        'adx_threshold': 25
+    }
+
     def setup(self):
         """Initialize strategy parameters"""
         if self.symbol:
             self.name = f"NSE_RSI_MACD_{self.symbol}"
-
-        # Strategy Parameters
-        self.rsi_period = int(getattr(self, 'rsi_period', 14))
-        self.macd_fast = int(getattr(self, 'macd_fast', 12))
-        self.macd_slow = int(getattr(self, 'macd_slow', 26))
-        self.macd_signal = int(getattr(self, 'macd_signal', 9))
-        self.adx_period = int(getattr(self, 'adx_period', 14))
-        self.adx_threshold = int(getattr(self, 'adx_threshold', 25))
 
         # Declarative Indicators Configuration for BaseStrategy automation
         self.indicators = {

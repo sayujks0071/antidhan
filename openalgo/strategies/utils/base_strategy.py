@@ -43,6 +43,7 @@ try:
         is_market_open,
         normalize_symbol,
         calculate_vix_volatility_multiplier,
+        resolve_api_key,
     )
 except ImportError:
     # Fallback to absolute import or direct import (for script mode)
@@ -67,6 +68,7 @@ except ImportError:
             is_market_open,
             normalize_symbol,
             calculate_vix_volatility_multiplier,
+            resolve_api_key,
         )
     except ImportError:
         # If running from a script that didn't set path correctly
@@ -91,6 +93,7 @@ except ImportError:
             is_market_open,
             normalize_symbol,
             calculate_vix_volatility_multiplier,
+            resolve_api_key,
         )
 
 class BaseStrategy:
@@ -112,9 +115,20 @@ class BaseStrategy:
         self.type = type
         self.product = product
 
+        # Handle declarative parameters
+        if hasattr(self, 'parameters') and isinstance(self.parameters, dict):
+            for param, default in self.parameters.items():
+                # Priority: kwargs > default
+                val = kwargs.get(param, default)
+                setattr(self, param, val)
+                # Ensure it's in kwargs for setup() if needed
+                if param not in kwargs:
+                    kwargs[param] = val
+
         # Set any additional kwargs as attributes (e.g. threshold, stop_pct)
         for k, v in kwargs.items():
-            setattr(self, k, v)
+            if not hasattr(self, k):
+                setattr(self, k, v)
 
         self.last_candle_time = None
 
@@ -128,7 +142,7 @@ class BaseStrategy:
         load_dotenv()
 
         # Resolve API Key
-        self.api_key = self._resolve_api_key(api_key)
+        self.api_key = resolve_api_key(api_key)
 
         # Default to 5000 to match trading_utils default, allow override via env
         self.host = host or os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')
@@ -197,37 +211,6 @@ class BaseStrategy:
             # Don't fail if we can't figure out paths, just log it later if logger exists
             pass
 
-    def _resolve_api_key(self, api_key):
-        """Resolve API Key from multiple sources."""
-        if api_key:
-            return api_key
-
-        # 1. Try environment variables
-        key = os.getenv('OPENALGO_APIKEY') or os.getenv('OPENALGO_API_KEY')
-        if key:
-            return key
-
-        # 2. Try database
-        try:
-            # Ensure project root is in path
-            self._add_project_root_to_path()
-            # This requires 'database' to be importable
-            from database.auth_db import get_first_available_api_key
-            key = get_first_available_api_key()
-            if key:
-                if hasattr(self, 'logger'):
-                    self.logger.info("Resolved API key from database.")
-                return key
-        except ImportError:
-            # Database module not available or path issue
-            pass
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.warning(f"Failed to fetch API key from DB: {e}")
-            else:
-                pass
-
-        return None
 
     def setup_logging(self, log_file=None):
         self.logger = logging.getLogger(self.name)
@@ -728,8 +711,20 @@ class BaseStrategy:
 
     @classmethod
     def add_arguments(cls, parser):
-        """Hook for subclasses to add arguments."""
-        pass
+        """Hook for subclasses to add arguments. Automatically adds from 'parameters' dict."""
+        if hasattr(cls, 'parameters') and isinstance(cls.parameters, dict):
+            for param, default in cls.parameters.items():
+                if default is not None:
+                    arg_type = type(default)
+                    if arg_type == bool:
+                         if default is False:
+                             parser.add_argument(f"--{param}", action="store_true", help=f"Enable {param} (default: False)")
+                         else:
+                             parser.add_argument(f"--no-{param}", action="store_false", dest=param, help=f"Disable {param} (default: True)")
+                    else:
+                        parser.add_argument(f"--{param}", type=arg_type, default=default, help=f"{param} (default: {default})")
+                else:
+                    parser.add_argument(f"--{param}", type=str, help=f"{param} (optional)")
 
     @classmethod
     def parse_arguments(cls, args):
