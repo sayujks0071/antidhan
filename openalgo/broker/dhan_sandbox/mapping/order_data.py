@@ -11,13 +11,13 @@ def map_order_data(order_data):
     """
     Processes and modifies a list of order dictionaries based on specific conditions.
 
-    Parameters:
-    - order_data: A list of dictionaries, where each dictionary represents an order.
+    Args:
+        order_data (list): A list of dictionaries, where each dictionary represents an order.
 
     Returns:
-    - The modified order_data with updated 'tradingsymbol' and 'product' fields.
+        list: The modified order_data with updated 'tradingsymbol' and 'product' fields.
     """
-    # Check if 'data' is None
+    # Check if order_data is None
     if order_data is None:
         # Handle the case where there is no data
         # For example, you might want to display a message to the user
