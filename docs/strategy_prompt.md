@@ -1,7 +1,6 @@
 # OpenAlgo Strategy Development Prompt for Google Jules
 
 Use this prompt when asking Jules to create new trading strategies for the OpenAlgo platform.
-(Verified: 2025-02-18)
 
 ---
 
